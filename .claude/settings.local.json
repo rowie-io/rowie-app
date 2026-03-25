@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx expo install expo-font @expo-google-fonts/inter expo-splash-screen)",
+      "WebSearch",
+      "WebFetch(domain:dribbble.com)",
+      "WebFetch(domain:mobbin.com)",
+      "WebFetch(domain:docs.stripe.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(grep:*)",
+      "Bash(xxd:*)",
+      "Bash(ls:*)",
+      "WebFetch(domain:stripe.dev)",
+      "Bash(npx babel:*)",
+      "Bash(node -e:*)",
+      "Bash(npx expo export:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm install:*)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebFetch(domain:hyochan.github.io)",
+      "WebFetch(domain:www.openiap.dev)",
+      "Bash(convert:*)",
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "Bash(xargs -I {} sh -c 'grep -H \"\"SafeAreaView\"\" {} | grep \"\"from [''''\\\\\"\"']react-native \")"
+    ]
+  }
+}
