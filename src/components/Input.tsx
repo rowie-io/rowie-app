@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(31, 41, 55, 0.5)',
+    backgroundColor: 'rgba(41, 37, 36, 0.5)',
     borderWidth: 2,
     borderColor: colors.gray700,
     borderRadius: 12,

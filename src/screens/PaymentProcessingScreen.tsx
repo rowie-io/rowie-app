@@ -19,7 +19,6 @@ import { formatCents } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { glass } from '../lib/colors';
 import { shadows } from '../lib/shadows';
-import { StarBackground } from '../components/StarBackground';
 import { config } from '../lib/config';
 import logger from '../lib/logger';
 
@@ -311,7 +310,7 @@ export function PaymentProcessingScreen() {
   const styles = createStyles(colors, glassColors);
 
   return (
-    <StarBackground colors={colors} isDark={isDark}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={[styles.safeArea, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={styles.content}>
           {/* Amount Display */}
@@ -351,7 +350,7 @@ export function PaymentProcessingScreen() {
           </TouchableOpacity>
         </View>
       </View>
-    </StarBackground>
+    </View>
   );
 }
 

@@ -32,8 +32,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { stripeTerminalApi, ordersApi, preordersApi } from '../lib/api';
 import logger from '../lib/logger';
 import { isValidEmail } from '../lib/validation';
-import { StarBackground } from '../components/StarBackground';
-
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type RouteParams = {
@@ -392,7 +390,7 @@ export function PaymentResultScreen() {
   if (showCardEntry) {
     return (
       <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-        <StarBackground colors={colors} isDark={isDark}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={[styles.safeArea, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
             {/* Header */}
             <View style={styles.cardPageHeader}>
@@ -436,10 +434,10 @@ export function PaymentResultScreen() {
                     cvc: 'CVC',
                   }}
                   cardStyle={{
-                    backgroundColor: isDark ? '#1f2937' : '#f9fafb',
-                    textColor: isDark ? '#ffffff' : '#111827',
-                    placeholderColor: isDark ? '#6b7280' : '#9ca3af',
-                    borderColor: isDark ? '#374151' : '#e5e7eb',
+                    backgroundColor: isDark ? '#292524' : '#FAFAF9',
+                    textColor: isDark ? '#F5F5F4' : '#1C1917',
+                    placeholderColor: isDark ? '#78716C' : '#A8A29E',
+                    borderColor: isDark ? '#44403C' : '#E7E5E4',
                     borderWidth: 1,
                     borderRadius: 12,
                     fontSize: 20,
@@ -465,7 +463,7 @@ export function PaymentResultScreen() {
                 activeOpacity={0.9}
                 style={[
                   styles.cardPagePayButton,
-                  { backgroundColor: isDark ? '#fff' : '#09090b' },
+                  { backgroundColor: isDark ? '#fff' : '#1C1917' },
                   (!cardDetails?.complete || processingCard) && styles.cardPagePayButtonDisabled,
                 ]}
                 accessibilityRole="button"
@@ -473,11 +471,11 @@ export function PaymentResultScreen() {
                 accessibilityState={{ disabled: !cardDetails?.complete || processingCard }}
               >
                 {processingCard ? (
-                  <ActivityIndicator size="small" color={isDark ? '#09090b' : '#fff'} accessibilityLabel="Processing card payment" />
+                  <ActivityIndicator size="small" color={isDark ? '#1C1917' : '#fff'} accessibilityLabel="Processing card payment" />
                 ) : (
                   <>
-                    <Ionicons name="lock-closed" size={20} color={isDark ? '#09090b' : '#fff'} />
-                    <Text style={[styles.cardPagePayButtonText, { color: isDark ? '#09090b' : '#fff' }]} maxFontSizeMultiplier={1.3}>
+                    <Ionicons name="lock-closed" size={20} color={isDark ? '#1C1917' : '#fff'} />
+                    <Text style={[styles.cardPagePayButtonText, { color: isDark ? '#1C1917' : '#fff' }]} maxFontSizeMultiplier={1.3}>
                       Pay {formatCents(amount, currency)}
                     </Text>
                   </>
@@ -485,14 +483,14 @@ export function PaymentResultScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </StarBackground>
+        </View>
       </TouchableWithoutFeedback>
     );
   }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <StarBackground colors={colors} isDark={isDark}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         {/* Background Gradient */}
         {success && (
         <View style={styles.backgroundGradients}>
@@ -682,13 +680,13 @@ export function PaymentResultScreen() {
               <TouchableOpacity
                 onPress={handleTryAgain}
                 activeOpacity={0.9}
-                style={[styles.primaryButton, { backgroundColor: isDark ? '#fff' : '#09090b' }]}
+                style={[styles.primaryButton, { backgroundColor: isDark ? '#fff' : '#1C1917' }]}
                 accessibilityRole="button"
                 accessibilityLabel="Try again"
                 accessibilityHint="Retry the payment"
               >
-                <Ionicons name="refresh" size={24} color={isDark ? '#09090b' : '#fff'} />
-                <Text style={[styles.primaryButtonText, { color: isDark ? '#09090b' : '#fff' }]} maxFontSizeMultiplier={1.3}>Try Again</Text>
+                <Ionicons name="refresh" size={24} color={isDark ? '#1C1917' : '#fff'} />
+                <Text style={[styles.primaryButtonText, { color: isDark ? '#1C1917' : '#fff' }]} maxFontSizeMultiplier={1.3}>Try Again</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.secondaryButton} onPress={handleNewSale} accessibilityRole="button" accessibilityLabel="Cancel order">
                 <Text style={styles.secondaryButtonText} maxFontSizeMultiplier={1.3}>Cancel Order</Text>
@@ -697,7 +695,7 @@ export function PaymentResultScreen() {
           )}
         </Animated.View>
       </View>
-      </StarBackground>
+      </View>
     </TouchableWithoutFeedback>
   );
 }

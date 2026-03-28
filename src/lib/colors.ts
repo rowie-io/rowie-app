@@ -1,23 +1,21 @@
-// Matches Rowie Vendor site design system
+// Rowie brand design system — amber/stone warm palette
 
 // Glass/Glassmorphism colors
 export const glass = {
-  // Dark theme glass - using solid colors to prevent star bleed-through
   dark: {
-    background: '#0f1419',
-    backgroundElevated: '#1a1f26',
-    backgroundSubtle: '#0a0d10',
-    border: '#2a3140',
-    borderLight: '#3a4250',
-    borderSubtle: '#1a2030',
-    highlight: 'rgba(255, 255, 255, 0.2)',
+    background: '#1C1917',
+    backgroundElevated: '#292524',
+    backgroundSubtle: '#0C0A09',
+    border: '#44403C',
+    borderLight: '#57534E',
+    borderSubtle: '#292524',
+    highlight: 'rgba(255, 255, 255, 0.15)',
     overlay: 'rgba(0, 0, 0, 0.6)',
   },
-  // Light theme glass - clean whites, minimal borders
   light: {
     background: '#FFFFFF',
     backgroundElevated: '#FFFFFF',
-    backgroundSubtle: '#F9FAFB',
+    backgroundSubtle: '#FAFAF9',
     border: 'rgba(0, 0, 0, 0.06)',
     borderLight: 'rgba(0, 0, 0, 0.04)',
     borderSubtle: 'rgba(0, 0, 0, 0.03)',
@@ -28,42 +26,42 @@ export const glass = {
 
 // Gradient presets
 export const gradients = {
-  // Primary blue gradient
-  primary: ['#2563EB', '#3B82F6'] as const,
-  primaryReverse: ['#3B82F6', '#2563EB'] as const,
+  // Primary amber gradient
+  primary: ['#F59E0B', '#D97706'] as const,
+  primaryReverse: ['#D97706', '#F59E0B'] as const,
 
   // Surface gradients
-  surfaceDark: ['#111827', '#0a0a0f'] as const,
-  surfaceLight: ['#FFFFFF', '#F9FAFB'] as const,
+  surfaceDark: ['#1C1917', '#0C0A09'] as const,
+  surfaceLight: ['#FFFFFF', '#FAFAF9'] as const,
 
   // Glass gradients (for borders/highlights)
-  glassDark: ['rgba(255,255,255,0.1)', 'rgba(255,255,255,0.02)'] as const,
+  glassDark: ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)'] as const,
   glassLight: ['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.01)'] as const,
 
   // Background gradients
-  backgroundDark: ['#030712', '#0c1a2d', '#030712'] as const,
-  backgroundLight: ['#FFFFFF', '#F3F4F6', '#FFFFFF'] as const,
+  backgroundDark: ['#0C0A09', '#1C1917', '#0C0A09'] as const,
+  backgroundLight: ['#FFFFFF', '#FAFAF9', '#FFFFFF'] as const,
 
-  // Success/Error gradients
+  // Status gradients
   success: ['#22c55e', '#16a34a'] as const,
   error: ['#ef4444', '#dc2626'] as const,
   warning: ['#f59e0b', '#d97706'] as const,
 };
 
-// Primary blue palette (shared between themes)
+// Primary amber palette (shared between themes)
 const primaryPalette = {
-  primary: '#2563EB',
-  primary50: '#EFF6FF',
-  primary100: '#DBEAFE',
-  primary200: '#BFDBFE',
-  primary300: '#93BBFC',
-  primary400: '#60A5FA',
-  primary500: '#3B82F6',
-  primary600: '#2563EB',
-  primary700: '#1D4ED8',
-  primary800: '#1E40AF',
-  primary900: '#1E3A8A',
-  primary950: '#172554',
+  primary: '#F59E0B',
+  primary50: '#FFFBEB',
+  primary100: '#FEF3C7',
+  primary200: '#FDE68A',
+  primary300: '#FCD34D',
+  primary400: '#FBBF24',
+  primary500: '#F59E0B',
+  primary600: '#D97706',
+  primary700: '#B45309',
+  primary800: '#92400E',
+  primary900: '#78350F',
+  primary950: '#451A03',
 };
 
 // Status colors (shared between themes)
@@ -77,23 +75,23 @@ const statusColors = {
   warning: '#f59e0b',
   warningBg: 'rgba(245, 158, 11, 0.1)',
   warningLight: '#fcd34d',
-  info: '#3b82f6',
-  infoBg: 'rgba(59, 130, 246, 0.1)',
+  info: '#F59E0B',
+  infoBg: 'rgba(245, 158, 11, 0.1)',
 };
 
-// Gray palette
+// Gray palette (warm stone)
 const grayPalette = {
-  gray50: '#F9FAFB',
-  gray100: '#F3F4F6',
-  gray200: '#E5E7EB',
-  gray300: '#D1D5DB',
-  gray400: '#9CA3AF',
-  gray500: '#6B7280',
-  gray600: '#4B5563',
-  gray700: '#374151',
-  gray800: '#1F2937',
-  gray900: '#111827',
-  gray950: '#030712',
+  gray50: '#FAFAF9',
+  gray100: '#F5F5F4',
+  gray200: '#E7E5E4',
+  gray300: '#D6D3D1',
+  gray400: '#A8A29E',
+  gray500: '#78716C',
+  gray600: '#57534E',
+  gray700: '#44403C',
+  gray800: '#292524',
+  gray900: '#1C1917',
+  gray950: '#0C0A09',
 };
 
 // Dark theme colors
@@ -103,50 +101,50 @@ export const darkColors = {
   ...grayPalette,
 
   // Semantic colors
-  background: '#000000',
-  surface: '#111827',
-  surfaceSecondary: '#1F2937',
-  surfaceElevated: '#1F2937',
+  background: '#1C1917',
+  surface: '#292524',
+  surfaceSecondary: '#292524',
+  surfaceElevated: '#292524',
 
   // Card styling
-  card: '#111827',
-  cardBorder: '#1F2937',
-  cardHover: '#1F2937',
+  card: '#292524',
+  cardBorder: '#44403C',
+  cardHover: '#44403C',
 
   // Borders
-  border: '#374151',
-  borderLight: '#4B5563',
-  borderSubtle: '#1F2937',
+  border: '#44403C',
+  borderLight: '#57534E',
+  borderSubtle: '#292524',
 
   // Text
-  text: '#F3F4F6',
-  textSecondary: '#9CA3AF',
-  textMuted: '#6B7280',
-  textInverse: '#111827',
+  text: '#F5F5F4',
+  textSecondary: '#A8A29E',
+  textMuted: '#78716C',
+  textInverse: '#1C1917',
 
   // Input
-  inputBackground: '#1F2937',
-  inputBorder: '#374151',
-  inputText: '#F3F4F6',
-  inputPlaceholder: '#6B7280',
+  inputBackground: '#292524',
+  inputBorder: '#44403C',
+  inputText: '#F5F5F4',
+  inputPlaceholder: '#78716C',
 
   // Tab bar
-  tabBar: '#111827',
-  tabBarBorder: '#1F2937',
-  tabInactive: '#6B7280',
-  tabActive: '#2563EB',
+  tabBar: '#292524',
+  tabBarBorder: '#44403C',
+  tabInactive: '#78716C',
+  tabActive: '#F59E0B',
 
   // Overlay
   overlay: 'rgba(0, 0, 0, 0.7)',
   backdrop: 'rgba(0, 0, 0, 0.5)',
 
-  // Shadows (for dark mode, use subtle glows)
+  // Shadows
   shadow: 'rgba(0, 0, 0, 0.5)',
-  shadowPrimary: 'rgba(37, 99, 235, 0.25)',
+  shadowPrimary: 'rgba(245, 158, 11, 0.25)',
 
   // Keypad
-  keypadButton: '#1F2937',
-  keypadButtonPressed: '#374151',
+  keypadButton: '#292524',
+  keypadButtonPressed: '#44403C',
 };
 
 // Light theme colors
@@ -156,38 +154,38 @@ export const lightColors = {
   ...grayPalette,
 
   // Semantic colors
-  background: '#FFFFFF',
-  surface: '#F9FAFB',
-  surfaceSecondary: '#F3F4F6',
+  background: '#FAFAF9',
+  surface: '#FAFAF9',
+  surfaceSecondary: '#F5F5F4',
   surfaceElevated: '#FFFFFF',
 
   // Card styling
   card: '#FFFFFF',
-  cardBorder: '#E5E7EB',
-  cardHover: '#F9FAFB',
+  cardBorder: '#E7E5E4',
+  cardHover: '#FAFAF9',
 
   // Borders
-  border: '#E5E7EB',
-  borderLight: '#F3F4F6',
-  borderSubtle: '#F3F4F6',
+  border: '#E7E5E4',
+  borderLight: '#F5F5F4',
+  borderSubtle: '#F5F5F4',
 
   // Text
-  text: '#111827',
-  textSecondary: '#4B5563',
-  textMuted: '#6B7280',
-  textInverse: '#F3F4F6',
+  text: '#1C1917',
+  textSecondary: '#57534E',
+  textMuted: '#78716C',
+  textInverse: '#F5F5F4',
 
   // Input
   inputBackground: '#FFFFFF',
-  inputBorder: '#D1D5DB',
-  inputText: '#111827',
-  inputPlaceholder: '#9CA3AF',
+  inputBorder: '#D6D3D1',
+  inputText: '#1C1917',
+  inputPlaceholder: '#A8A29E',
 
   // Tab bar
   tabBar: '#FFFFFF',
-  tabBarBorder: '#E5E7EB',
-  tabInactive: '#6B7280',
-  tabActive: '#2563EB',
+  tabBarBorder: '#E7E5E4',
+  tabInactive: '#78716C',
+  tabActive: '#F59E0B',
 
   // Overlay
   overlay: 'rgba(0, 0, 0, 0.5)',
@@ -195,11 +193,11 @@ export const lightColors = {
 
   // Shadows
   shadow: 'rgba(0, 0, 0, 0.1)',
-  shadowPrimary: 'rgba(37, 99, 235, 0.15)',
+  shadowPrimary: 'rgba(245, 158, 11, 0.15)',
 
   // Keypad
-  keypadButton: '#F3F4F6',
-  keypadButtonPressed: '#E5E7EB',
+  keypadButton: '#F5F5F4',
+  keypadButtonPressed: '#E7E5E4',
 };
 
 // Type for theme colors

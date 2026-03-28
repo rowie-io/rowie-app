@@ -23,6 +23,7 @@ import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { config } from '../lib/config';
 import logger from '../lib/logger';
+import { PRICING } from '../lib/pricing';
 
 const PRO_FEATURES = [
   { icon: 'infinite-outline', text: 'Unlimited custom menus' },
@@ -137,7 +138,7 @@ export function UpgradeScreen() {
   const styles = createStyles(colors, glassColors);
 
   const platformName = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
-  const price = product?.localizedPrice || '$29.99';
+  const price = product?.localizedPrice || PRICING.pro.monthlyPriceDisplay;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -196,7 +197,7 @@ export function UpgradeScreen() {
           <Ionicons name="card-outline" size={20} color={colors.success} />
           <View style={styles.feeTextContainer}>
             <Text style={styles.feeTitle} maxFontSizeMultiplier={1.5}>Lower Transaction Fees</Text>
-            <Text style={styles.feeSubtitle} maxFontSizeMultiplier={1.5}>{user?.rates?.tapToPay.pro || '2.8% + $0.16'} per tap (vs {user?.rates?.tapToPay.starter || '2.9% + $0.18'})</Text>
+            <Text style={styles.feeSubtitle} maxFontSizeMultiplier={1.5}>{user?.rates?.tapToPay.pro || PRICING.pro.transactionFeeDisplay} per tap (vs {user?.rates?.tapToPay.starter || PRICING.starter.transactionFeeDisplay})</Text>
           </View>
         </View>
 

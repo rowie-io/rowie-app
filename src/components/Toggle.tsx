@@ -33,7 +33,7 @@ export function Toggle({ value, onValueChange, disabled = false, accessibilityLa
     });
   }, [value]);
 
-  const offColor = isDark ? '#374151' : '#D1D5DB';
+  const offColor = isDark ? '#44403C' : '#D6D3D1';
   const onColor = colors.primary;
 
   const trackStyle = useAnimatedStyle(() => {

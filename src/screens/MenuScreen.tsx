@@ -15,7 +15,6 @@ import {
   useWindowDimensions,
   TextInput,
   Alert,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
@@ -68,73 +67,14 @@ import { ProductModal } from '../components/ProductModal';
 import { CategoryManagerModal } from '../components/CategoryManagerModal';
 import { CatalogSettingsModal } from '../components/CatalogSettingsModal';
 import { ItemNotesModal } from '../components/ItemNotesModal';
-import { StarBackground } from '../components/StarBackground';
 import { QuickChargeBottomSheet } from '../components/QuickChargeBottomSheet';
 import { glass } from '../lib/colors';
 import { shadows } from '../lib/shadows';
 import { useTapToPayGuard } from '../hooks';
 
 const isWeb = Platform.OS === 'web';
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// Star component for Apple-style sparkle effect
-function Star({ style, size = 8, color = 'rgba(255,255,255,0.8)' }: { style?: any; size?: number; color?: string }) {
-  return (
-    <View style={[{ position: 'absolute' }, style]}>
-      <View style={{
-        width: size,
-        height: size,
-        backgroundColor: color,
-        borderRadius: size / 2,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: size * 1.5,
-      }} />
-    </View>
-  );
-}
-
-// Four-point star for larger sparkles
-function FourPointStar({ style, size = 16, color = 'rgba(255,255,255,0.9)' }: { style?: any; size?: number; color?: string }) {
-  return (
-    <View style={[{ position: 'absolute', width: size, height: size }, style]}>
-      <View style={{
-        position: 'absolute',
-        left: size / 2 - 1,
-        top: 0,
-        width: 2,
-        height: size,
-        backgroundColor: color,
-        borderRadius: 1,
-      }} />
-      <View style={{
-        position: 'absolute',
-        top: size / 2 - 1,
-        left: 0,
-        width: size,
-        height: 2,
-        backgroundColor: color,
-        borderRadius: 1,
-      }} />
-      <View style={{
-        position: 'absolute',
-        left: size / 2 - 2,
-        top: size / 2 - 2,
-        width: 4,
-        height: 4,
-        backgroundColor: color,
-        borderRadius: 2,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: size / 2,
-      }} />
-    </View>
-  );
-}
-
-// Empty state with star background for menu screen
+// Empty state for menu screen
 function EmptyMenuState({
   colors,
   isDark,
@@ -156,7 +96,6 @@ function EmptyMenuState({
   onAddProduct: () => void;
   onOpenVendorPortal: () => void;
 }) {
-  const sparkleAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -165,59 +104,21 @@ function EmptyMenuState({
       duration: 600,
       useNativeDriver: true,
     }).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(sparkleAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(sparkleAnim, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
   }, []);
 
   return (
-    <Animated.View style={[emptyMenuStyles.container, { backgroundColor: isDark ? '#09090b' : colors.background, opacity: fadeAnim }]}>
-      {/* Background layer - contains gradient and stars */}
+    <Animated.View style={[emptyMenuStyles.container, { backgroundColor: colors.background, opacity: fadeAnim }]}>
+      {/* Background layer - subtle gradient overlay */}
       <View style={[StyleSheet.absoluteFill, { zIndex: 0 }]} pointerEvents="none">
-        {/* Subtle gradient overlay */}
         <LinearGradient
           colors={isDark
-            ? ['transparent', 'rgba(99, 102, 241, 0.08)', 'rgba(139, 92, 246, 0.05)', 'transparent']
-            : ['transparent', 'rgba(99, 102, 241, 0.05)', 'rgba(139, 92, 246, 0.03)', 'transparent']
+            ? ['transparent', 'rgba(245,158,11, 0.08)', 'rgba(245,158,11, 0.05)', 'transparent']
+            : ['transparent', 'rgba(245,158,11, 0.05)', 'rgba(245,158,11, 0.03)', 'transparent']
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-
-        {/* Star field - Group 1 (fades in/out) */}
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: sparkleAnim }]}>
-          <FourPointStar style={{ top: 40, left: 30 }} size={14} color={isDark ? 'rgba(255,255,255,0.7)' : 'rgba(99,102,241,0.4)'} />
-          <Star style={{ top: 80, left: 70 }} size={4} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(99,102,241,0.3)'} />
-          <Star style={{ top: 60, right: 50 }} size={6} color={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(139,92,246,0.35)'} />
-          <FourPointStar style={{ top: 100, right: 35 }} size={12} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(99,102,241,0.3)'} />
-          <Star style={{ top: 130, left: 45 }} size={3} color={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(139,92,246,0.25)'} />
-          <Star style={{ top: 70, left: SCREEN_WIDTH * 0.45 }} size={5} color={isDark ? 'rgba(255,255,255,0.55)' : 'rgba(99,102,241,0.3)'} />
-          <Star style={{ top: 150, right: 80 }} size={4} color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(139,92,246,0.25)'} />
-        </Animated.View>
-
-        {/* Star field - Group 2 (opposite fade) */}
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: Animated.subtract(1, sparkleAnim) }]}>
-          <Star style={{ top: 50, left: 50 }} size={5} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(99,102,241,0.3)'} />
-          <FourPointStar style={{ top: 85, right: 40 }} size={16} color={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(139,92,246,0.35)'} />
-          <Star style={{ top: 120, left: 30 }} size={4} color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(99,102,241,0.25)'} />
-          <Star style={{ top: 75, left: SCREEN_WIDTH * 0.55 }} size={6} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(139,92,246,0.3)'} />
-          <FourPointStar style={{ top: 35, right: 90 }} size={10} color={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(99,102,241,0.25)'} />
-          <Star style={{ top: 140, right: 55 }} size={3} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(139,92,246,0.25)'} />
-          <Star style={{ top: 95, left: 90 }} size={5} color={isDark ? 'rgba(255,255,255,0.55)' : 'rgba(99,102,241,0.3)'} />
-        </Animated.View>
       </View>
 
       {/* Content rendered on top */}
@@ -226,8 +127,8 @@ function EmptyMenuState({
           // No search results
           <>
             <View style={[emptyMenuStyles.iconContainer, {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(99,102,241,0.1)',
-              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(99,102,241,0.15)'
+              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.1)',
+              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.15)'
             }]}>
               <Ionicons name="search-outline" size={44} color={isDark ? 'rgba(255,255,255,0.95)' : colors.primary} />
             </View>
@@ -252,8 +153,8 @@ function EmptyMenuState({
           // Empty catalog in edit mode
           <>
             <View style={[emptyMenuStyles.iconContainer, {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(99,102,241,0.1)',
-              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(99,102,241,0.15)'
+              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.1)',
+              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.15)'
             }]}>
               <Ionicons name="cube-outline" size={44} color={isDark ? 'rgba(255,255,255,0.95)' : colors.primary} />
             </View>
@@ -277,8 +178,8 @@ function EmptyMenuState({
           // No products in catalog (view mode)
           <>
             <View style={[emptyMenuStyles.iconContainer, {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(99,102,241,0.1)',
-              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(99,102,241,0.15)'
+              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.1)',
+              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.15)'
             }]}>
               <Ionicons name="cube-outline" size={44} color={isDark ? 'rgba(255,255,255,0.95)' : colors.primary} />
             </View>
@@ -1652,14 +1553,14 @@ export function MenuScreen() {
         {/* Quick Charge FAB - always available even without menus */}
         <View style={[styles.bottomActions, styles.bottomActionsEmpty]}>
           <TouchableOpacity
-            style={[styles.quickChargeFab, { backgroundColor: isDark ? '#fff' : '#09090b' }]}
+            style={[styles.quickChargeFab, { backgroundColor: isDark ? '#fff' : '#1C1917' }]}
             onPress={() => setQuickChargeVisible(true)}
             activeOpacity={0.9}
             accessibilityRole="button"
             accessibilityLabel="Quick charge"
             accessibilityHint="Open quick charge to enter a custom amount"
           >
-            <Ionicons name="flash" size={24} color={isDark ? '#09090b' : '#fff'} />
+            <Ionicons name="flash" size={24} color={isDark ? '#1C1917' : '#fff'} />
           </TouchableOpacity>
         </View>
 
@@ -1747,7 +1648,7 @@ export function MenuScreen() {
   }
 
   return (
-    <StarBackground colors={colors} isDark={isDark}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={[styles.container, { paddingTop: insets.top }]}>
         {/* Header with glass effect */}
         <View style={styles.header}>
@@ -2012,14 +1913,14 @@ export function MenuScreen() {
         <View style={[styles.bottomActions, itemCount === 0 && styles.bottomActionsEmpty]}>
           {/* Quick Charge FAB */}
           <TouchableOpacity
-            style={[styles.quickChargeFab, { backgroundColor: isDark ? '#fff' : '#09090b' }]}
+            style={[styles.quickChargeFab, { backgroundColor: isDark ? '#fff' : '#1C1917' }]}
             onPress={() => setQuickChargeVisible(true)}
             activeOpacity={0.9}
             accessibilityRole="button"
             accessibilityLabel="Quick charge"
             accessibilityHint="Open quick charge to enter a custom amount"
           >
-            <Ionicons name="flash" size={24} color={isDark ? '#09090b' : '#fff'} />
+            <Ionicons name="flash" size={24} color={isDark ? '#1C1917' : '#fff'} />
           </TouchableOpacity>
 
           {/* Go to Cart Button */}
@@ -2071,7 +1972,7 @@ export function MenuScreen() {
         visible={catalogSettingsVisible}
         catalog={selectedCatalog}
         onSave={handleSaveCatalog}
-        onDuplicate={subscription?.tier !== 'starter' && subscription?.tier !== 'free' ? handleDuplicateCatalog : undefined}
+        onDuplicate={subscription?.tier !== 'starter' ? handleDuplicateCatalog : undefined}
         onDelete={user?.role === 'owner' ? handleDeleteCatalog : undefined}
         onClose={() => setCatalogSettingsVisible(false)}
       />
@@ -2090,7 +1991,7 @@ export function MenuScreen() {
           onClose={() => setQuickChargeVisible(false)}
         />
       </View>
-    </StarBackground>
+    </View>
   );
 }
 
@@ -2755,7 +2656,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
-      backgroundColor: '#2563EB',
+      backgroundColor: colors.primary,
       paddingVertical: 14,
       paddingHorizontal: 16,
       borderRadius: 28,

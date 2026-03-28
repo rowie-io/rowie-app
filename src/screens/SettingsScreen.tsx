@@ -44,7 +44,6 @@ import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import logger from '../lib/logger';
-import { StarBackground } from '../components/StarBackground';
 
 export function SettingsScreen() {
   const { colors, isDark, toggleTheme } = useTheme();
@@ -185,7 +184,7 @@ export function SettingsScreen() {
               if (error?.status === 409) {
                 Alert.alert('Already Scheduled', 'Your account is already scheduled for deletion.');
               } else {
-                Alert.alert('Error', 'Failed to process deletion request. Please try again or contact support@rowie.iom.');
+                Alert.alert('Error', 'Failed to process deletion request. Please try again or contact support@rowie.io.');
               }
             }
           },
@@ -310,7 +309,7 @@ export function SettingsScreen() {
   const styles = createStyles(colors, glassColors, isDark);
 
   return (
-    <StarBackground colors={colors} isDark={isDark}>
+    <View style={{ flex: 1 }}>
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.headerContainer}>
           <Text style={styles.title} maxFontSizeMultiplier={1.3}>Settings</Text>
@@ -337,7 +336,7 @@ export function SettingsScreen() {
               accessibilityHint="Opens the vendor dashboard to manage products, menus, and reports"
             >
               <LinearGradient
-                colors={[colors.primary, colors.primary700 || '#4338ca']}
+                colors={[colors.primary, colors.primary700 || '#B45309']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.vendorPortalGradient}
@@ -784,10 +783,10 @@ export function SettingsScreen() {
 
             <TouchableOpacity
               style={styles.row}
-              onPress={() => Linking.openURL('mailto:support@rowie.iom?subject=Rowie Support')}
+              onPress={() => Linking.openURL('mailto:support@rowie.io?subject=Rowie Support')}
               accessibilityRole="link"
               accessibilityLabel="Contact support"
-              accessibilityHint="Opens email to support@rowie.iom"
+              accessibilityHint="Opens email to support@rowie.io"
             >
               <View style={styles.rowLeft}>
                 <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
@@ -863,18 +862,18 @@ export function SettingsScreen() {
         visible={showProfileEdit}
         onClose={() => setShowProfileEdit(false)}
       />
-    </StarBackground>
+    </View>
   );
 }
 
 const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) => {
-  const cardBackground = isDark ? '#181819' : 'rgba(255,255,255,0.95)';
-  const cardBorder = isDark ? '#1d1d1f' : 'rgba(0,0,0,0.08)';
+  const cardBackground = isDark ? '#292524' : 'rgba(255,255,255,0.95)';
+  const cardBorder = isDark ? '#292524' : 'rgba(0,0,0,0.08)';
 
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: 'transparent',
+      backgroundColor: colors.background,
     },
     headerContainer: {
       paddingTop: 4,
@@ -1269,7 +1268,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     },
     progressBarBackground: {
       height: 6,
-      backgroundColor: isDark ? '#374151' : '#e5e7eb',
+      backgroundColor: isDark ? '#44403C' : '#E7E5E4',
       borderRadius: 3,
       overflow: 'hidden',
       marginBottom: 8,

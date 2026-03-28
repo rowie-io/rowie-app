@@ -19,7 +19,7 @@
         "EXPO_PUBLIC_WS_URL": "wss://dev.api.rowie.io",
         "EXPO_PUBLIC_WEBSITE_URL": "https://dev.rowie.io",
         "EXPO_PUBLIC_VENDOR_DASHBOARD_URL": "https://dev.portal.rowie.io",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51SToCcPqJbTmiYNPE6iOOIwMUqNQQjoO1ehO4QHMYEl63mKdNcykSRiSCtXDXOCszUROriDJBCD1w0HorxHHhnmg00j7d0tX2B"
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_51TDsKr0P9Ohy9QCxLASPyKtxWLLdugQtfQqXlGon6V062wayCoxFRV3biWwPUnfMwk7KOznWSYlbvHUZ18nsdhxP00PmYFL9cR"
       }
     },
     "prod": {
@@ -33,7 +33,7 @@
         "EXPO_PUBLIC_WS_URL": "wss://api.rowie.io",
         "EXPO_PUBLIC_WEBSITE_URL": "https://rowie.io",
         "EXPO_PUBLIC_VENDOR_DASHBOARD_URL": "https://portal.rowie.io",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51SToCTQ4N4nOz23WkC3jRYH9OvnSSANWUmMD3WhEkB8XMDkqSRpA36zSn4jriyWDjfwbtWBfKZXUUJPl1Bw3CCrf00PHkNNbha"
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_51TDsKd1b5gTpJBXjDMMMrgvVOGF1tiV5ERu1sR3q9pp2AjmNxC44jG4G9nP5QNZdTvhaXwr3epRb4lLyBOqM9twB00dD5uGZpc"
       }
     }
   },

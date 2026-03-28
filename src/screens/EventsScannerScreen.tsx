@@ -18,9 +18,6 @@ import { useDevice } from '../context/DeviceContext';
 import { useSocket } from '../context/SocketContext';
 import { eventsApi, type OrgEvent, type RecentScan } from '../lib/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { glass } from '../lib/colors';
-import { StarBackground } from '../components/StarBackground';
-
 // Dynamically import expo-camera (may not be installed)
 let CameraView: any = null;
 let useCameraPermissions: any = null;
@@ -49,7 +46,6 @@ export function EventsScannerScreen() {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const glassColors = isDark ? glass.dark : glass.light;
   const { subscription, isLoading: authLoading } = useAuth();
   const { deviceId } = useDevice();
   const { isConnected } = useSocket();
@@ -206,7 +202,7 @@ export function EventsScannerScreen() {
   // Event selection screen (or loading/empty states)
   if (!selectedEvent) {
     return (
-      <StarBackground colors={colors} isDark={isDark}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={[styles.container, { paddingTop: insets.top }]}>
           {/* Header - always visible */}
           <View style={styles.selectHeader}>
@@ -301,14 +297,14 @@ export function EventsScannerScreen() {
           />
         )}
         </View>
-      </StarBackground>
+      </View>
     );
   }
 
   // Camera not available or permission not granted — show inline in scanner view
   if (!CameraView || !permission?.granted) {
     return (
-      <StarBackground colors={colors} isDark={isDark}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={[styles.container, { paddingTop: insets.top }]}>
           <View style={styles.selectHeader}>
             <TouchableOpacity onPress={() => setSelectedEvent(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }} accessibilityRole="button" accessibilityLabel="Back to event selection">
@@ -348,7 +344,7 @@ export function EventsScannerScreen() {
                 accessibilityHint="Grant camera permission to scan QR codes"
               >
                 <LinearGradient
-                  colors={[colors.primary, '#3B82F6']}
+                  colors={[colors.primary, '#D97706']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.primaryButtonGradient}
@@ -360,7 +356,7 @@ export function EventsScannerScreen() {
             </View>
           )}
         </View>
-      </StarBackground>
+      </View>
     );
   }
 
@@ -577,47 +573,7 @@ const styles = StyleSheet.create({
     width: 70,
     borderRadius: 6,
   },
-  // Pro gate styles
-  proGateContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  proFeaturesCard: {
-    width: '100%',
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 20,
-    marginBottom: 32,
-    gap: 16,
-  },
-  proFeatureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  proFeatureText: {
-    fontSize: 15,
-    flex: 1,
-  },
   // Buttons
-  upgradeButton: {
-    width: '100%',
-    borderRadius: 14,
-    overflow: 'hidden',
-  },
-  upgradeButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    gap: 8,
-  },
-  upgradeButtonText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-  },
   primaryButton: {
     marginTop: 24,
     borderRadius: 14,
@@ -734,7 +690,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 24,
     height: 24,
-    borderColor: '#2563EB',
+    borderColor: '#F59E0B',
     borderWidth: 3,
   },
   topLeft: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 8 },

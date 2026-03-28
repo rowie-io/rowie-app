@@ -216,7 +216,7 @@ export function LoginScreen() {
 
   return (
     <LinearGradient
-      colors={['#030712', '#0c1a2d', '#030712']}
+      colors={['#0C0A09', '#1C1917', '#0C0A09']}
       locations={[0, 0.5, 1]}
       start={{ x: 0.5, y: 0 }}
       end={{ x: 0.5, y: 1 }}
@@ -246,7 +246,7 @@ export function LoginScreen() {
 
             {/* Card */}
             <LinearGradient
-              colors={['#111827', '#030712']}
+              colors={['#292524', '#1C1917']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={styles.card}

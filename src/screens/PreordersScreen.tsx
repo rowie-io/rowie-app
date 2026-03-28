@@ -24,8 +24,6 @@ import { formatCurrency } from '../utils/currency';
 import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
-import { StarBackground } from '../components/StarBackground';
-
 type TabType = 'new' | 'preparing' | 'ready';
 
 const TABS: { key: TabType; label: string; statuses: PreorderStatus[] }[] = [
@@ -182,7 +180,7 @@ function LoadingContent({ colors, isDark }: { colors: any; isDark: boolean }) {
   });
 
   const starColor = isDark ? '#fff' : colors.primary;
-  const glowColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(99,102,241,0.2)';
+  const glowColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(245,158,11,0.2)';
 
   return (
     <Animated.View style={[loadingStyles.container, { opacity: fadeAnim }]}>
@@ -453,17 +451,17 @@ export function PreordersScreen() {
 
   if (isLoading && preorders.length === 0) {
     return (
-      <StarBackground colors={colors} isDark={isDark}>
+      <View style={{ flex: 1 }}>
         <View style={[styles.container, { paddingTop: insets.top }]}>
           {renderHeader()}
           <LoadingContent colors={colors} isDark={isDark} />
         </View>
-      </StarBackground>
+      </View>
     );
   }
 
   return (
-    <StarBackground colors={colors} isDark={isDark}>
+    <View style={{ flex: 1 }}>
       <View style={[styles.container, { paddingTop: insets.top }]}>
         {renderHeader()}
         <FlatList
@@ -486,7 +484,7 @@ export function PreordersScreen() {
           showsVerticalScrollIndicator={false}
         />
       </View>
-    </StarBackground>
+    </View>
   );
 }
 
@@ -494,7 +492,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: 'transparent',
+      backgroundColor: colors.background,
     },
     headerContainer: {
       paddingTop: 4,

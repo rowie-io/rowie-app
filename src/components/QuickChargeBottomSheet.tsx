@@ -200,7 +200,7 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
 
   const chargeDisabled = cents < 50;
 
-  const containerBg = isDark ? '#18181b' : '#ffffff';
+  const containerBg = isDark ? '#1C1917' : '#ffffff';
   const handleColor = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)';
 
   return (
@@ -278,7 +278,7 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
                   {
                     backgroundColor: chargeDisabled
                       ? glassColors.backgroundElevated
-                      : isDark ? '#fff' : '#09090b',
+                      : isDark ? '#fff' : '#1C1917',
                   },
                   pressed && !chargeDisabled && styles.chargeButtonPressed,
                 ]}
@@ -286,12 +286,12 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
                 <Ionicons
                   name="flash"
                   size={20}
-                  color={chargeDisabled ? colors.textMuted : isDark ? '#09090b' : '#fff'}
+                  color={chargeDisabled ? colors.textMuted : isDark ? '#1C1917' : '#fff'}
                 />
                 <Text
                   style={[
                     styles.chargeButtonText,
-                    { color: chargeDisabled ? colors.textMuted : isDark ? '#09090b' : '#fff' },
+                    { color: chargeDisabled ? colors.textMuted : isDark ? '#1C1917' : '#fff' },
                   ]}
                   maxFontSizeMultiplier={1.3}
                 >

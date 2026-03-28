@@ -53,7 +53,7 @@ export function ForgotPasswordScreen() {
   if (isSuccess) {
     return (
       <LinearGradient
-        colors={['#030712', '#0c1a2d', '#030712']}
+        colors={['#0C0A09', '#1C1917', '#0C0A09']}
         locations={[0, 0.5, 1]}
         start={{ x: 0.5, y: 0 }}
         end={{ x: 0.5, y: 1 }}
@@ -67,7 +67,7 @@ export function ForgotPasswordScreen() {
           >
             <View style={styles.contentWrapper}>
               <LinearGradient
-                colors={['#111827', '#030712']}
+                colors={['#292524', '#1C1917']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.card}
@@ -116,7 +116,7 @@ export function ForgotPasswordScreen() {
 
   return (
     <LinearGradient
-      colors={['#030712', '#0c1a2d', '#030712']}
+      colors={['#0C0A09', '#1C1917', '#0C0A09']}
       locations={[0, 0.5, 1]}
       start={{ x: 0.5, y: 0 }}
       end={{ x: 0.5, y: 1 }}
@@ -156,7 +156,7 @@ export function ForgotPasswordScreen() {
 
               {/* Card */}
               <LinearGradient
-                colors={['#111827', '#030712']}
+                colors={['#292524', '#1C1917']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.card}
@@ -254,7 +254,7 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 20,
-    backgroundColor: 'rgba(37, 99, 235, 0.15)',
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,

@@ -6,7 +6,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   return {
     ...config,
     name: ENV === 'prod' ? 'Rowie' : `Rowie (${ENV})`,
-    slug: 'rowie-app',
+    slug: 'rowie',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/logo-dark.png',
@@ -107,7 +107,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ],
     extra: {
       eas: {
-        projectId: '2fde0ea8-4005-4003-a81c-492378f175b8',
+        projectId: '537e258c-86b4-4674-be82-bf36aa27e33e',
       },
       apiUrl: process.env.EXPO_PUBLIC_API_URL,
       env: ENV,

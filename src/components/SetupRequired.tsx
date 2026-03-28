@@ -351,12 +351,12 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
           }
         ]}
       >
-        <View style={[styles.headerBackground, { backgroundColor: isDark ? '#09090b' : colors.background }]}>
+        <View style={[styles.headerBackground, { backgroundColor: isDark ? '#1C1917' : colors.background }]}>
           {/* Subtle gradient overlay */}
           <LinearGradient
             colors={isDark
-              ? ['transparent', 'rgba(99, 102, 241, 0.08)', 'rgba(139, 92, 246, 0.05)', 'transparent']
-              : ['transparent', 'rgba(99, 102, 241, 0.05)', 'rgba(139, 92, 246, 0.03)', 'transparent']
+              ? ['transparent', 'rgba(245, 158, 11, 0.08)', 'rgba(245, 158, 11, 0.05)', 'transparent']
+              : ['transparent', 'rgba(245, 158, 11, 0.05)', 'rgba(245, 158, 11, 0.03)', 'transparent']
             }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -365,31 +365,31 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
 
           {/* Star field - Group 1 (fades in/out) */}
           <Animated.View style={[StyleSheet.absoluteFill, { opacity: sparkleAnim }]}>
-            <FourPointStar style={{ top: 25, left: 25 }} size={14} color={isDark ? 'rgba(255,255,255,0.7)' : 'rgba(99,102,241,0.4)'} />
-            <Star style={{ top: 50, left: 80 }} size={4} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(99,102,241,0.3)'} />
-            <Star style={{ top: 35, right: 60 }} size={6} color={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(139,92,246,0.35)'} />
-            <FourPointStar style={{ top: 70, right: 30 }} size={12} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(99,102,241,0.3)'} />
-            <Star style={{ top: 90, left: 50 }} size={3} color={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(139,92,246,0.25)'} />
-            <Star style={{ top: 40, left: SCREEN_WIDTH * 0.45 }} size={5} color={isDark ? 'rgba(255,255,255,0.55)' : 'rgba(99,102,241,0.3)'} />
-            <Star style={{ top: 110, right: 90 }} size={4} color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(139,92,246,0.25)'} />
+            <FourPointStar style={{ top: 25, left: 25 }} size={14} color={isDark ? 'rgba(255,255,255,0.7)' : 'rgba(245,158,11,0.4)'} />
+            <Star style={{ top: 50, left: 80 }} size={4} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(245,158,11,0.3)'} />
+            <Star style={{ top: 35, right: 60 }} size={6} color={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(245,158,11,0.35)'} />
+            <FourPointStar style={{ top: 70, right: 30 }} size={12} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(245,158,11,0.3)'} />
+            <Star style={{ top: 90, left: 50 }} size={3} color={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(245,158,11,0.25)'} />
+            <Star style={{ top: 40, left: SCREEN_WIDTH * 0.45 }} size={5} color={isDark ? 'rgba(255,255,255,0.55)' : 'rgba(245,158,11,0.3)'} />
+            <Star style={{ top: 110, right: 90 }} size={4} color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(245,158,11,0.25)'} />
           </Animated.View>
 
           {/* Star field - Group 2 (opposite fade) */}
           <Animated.View style={[StyleSheet.absoluteFill, { opacity: Animated.subtract(1, sparkleAnim) }]}>
-            <Star style={{ top: 30, left: 55 }} size={5} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(99,102,241,0.3)'} />
-            <FourPointStar style={{ top: 55, right: 45 }} size={16} color={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(139,92,246,0.35)'} />
-            <Star style={{ top: 80, left: 35 }} size={4} color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(99,102,241,0.25)'} />
-            <Star style={{ top: 45, left: SCREEN_WIDTH * 0.55 }} size={6} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(139,92,246,0.3)'} />
-            <FourPointStar style={{ top: 20, right: 100 }} size={10} color={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(99,102,241,0.25)'} />
-            <Star style={{ top: 100, right: 50 }} size={3} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(139,92,246,0.25)'} />
-            <Star style={{ top: 65, left: 100 }} size={5} color={isDark ? 'rgba(255,255,255,0.55)' : 'rgba(99,102,241,0.3)'} />
+            <Star style={{ top: 30, left: 55 }} size={5} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(245,158,11,0.3)'} />
+            <FourPointStar style={{ top: 55, right: 45 }} size={16} color={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(245,158,11,0.35)'} />
+            <Star style={{ top: 80, left: 35 }} size={4} color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(245,158,11,0.25)'} />
+            <Star style={{ top: 45, left: SCREEN_WIDTH * 0.55 }} size={6} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(245,158,11,0.3)'} />
+            <FourPointStar style={{ top: 20, right: 100 }} size={10} color={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(245,158,11,0.25)'} />
+            <Star style={{ top: 100, right: 50 }} size={3} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(245,158,11,0.25)'} />
+            <Star style={{ top: 65, left: 100 }} size={5} color={isDark ? 'rgba(255,255,255,0.55)' : 'rgba(245,158,11,0.3)'} />
           </Animated.View>
 
           {/* Welcome Content */}
           <View style={styles.headerContent}>
             <View style={[styles.headerIconContainer, {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(99,102,241,0.1)',
-              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(99,102,241,0.15)'
+              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.1)',
+              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.15)'
             }]}>
               <Ionicons name="storefront" size={44} color={isDark ? 'rgba(255,255,255,0.95)' : colors.primary} />
             </View>
@@ -448,9 +448,9 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
                 </View>
               </View>
 
-              <View style={[styles.primaryCardButton, { backgroundColor: isDark ? '#fff' : '#09090b' }]}>
-                <Ionicons name="add" size={20} color={isDark ? '#09090b' : '#fff'} />
-                <Text style={[styles.primaryCardButtonText, { color: isDark ? '#09090b' : '#fff' }]} maxFontSizeMultiplier={1.3}>Create Menu</Text>
+              <View style={[styles.primaryCardButton, { backgroundColor: isDark ? '#fff' : '#1C1917' }]}>
+                <Ionicons name="add" size={20} color={isDark ? '#1C1917' : '#fff'} />
+                <Text style={[styles.primaryCardButtonText, { color: isDark ? '#1C1917' : '#fff' }]} maxFontSizeMultiplier={1.3}>Create Menu</Text>
               </View>
             </TouchableOpacity>
           </Animated.View>
@@ -917,7 +917,7 @@ const createWelcomeStyles = (colors: any, glassColors: typeof glass.dark, isDark
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: isDark ? '#09090b' : colors.background,
+      backgroundColor: isDark ? '#1C1917' : colors.background,
     },
     scrollContainer: {
       flex: 1,

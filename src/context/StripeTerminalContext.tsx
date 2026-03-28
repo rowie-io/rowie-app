@@ -841,12 +841,12 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
 
       // Check for immediate errors (e.g. SDK not ready)
       let discoveryErrored = false;
-      discoverPromise.then((result) => {
+      discoverPromise.then((result: { error?: { message?: string } }) => {
         if (result.error) {
           logger.error('[StripeTerminal] Discovery error:', result.error);
           discoveryErrored = true;
         }
-      }).catch((err) => {
+      }).catch((err: Error) => {
         logger.error('[StripeTerminal] Discovery promise rejected:', err);
         discoveryErrored = true;
       });
@@ -1032,7 +1032,7 @@ async function fetchConnectionToken(): Promise<string> {
       lastConnectionTokenError = error?.message || 'Failed to connect to payment service. Please try again.';
     }
 
-    throw new Error(lastConnectionTokenError);
+    throw new Error(lastConnectionTokenError || 'Failed to connect to payment service');
   }
 }
 

@@ -72,7 +72,7 @@ export const glow = (color: string, intensity: 'subtle' | 'medium' | 'strong' = 
 };
 
 // Primary button glow
-export const primaryGlow = glow('#2563EB', 'medium');
+export const primaryGlow = glow('#F59E0B', 'medium');
 
 // Success glow
 export const successGlow = glow('#22c55e', 'medium');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
   const [phone, setPhone] = useState(user?.phone || '');
   const [selectedCountry, setSelectedCountry] = useState<ICountry | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const phoneInputRef = useRef(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
@@ -318,6 +319,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
             <View style={styles.inputGroup}>
               <Text style={styles.label} maxFontSizeMultiplier={1.5}>Phone Number</Text>
               <PhoneInput
+                ref={phoneInputRef}
                 defaultValue={phone ? `+1${phone}` : undefined}
                 onChangePhoneNumber={(text) => setPhone(text.replace(/\D/g, ''))}
                 selectedCountry={selectedCountry}
@@ -359,13 +361,13 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
 }
 
 const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) => {
-  const cardBackground = isDark ? '#181819' : 'rgba(255,255,255,0.95)';
-  const inputBackground = isDark ? '#0f0f10' : '#f5f5f5';
+  const cardBackground = isDark ? '#292524' : 'rgba(255,255,255,0.95)';
+  const inputBackground = isDark ? '#0C0A09' : '#f5f5f5';
 
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: isDark ? '#09090b' : colors.background,
+      backgroundColor: isDark ? '#1C1917' : colors.background,
     },
     header: {
       flexDirection: 'row',
@@ -448,7 +450,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 3,
-      borderColor: isDark ? '#09090b' : colors.background,
+      borderColor: isDark ? '#1C1917' : colors.background,
     },
     changePhotoText: {
       fontSize: 15,
@@ -476,7 +478,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       fontFamily: fonts.regular,
       color: colors.text,
       borderWidth: 1,
-      borderColor: isDark ? '#1d1d1f' : 'rgba(0,0,0,0.08)',
+      borderColor: isDark ? '#292524' : 'rgba(0,0,0,0.08)',
     },
     emailContainer: {
       flexDirection: 'row',
@@ -487,7 +489,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       paddingHorizontal: 16,
       paddingVertical: 14,
       borderWidth: 1,
-      borderColor: isDark ? '#1d1d1f' : 'rgba(0,0,0,0.08)',
+      borderColor: isDark ? '#292524' : 'rgba(0,0,0,0.08)',
     },
     emailText: {
       fontSize: 16,
@@ -505,10 +507,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       backgroundColor: cardBackground,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: isDark ? '#1d1d1f' : 'rgba(0,0,0,0.08)',
+      borderColor: isDark ? '#292524' : 'rgba(0,0,0,0.08)',
     },
     phoneFlagContainer: {
-      backgroundColor: isDark ? '#181819' : '#F3F4F6',
+      backgroundColor: isDark ? '#292524' : '#F5F5F4',
       borderTopLeftRadius: 11,
       borderBottomLeftRadius: 11,
     },

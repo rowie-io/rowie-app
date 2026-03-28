@@ -1,17 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet, Platform, Animated, Text, Dimensions } from 'react-native';
+import { View, StyleSheet, Platform, Animated, Text, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as SplashScreen from 'expo-splash-screen';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 // Stripe React Native only works on native platforms with dev builds (not Expo Go)
 import Constants from 'expo-constants';
@@ -26,12 +22,12 @@ if (Platform.OS !== 'web' && !isExpoGo) {
 }
 import {
   useFonts,
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
-  Inter_800ExtraBold,
-} from '@expo-google-fonts/inter';
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 
 import { QueryProvider } from './src/providers/QueryProvider';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
@@ -91,224 +87,11 @@ import { SetupPaymentsModal } from './src/components/SetupPaymentsModal';
 // Keep splash screen visible while loading fonts
 SplashScreen.preventAutoHideAsync();
 
-// Star component for Apple-style sparkle effect
-function Star({ style, size = 8, color = 'rgba(255,255,255,0.8)' }: { style?: any; size?: number; color?: string }) {
+function LoadingScreen() {
   return (
-    <View style={[{ position: 'absolute' }, style]}>
-      <View style={{
-        width: size,
-        height: size,
-        backgroundColor: color,
-        borderRadius: size / 2,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: size * 1.5,
-      }} />
+    <View style={{ flex: 1, backgroundColor: '#1C1917', justifyContent: 'center', alignItems: 'center' }}>
+      <ActivityIndicator size="large" color="#F59E0B" />
     </View>
-  );
-}
-
-// Four-point star for larger sparkles
-function FourPointStar({ style, size = 16, color = 'rgba(255,255,255,0.9)' }: { style?: any; size?: number; color?: string }) {
-  return (
-    <View style={[{ position: 'absolute', width: size, height: size }, style]}>
-      <View style={{
-        position: 'absolute',
-        left: size / 2 - 1,
-        top: 0,
-        width: 2,
-        height: size,
-        backgroundColor: color,
-        borderRadius: 1,
-      }} />
-      <View style={{
-        position: 'absolute',
-        top: size / 2 - 1,
-        left: 0,
-        width: size,
-        height: 2,
-        backgroundColor: color,
-        borderRadius: 1,
-      }} />
-      <View style={{
-        position: 'absolute',
-        left: size / 2 - 2,
-        top: size / 2 - 2,
-        width: 4,
-        height: 4,
-        backgroundColor: color,
-        borderRadius: 2,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: size / 2,
-      }} />
-    </View>
-  );
-}
-
-// Central glowing star for loading
-function GlowingStar({ size = 32, color, glowColor, pulseAnim }: { size?: number; color: string; glowColor: string; pulseAnim: Animated.Value }) {
-  return (
-    <Animated.View style={{
-      width: size * 2,
-      height: size * 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-      opacity: pulseAnim,
-      transform: [{ scale: pulseAnim }],
-    }}>
-      {/* Outer glow */}
-      <View style={{
-        position: 'absolute',
-        width: size * 1.5,
-        height: size * 1.5,
-        borderRadius: size,
-        backgroundColor: glowColor,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: size,
-      }} />
-      {/* Vertical line */}
-      <View style={{
-        position: 'absolute',
-        width: 3,
-        height: size,
-        backgroundColor: color,
-        borderRadius: 1.5,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 8,
-      }} />
-      {/* Horizontal line */}
-      <View style={{
-        position: 'absolute',
-        width: size,
-        height: 3,
-        backgroundColor: color,
-        borderRadius: 1.5,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 8,
-      }} />
-      {/* Center bright point */}
-      <View style={{
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: color,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 10,
-      }} />
-    </Animated.View>
-  );
-}
-
-// Loading screen with stars animation
-function LoadingScreen({ colors, isDark }: { colors: any; isDark: boolean }) {
-  const sparkleAnim = useRef(new Animated.Value(0)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(0.7)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(sparkleAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(sparkleAnim, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.7,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 8000,
-        useNativeDriver: true,
-      })
-    ).start();
-  }, []);
-
-  const rotation = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const starColor = isDark ? '#fff' : colors.primary;
-  const glowColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(99,102,241,0.2)';
-
-  return (
-    <Animated.View style={[styles.loadingScreen, { backgroundColor: isDark ? '#09090b' : colors.background, opacity: fadeAnim }]}>
-      <LinearGradient
-        colors={isDark
-          ? ['transparent', 'rgba(99, 102, 241, 0.08)', 'rgba(139, 92, 246, 0.05)', 'transparent']
-          : ['transparent', 'rgba(99, 102, 241, 0.05)', 'rgba(139, 92, 246, 0.03)', 'transparent']
-        }
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
-
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: sparkleAnim }]}>
-        <FourPointStar style={{ top: 120, left: 30 }} size={14} color={isDark ? 'rgba(255,255,255,0.7)' : 'rgba(99,102,241,0.4)'} />
-        <Star style={{ top: 180, left: 70 }} size={4} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(99,102,241,0.3)'} />
-        <Star style={{ top: 150, right: 50 }} size={6} color={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(139,92,246,0.35)'} />
-        <FourPointStar style={{ top: 220, right: 35 }} size={12} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(99,102,241,0.3)'} />
-        <Star style={{ top: 280, left: 45 }} size={3} color={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(139,92,246,0.25)'} />
-        <Star style={{ top: 170, left: SCREEN_WIDTH * 0.45 }} size={5} color={isDark ? 'rgba(255,255,255,0.55)' : 'rgba(99,102,241,0.3)'} />
-        <Star style={{ top: 320, right: 80 }} size={4} color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(139,92,246,0.25)'} />
-      </Animated.View>
-
-      <Animated.View style={[StyleSheet.absoluteFill, { opacity: Animated.subtract(1, sparkleAnim) }]}>
-        <Star style={{ top: 140, left: 50 }} size={5} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(99,102,241,0.3)'} />
-        <FourPointStar style={{ top: 200, right: 40 }} size={16} color={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(139,92,246,0.35)'} />
-        <Star style={{ top: 260, left: 30 }} size={4} color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(99,102,241,0.25)'} />
-        <Star style={{ top: 190, left: SCREEN_WIDTH * 0.55 }} size={6} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(139,92,246,0.3)'} />
-        <FourPointStar style={{ top: 130, right: 90 }} size={10} color={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(99,102,241,0.25)'} />
-        <Star style={{ top: 300, right: 55 }} size={3} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(139,92,246,0.25)'} />
-        <Star style={{ top: 240, left: 90 }} size={5} color={isDark ? 'rgba(255,255,255,0.55)' : 'rgba(99,102,241,0.3)'} />
-      </Animated.View>
-
-      <View style={styles.loadingContent}>
-        <Animated.View style={{ transform: [{ rotate: rotation }] }}>
-          <GlowingStar size={36} color={starColor} glowColor={glowColor} pulseAnim={pulseAnim} />
-        </Animated.View>
-      </View>
-    </Animated.View>
   );
 }
 
@@ -319,11 +102,11 @@ const HistoryStack = createNativeStackNavigator();
 
 // Font family constants
 export const fonts = {
-  regular: 'Inter_400Regular',
-  medium: 'Inter_500Medium',
-  semiBold: 'Inter_600SemiBold',
-  bold: 'Inter_700Bold',
-  extraBold: 'Inter_800ExtraBold',
+  regular: 'PlusJakartaSans_400Regular',
+  medium: 'PlusJakartaSans_500Medium',
+  semiBold: 'PlusJakartaSans_600SemiBold',
+  bold: 'PlusJakartaSans_700Bold',
+  extraBold: 'PlusJakartaSans_800ExtraBold',
 };
 
 // Menu tab stack
@@ -473,9 +256,9 @@ function TabNavigator() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: isDark ? '#111827' : '#ffffff',
+          backgroundColor: isDark ? '#292524' : '#ffffff',
           borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+          borderTopColor: isDark ? '#44403C' : 'rgba(0, 0, 0, 0.08)',
           height: 60 + insets.bottom,
           paddingTop: 8,
           paddingBottom: insets.bottom,
@@ -621,7 +404,7 @@ function AuthenticatedNavigator() {
   const isLoading = catalogLoading || connectLoading;
 
   if (isLoading) {
-    return <LoadingScreen colors={colors} isDark={isDark} />;
+    return <LoadingScreen />;
   }
 
   return (
@@ -733,7 +516,7 @@ function AppNavigator() {
   const { colors, isDark } = useTheme();
 
   if (isLoading) {
-    return <LoadingScreen colors={colors} isDark={isDark} />;
+    return <LoadingScreen />;
   }
 
   return (
@@ -781,11 +564,11 @@ function AppNavigator() {
 // Root component with all providers
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    Inter_800ExtraBold,
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
   });
 
   const onLayoutRootView = useCallback(async () => {
@@ -807,7 +590,7 @@ export default function App() {
         input:-webkit-autofill:hover,
         input:-webkit-autofill:focus,
         input:-webkit-autofill:active {
-          -webkit-box-shadow: 0 0 0 30px rgba(31, 41, 55, 0.5) inset !important;
+          -webkit-box-shadow: 0 0 0 30px rgba(41, 37, 36, 0.5) inset !important;
           -webkit-text-fill-color: #ffffff !important;
           caret-color: #ffffff !important;
           transition: background-color 5000s ease-in-out 0s;
@@ -861,18 +644,6 @@ export default function App() {
 const styles = StyleSheet.create({
   gestureRoot: {
     flex: 1,
-  },
-  loadingScreen: {
-    flex: 1,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  loadingContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    zIndex: 10,
   },
   tabIconWrapper: {
     alignItems: 'center',

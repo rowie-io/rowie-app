@@ -29,7 +29,6 @@ import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { Swipeable } from 'react-native-gesture-handler';
-import { StarBackground } from '../components/StarBackground';
 import { useTapToPayGuard } from '../hooks';
 
 type TabType = 'transactions' | 'held';
@@ -56,8 +55,8 @@ function EmptyTransactionsContent({ colors, isDark }: { colors: any; isDark: boo
     <Animated.View style={[emptyStyles.container, { opacity: fadeAnim }]}>
       <View style={emptyStyles.content}>
         <View style={[emptyStyles.iconContainer, {
-          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(99,102,241,0.1)',
-          borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(99,102,241,0.15)'
+          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.1)',
+          borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.15)'
         }]}>
           <Ionicons name="receipt-outline" size={44} color={isDark ? 'rgba(255,255,255,0.95)' : colors.primary} />
         </View>
@@ -211,7 +210,7 @@ function LoadingTransactionsContent({ colors, isDark }: { colors: any; isDark: b
   });
 
   const starColor = isDark ? '#fff' : colors.primary;
-  const glowColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(99,102,241,0.2)';
+  const glowColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(245,158,11,0.2)';
 
   return (
     <Animated.View style={[emptyStyles.container, { opacity: fadeAnim }]}>
@@ -717,7 +716,7 @@ export function TransactionsScreen() {
   );
 
   return (
-    <StarBackground colors={colors} isDark={isDark}>
+    <View style={{ flex: 1 }}>
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.headerContainer}>
           <Text maxFontSizeMultiplier={1.3} style={styles.title}>History</Text>
@@ -783,7 +782,7 @@ export function TransactionsScreen() {
                 const isActive = filter === f;
                 // Use solid colors in dark mode to prevent stars showing through
                 const filterColors = isDark ? {
-                  all: { bg: '#0d1427', border: '#132040', text: colors.primary },
+                  all: { bg: 'rgba(245, 158, 11, 0.06)', border: '#44403C', text: colors.primary },
                   succeeded: { bg: '#0a1a0f', border: '#0f2a17', text: colors.success },
                   refunded: { bg: '#1a1408', border: '#2a200d', text: colors.warning },
                   failed: { bg: '#1a0a0a', border: '#2a0f0f', text: colors.error },
@@ -847,20 +846,19 @@ export function TransactionsScreen() {
           </>
         )}
       </View>
-    </StarBackground>
+    </View>
   );
 }
 
 const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) => {
-  // Card backgrounds - solid colors that match the visual appearance of the old semi-transparent ones
-  // Calculated: #09090b base + 6% white overlay ≈ #181819
-  const cardBackground = isDark ? '#181819' : 'rgba(255,255,255,0.85)';
-  const cardBorder = isDark ? '#1d1d1f' : 'rgba(0,0,0,0.08)';
+  // Card backgrounds - solid colors matching the stone-800 brand palette
+  const cardBackground = isDark ? '#292524' : 'rgba(255,255,255,0.85)';
+  const cardBorder = isDark ? '#292524' : 'rgba(0,0,0,0.08)';
 
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: 'transparent',
+      backgroundColor: colors.background,
     },
     headerContainer: {
       paddingTop: 4,

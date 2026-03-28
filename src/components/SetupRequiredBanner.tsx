@@ -14,8 +14,8 @@ export function SetupRequiredBanner({ compact = false }: SetupRequiredBannerProp
   const navigation = useNavigation<any>();
 
   // Solid colors for dark mode to prevent stars showing through
-  const compactBg = isDark ? '#09090b' : colors.warning + '15';
-  const containerBg = isDark ? '#09090b' : colors.warning + '10';
+  const compactBg = isDark ? '#1C1917' : colors.warning + '15';
+  const containerBg = isDark ? '#1C1917' : colors.warning + '10';
   const containerBorder = isDark ? '#3d2a0d' : colors.warning + '30';
 
   const handleSetup = () => {

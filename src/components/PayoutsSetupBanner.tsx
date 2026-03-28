@@ -81,7 +81,7 @@ const createStyles = (colors: any, compact: boolean, isDark: boolean) =>
   StyleSheet.create({
     // Full banner styles
     container: {
-      backgroundColor: isDark ? '#181819' : colors.card,
+      backgroundColor: isDark ? '#292524' : colors.card,
       borderRadius: 12,
       borderWidth: 1,
       borderColor: isDark ? '#0f2a17' : colors.success,
@@ -136,7 +136,7 @@ const createStyles = (colors: any, compact: boolean, isDark: boolean) =>
     compactContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: isDark ? '#0d1420' : (colors.infoBg || colors.info + '15'),
+      backgroundColor: isDark ? 'rgba(245, 158, 11, 0.08)' : (colors.infoBg || colors.info + '15'),
       paddingVertical: 10,
       paddingHorizontal: 14,
       borderRadius: 8,

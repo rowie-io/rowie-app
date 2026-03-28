@@ -123,7 +123,7 @@ Rules by element type:
 
 When to use `accessibilityHint`: Only when the action isn't obvious from the label alone. Example: `accessibilityHint="Double tap to process payment"`.
 
-What NOT to label: Decorative elements (star backgrounds, gradients, dividers, spacers).
+What NOT to label: Decorative elements (gradients, dividers, spacers).
 
 Dynamic labels: When content is dynamic, build the label from the data:
 ```tsx
@@ -180,13 +180,13 @@ The `useSocketEvent(event, callback)` hook subscribes/unsubscribes via `useEffec
 ```tsx
 // BAD — inline useCallback recreates on dependency change → subscribe/unsubscribe loop
 useSocketEvent(SocketEvents.ORDER_UPDATED, useCallback((data: any) => {
-  if (data.status === 'held') fetchHeldOrders();
-}, [fetchHeldOrders]));
+  if (data.catalogId === selectedCatalogId) refreshOrders();
+}, [refreshOrders]));
 
 // GOOD — define the handler OUTSIDE, then pass the stable reference
 const handleOrderUpdated = useCallback((data: any) => {
-  if (data.status === 'held') fetchHeldOrders();
-}, [fetchHeldOrders]);
+  if (data.catalogId === selectedCatalogId) refreshOrders();
+}, [refreshOrders]);
 
 useSocketEvent(SocketEvents.ORDER_UPDATED, handleOrderUpdated);
 ```
@@ -229,7 +229,7 @@ function TransactionItem({ item, onPress }) { ... }
 const TransactionItem = memo(function TransactionItem({ item, onPress }) { ... });
 ```
 
-Currently memoized list item components: `AnimatedTransactionItem`, `CategoryPill`, `KeypadButton` (in both ChargeScreen and QuickChargeBottomSheet).
+Currently memoized list item components: `AnimatedTransactionItem`, `CategoryPill`, `KeypadButton`.
 
 ### 4. Avoid Redundant Data Fetching in Socket Handlers
 
@@ -282,7 +282,7 @@ Also NEVER call hooks inside `if` blocks, loops, ternaries, `switch` cases, or `
 ```
 rowie-app/
 ├── src/
-│   ├── screens/                         # All app screens (20)
+│   ├── screens/                         # All app screens (18)
 │   │   ├── LoginScreen.tsx              # Email/password + biometric login
 │   │   ├── SignUpScreen.tsx             # New user registration
 │   │   ├── ForgotPasswordScreen.tsx     # Password reset request
@@ -295,8 +295,6 @@ rowie-app/
 │   │   ├── PaymentResultScreen.tsx      # Success/failure + receipt
 │   │   ├── CashPaymentScreen.tsx        # Cash payment with change calc
 │   │   ├── SplitPaymentScreen.tsx       # Split across multiple methods
-│   │   ├── ChargeScreen.tsx             # Quick charge (amount only)
-│   │   ├── HeldOrdersScreen.tsx         # Saved/held orders list
 │   │   ├── TransactionsScreen.tsx       # Transaction history
 │   │   ├── TransactionDetailScreen.tsx  # Transaction details + refund
 │   │   ├── SettingsScreen.tsx           # Account settings
@@ -345,7 +343,7 @@ rowie-app/
 │   │   ├── validation.ts              # Input validation
 │   │   └── native/
 │   │       └── ProximityReaderDiscovery.ts  # NFC reader discovery
-│   ├── components/                     # Reusable UI components (19)
+│   ├── components/                     # Reusable UI components (18)
 │   │   ├── Input.tsx                   # Form input
 │   │   ├── Toggle.tsx                  # Toggle switch
 │   │   ├── ConfirmModal.tsx            # Confirmation dialog
@@ -362,7 +360,6 @@ rowie-app/
 │   │   ├── SetupRequiredBanner.tsx     # Setup required banner
 │   │   ├── TapToPayFirstUseModal.tsx   # First-use TTP education modal
 │   │   ├── TapToPayEducationScreen.tsx # Full TTP education component
-│   │   ├── StarBackground.tsx          # Decorative star background
 │   │   ├── SocketEventHandlers.tsx     # Socket event → query invalidation
 │   │   └── DataPrefetcher.tsx          # Pre-load data on app start
 │   ├── hooks/
@@ -392,11 +389,9 @@ Root Navigator (native-stack)
 │   └── ResetPasswordScreen
 │
 └── Authenticated Navigator (authenticated)
-    ├── MainTabs (Bottom Tab Navigator - 4 tabs)
+    ├── MainTabs (Bottom Tab Navigator - 3 tabs)
     │   ├── Menu Tab → MenuStackNavigator
     │   │   └── MenuScreen (product grid)
-    │   ├── QuickCharge Tab
-    │   │   └── ChargeScreen
     │   ├── History Tab → HistoryStackNavigator
     │   │   ├── TransactionsScreen
     │   │   └── TransactionDetailScreen
@@ -409,7 +404,6 @@ Root Navigator (native-stack)
     │   ├── TapToPayEducation (modal)
     │   ├── Upgrade (card)
     │   ├── StripeOnboarding (modal)
-    │   ├── HeldOrders (card)
     │   │
     │   └── Payment Flow (slide_from_bottom / fullScreenModal)
     │       ├── Checkout (modal)
@@ -831,19 +825,22 @@ const SocketEvents = {
 
 **Dark Theme (default):**
 ```typescript
-background: '#1C1917',
-card: '#292524',
-cardHover: '#44403C',
-border: '#44403C',
-text: '#FFFFFF',
-textSecondary: '#A8A29E',
-textMuted: '#78716C',
-primary: '#F59E0B',
-primaryLight: '#FBBF24',
+background: '#1C1917',      // stone-900 — NEVER use pure #000000
+card: '#292524',             // stone-800
+cardHover: '#44403C',        // stone-700
+border: '#44403C',           // stone-700
+text: '#F5F5F4',             // stone-100
+textSecondary: '#A8A29E',   // stone-400
+textMuted: '#78716C',        // stone-500
+primary: '#F59E0B',          // amber-500
+primaryLight: '#FBBF24',     // amber-400
 success: '#22C55E',
 error: '#EF4444',
 warning: '#F59E0B',
+tabActive: '#F59E0B',        // Active tab indicator
 ```
+
+**IMPORTANT:** Never use pure `#000000` black for backgrounds. Always use `#1C1917` (stone-900) or `#0C0A09` (stone-950). The only exceptions are phone bezel mockups and QR code colors. This matches the amber/stone palette used across all Rowie repos.
 
 **Light Theme:**
 ```typescript
@@ -906,7 +903,7 @@ npm run submit:ios                       # Submit to App Store
 ```bash
 # .env / .env.example
 EXPO_PUBLIC_APP_ENV=local                # local | dev | prod
-EXPO_PUBLIC_API_URL=http://localhost:3334
+EXPO_PUBLIC_API_URL=http://localhost:4334
 EXPO_PUBLIC_WEBSITE_URL=https://rowie.io
 EXPO_PUBLIC_VENDOR_DASHBOARD_URL=https://portal.rowie.io
 EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_xxx

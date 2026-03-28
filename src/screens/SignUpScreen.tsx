@@ -32,6 +32,7 @@ import { shadows } from '../lib/shadows';
 import { config } from '../lib/config';
 import logger from '../lib/logger';
 import { isValidEmail } from '../lib/validation';
+import { PRICING } from '../lib/pricing';
 
 // Types
 type Step = 'account' | 'business' | 'plan' | 'confirmation';
@@ -107,7 +108,7 @@ const PLANS = {
     name: 'Starter',
     price: 'Free',
     priceSubtext: 'No monthly fee',
-    transactionFee: '2.9% + $0.18',
+    transactionFee: PRICING.starter.transactionFeeDisplay,
     features: [
       'Tap to Pay on iPhone & Android',
       'Simple menu builder',
@@ -125,9 +126,9 @@ const PLANS = {
   },
   pro: {
     name: 'Pro',
-    price: '$29.99',
+    price: PRICING.pro.monthlyPriceDisplay,
     priceSubtext: '/month',
-    transactionFee: '2.8% + $0.16',
+    transactionFee: PRICING.pro.transactionFeeDisplay,
     features: [
       'Everything in Starter',
       'Unlimited custom menus',
@@ -1174,7 +1175,7 @@ export function SignUpScreen() {
 
   return (
     <LinearGradient
-      colors={['#030712', '#0c1a2d', '#030712']}
+      colors={['#0C0A09', '#1C1917', '#0C0A09']}
       locations={[0, 0.5, 1]}
       start={{ x: 0.5, y: 0 }}
       end={{ x: 0.5, y: 1 }}
@@ -1285,7 +1286,7 @@ export function SignUpScreen() {
               accessibilityState={{ disabled: isLoading || isCheckingEmail || isCheckingPassword || isPurchasing, busy: isLoading || isPurchasing }}
             >
               <LinearGradient
-                colors={[colors.primary, '#1d4ed8']}
+                colors={[colors.primary, '#D97706']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.nextButtonGradient}
@@ -1489,7 +1490,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     selectButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: 'rgba(31, 41, 55, 0.5)',
+      backgroundColor: 'rgba(41, 37, 36, 0.5)',
       borderRadius: 12,
       borderWidth: 2,
       borderColor: colors.gray700,
@@ -1558,7 +1559,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
     },
     pickerContent: {
-      backgroundColor: isDark ? '#1f2937' : '#ffffff',
+      backgroundColor: isDark ? '#292524' : '#ffffff',
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       maxHeight: '60%',
@@ -1923,13 +1924,13 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     },
     // Phone input styles
     phoneContainer: {
-      backgroundColor: isDark ? 'rgba(31, 41, 55, 0.5)' : '#FFFFFF',
+      backgroundColor: isDark ? 'rgba(41, 37, 36, 0.5)' : '#FFFFFF',
       borderRadius: 12,
       borderWidth: isDark ? 2 : 1,
       borderColor: isDark ? appColors.gray700 : appColors.gray300,
     },
     phoneFlagContainer: {
-      backgroundColor: isDark ? 'rgba(31, 41, 55, 0.5)' : appColors.gray100,
+      backgroundColor: isDark ? 'rgba(41, 37, 36, 0.5)' : appColors.gray100,
       borderTopLeftRadius: 11,
       borderBottomLeftRadius: 11,
     },

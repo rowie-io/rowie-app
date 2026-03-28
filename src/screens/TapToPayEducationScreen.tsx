@@ -29,8 +29,6 @@ import { authService } from '../lib/api';
 
 import { useTheme } from '../context/ThemeContext';
 import { useTerminal, ConfigurationStage } from '../context/StripeTerminalContext';
-import { StarBackground } from '../components/StarBackground';
-import { LoadingWithStars } from '../components/StarryBackground';
 import { glass } from '../lib/colors';
 import { shadows, glow } from '../lib/shadows';
 import { spacing, radius } from '../lib/spacing';
@@ -483,15 +481,19 @@ export function TapToPayEducationScreen() {
 
   if (showLoadingScreen) {
     if (loadingTimedOut) {
-      return <View style={{ flex: 1, backgroundColor: isDark ? '#09090b' : colors.background }} />;
+      return <View style={{ flex: 1, backgroundColor: isDark ? '#1C1917' : colors.background }} />;
     }
-    return <LoadingWithStars />;
+    return (
+      <View style={{ flex: 1, backgroundColor: isDark ? '#1C1917' : colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
   }
 
   const isButtonDisabled = isEnabling;
 
   return (
-    <StarBackground colors={colors} isDark={isDark}>
+    <View style={{ flex: 1 }}>
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
@@ -624,7 +626,7 @@ export function TapToPayEducationScreen() {
         </TouchableOpacity>
       </View>
     </View>
-    </StarBackground>
+    </View>
   );
 }
 
@@ -632,7 +634,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: 'transparent',
+      backgroundColor: colors.background,
     },
     header: {
       flexDirection: 'row',

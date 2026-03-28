@@ -62,9 +62,8 @@ export function DataPrefetcher() {
       queryFn: () => ordersApi.listHeld(deviceId),
     });
 
-    // Preorders and Events: Pro/Enterprise only
+    // Preorders: Pro/Enterprise only
     if (isPro) {
-      // Preorders: prefetch all status tabs so no loading on tab switch
       (['pending', 'preparing', 'ready'] as const).forEach((status) => {
         queryClient.prefetchQuery({
           queryKey: ['preorders', status],
@@ -73,13 +72,11 @@ export function DataPrefetcher() {
       });
     }
 
-    // Events: for ticket scanner screen (Pro/Enterprise only)
-    if (isPro) {
-      queryClient.prefetchQuery({
-        queryKey: ['events'],
-        queryFn: () => eventsApi.list(),
-      });
-    }
+    // Events: prefetch for ticket scanner screen (available to all tiers)
+    queryClient.prefetchQuery({
+      queryKey: ['events'],
+      queryFn: () => eventsApi.list(),
+    });
   }, [selectedCatalog?.id, deviceId, queryClient]);
 
   return null;

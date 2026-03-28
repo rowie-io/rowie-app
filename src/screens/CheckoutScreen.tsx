@@ -33,7 +33,6 @@ import { shadows } from '../lib/shadows';
 import { fonts } from '../lib/fonts';
 import { PayoutsSetupBanner } from '../components/PayoutsSetupBanner';
 import { SetupRequiredBanner } from '../components/SetupRequiredBanner';
-import { StarBackground } from '../components/StarBackground';
 import logger from '../lib/logger';
 import { isValidEmailOrEmpty } from '../lib/validation';
 import { formatCents, getCurrencySymbol, toSmallestUnit, fromSmallestUnit } from '../utils/currency';
@@ -636,7 +635,7 @@ export function CheckoutScreen() {
   };
 
   return (
-    <StarBackground colors={colors} isDark={isDark}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1126,7 +1125,7 @@ export function CheckoutScreen() {
             styles.payButton,
             paymentMethod === 'cash' && styles.payButtonCash,
             paymentMethod === 'split' && styles.payButtonSplit,
-            paymentMethod === 'tap_to_pay' && { backgroundColor: isDark ? '#fff' : '#09090b' },
+            paymentMethod === 'tap_to_pay' && { backgroundColor: isDark ? '#fff' : '#1C1917' },
             isProcessing && styles.payButtonDisabled,
           ]}
           accessibilityRole="button"
@@ -1134,17 +1133,17 @@ export function CheckoutScreen() {
           accessibilityState={{ disabled: isProcessing }}
         >
           {isProcessing ? (
-            <ActivityIndicator color={paymentMethod === 'tap_to_pay' ? (isDark ? '#09090b' : '#fff') : '#fff'} accessibilityLabel="Processing payment" />
+            <ActivityIndicator color={paymentMethod === 'tap_to_pay' ? (isDark ? '#1C1917' : '#fff') : '#fff'} accessibilityLabel="Processing payment" />
           ) : (
             <>
               {paymentMethod === 'tap_to_pay' ? (
                 <>
                   {/* Apple TTPOi 5.5: Contactless payment icon (wave symbol) */}
                   <View style={styles.tapToPayIcon}>
-                    <Ionicons name="wifi" size={22} color={isDark ? '#09090b' : '#fff'} style={styles.tapToPayIconRotated} />
+                    <Ionicons name="wifi" size={22} color={isDark ? '#1C1917' : '#fff'} style={styles.tapToPayIconRotated} />
                   </View>
                   {/* Apple TTPOi 5.4: Region-correct copy */}
-                  <Text style={[styles.payButtonText, { color: isDark ? '#09090b' : '#fff' }]} maxFontSizeMultiplier={1.3}>{TAP_TO_PAY_LABEL}</Text>
+                  <Text style={[styles.payButtonText, { color: isDark ? '#1C1917' : '#fff' }]} maxFontSizeMultiplier={1.3}>{TAP_TO_PAY_LABEL}</Text>
                 </>
               ) : paymentMethod === 'cash' ? (
                 <>
@@ -1233,12 +1232,12 @@ export function CheckoutScreen() {
       </Modal>
       </KeyboardAvoidingView>
       </View>
-    </StarBackground>
+    </View>
   );
 }
 
 const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) => {
-  const headerBackground = isDark ? '#09090b' : colors.background;
+  const headerBackground = isDark ? '#1C1917' : colors.background;
 
   return StyleSheet.create({
     container: {

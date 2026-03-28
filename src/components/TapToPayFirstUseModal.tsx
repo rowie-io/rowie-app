@@ -149,7 +149,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     },
     card: {
       // Use solid opaque background instead of glass for better readability
-      backgroundColor: isDark ? '#1f2937' : '#ffffff',
+      backgroundColor: isDark ? '#292524' : '#FFFFFF',
       borderRadius: 24,
       padding: 24,
       alignItems: 'center',
@@ -193,7 +193,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     },
     featuresList: {
       width: '100%',
-      backgroundColor: isDark ? '#111827' : '#f3f4f6',
+      backgroundColor: isDark ? '#292524' : '#F5F5F4',
       borderRadius: 16,
       padding: 16,
       marginBottom: 16,
@@ -246,7 +246,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: isDark ? '#111827' : '#f3f4f6',
+      backgroundColor: isDark ? '#292524' : '#F5F5F4',
       borderWidth: 1,
       borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
     },

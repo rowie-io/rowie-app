@@ -20,7 +20,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '../context/ThemeContext';
-import { StarBackground } from './StarBackground';
 import { glow } from '../lib/shadows';
 import { radius, spacing } from '../lib/spacing';
 
@@ -87,7 +86,7 @@ export function SetupPaymentsModal({
       statusBarTranslucent
       accessibilityViewIsModal={true}
     >
-      <StarBackground colors={colors} isDark={isDark}>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={[styles.container, { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 20 }]}>
           <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
             {/* Icon */}
@@ -169,7 +168,7 @@ export function SetupPaymentsModal({
             )}
           </Animated.View>
         </View>
-      </StarBackground>
+      </View>
     </Modal>
   );
 }

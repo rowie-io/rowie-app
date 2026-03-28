@@ -1,15 +1,15 @@
 import { Dimensions, PixelRatio } from 'react-native';
 
-// Inter font family names for use in styles
+// Plus Jakarta Sans font family names for use in styles
 export const fonts = {
-  regular: 'Inter_400Regular',
-  medium: 'Inter_500Medium',
-  semiBold: 'Inter_600SemiBold',
-  bold: 'Inter_700Bold',
-  extraBold: 'Inter_800ExtraBold',
+  regular: 'PlusJakartaSans_400Regular',
+  medium: 'PlusJakartaSans_500Medium',
+  semiBold: 'PlusJakartaSans_600SemiBold',
+  bold: 'PlusJakartaSans_700Bold',
+  extraBold: 'PlusJakartaSans_800ExtraBold',
 } as const;
 
-// Font weights mapped to Inter variants
+// Font weights mapped to Plus Jakarta Sans variants
 export const fontWeights = {
   400: fonts.regular,
   500: fonts.medium,
