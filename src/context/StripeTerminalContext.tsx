@@ -592,10 +592,11 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
       setConfigurationProgress(60);
       logger.log('[StripeTerminal] Connecting to:', readerToConnect.serialNumber || 'unknown');
 
-      const connectResult = await sdkConnectReader(
-        { reader: readerToConnect, locationId: locId },
+      const connectResult = await sdkConnectReader({
+        reader: readerToConnect,
+        locationId: locId,
         discoveryMethod,
-      );
+      });
 
       // Clean up Bluetooth discovery after connect attempt
       if (discoveryMethod === 'bluetoothScan') {
