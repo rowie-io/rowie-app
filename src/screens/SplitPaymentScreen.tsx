@@ -22,11 +22,11 @@ import { useCart } from '../context/CartContext';
 import { useTerminal } from '../context/StripeTerminalContext';
 import { ordersApi, OrderPayment, stripeTerminalApi } from '../lib/api';
 import { formatCents, getCurrencySymbol, isZeroDecimal, fromSmallestUnit, toSmallestUnit } from '../utils/currency';
-import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { CardField, useConfirmPayment, CardFieldInput, initStripe } from '@stripe/stripe-react-native';
 import { config } from '../lib/config';
+import { useTranslations } from '../lib/i18n';
 
 type RouteParams = {
   SplitPayment: {
@@ -42,11 +42,12 @@ type PaymentMethod = 'card' | 'cash' | 'tap_to_pay';
 export function SplitPaymentScreen() {
   const { colors, isDark } = useTheme();
   const { currency } = useAuth();
+  const t = useTranslations('payment');
+  const tc = useTranslations('common');
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'SplitPayment'>>();
   const { clearCart } = useCart();
-  const glassColors = isDark ? glass.dark : glass.light;
   const { initializeTerminal, connectReader, processPayment: terminalProcessPayment, preferredReader, processServerDrivenPayment, waitForWarm } = useTerminal();
   const { confirmPayment } = useConfirmPayment();
 
@@ -65,7 +66,7 @@ export function SplitPaymentScreen() {
   const [paymentAmount, setPaymentAmount] = useState('');
   const [cashTendered, setCashTendered] = useState('');
 
-  const styles = createStyles(colors, glassColors, isDark);
+  const styles = createStyles(colors, isDark);
 
   // Fetch existing payments
   const fetchPayments = useCallback(async () => {
@@ -155,7 +156,7 @@ export function SplitPaymentScreen() {
         const result = await terminalProcessPayment(piResponse.clientSecret);
 
         if (result.status !== 'succeeded') {
-          throw new Error(`Payment status: ${result.status}`);
+          throw new Error(t('paymentStatus', { status: result.status }));
         }
 
         await ordersApi.addPayment(orderId, {
@@ -172,7 +173,7 @@ export function SplitPaymentScreen() {
       setShowAddPayment(false);
       resetPaymentForm();
     } catch (error: any) {
-      Alert.alert('Payment Failed', error.message || 'Failed to process payment');
+      Alert.alert(t('splitPaymentFailedTitle'), error.message || t('paymentFailed'));
     } finally {
       setIsProcessing(false);
     }
@@ -181,7 +182,7 @@ export function SplitPaymentScreen() {
   // Process manual card entry payment (regular Stripe SDK)
   const processManualCardPayment = async (amount: number) => {
     if (!cardDetails?.complete) {
-      Alert.alert('Card Required', 'Please enter your card details.');
+      Alert.alert(t('splitCardRequiredTitle'), t('splitCardRequiredMessage'));
       return;
     }
 
@@ -211,11 +212,11 @@ export function SplitPaymentScreen() {
       });
 
       if (error) {
-        throw new Error(error.message || 'Payment failed');
+        throw new Error(error.message || t('paymentFailed'));
       }
 
       if (confirmedIntent?.status !== 'Succeeded') {
-        throw new Error('Payment was not successful');
+        throw new Error(t('paymentWasNotSuccessful'));
       }
 
       await ordersApi.addPayment(orderId, {
@@ -228,7 +229,7 @@ export function SplitPaymentScreen() {
       setShowAddPayment(false);
       resetPaymentForm();
     } catch (error: any) {
-      Alert.alert('Payment Failed', error.message || 'Failed to process card payment');
+      Alert.alert(t('splitPaymentFailedTitle'), error.message || t('paymentFailed'));
     } finally {
       setIsProcessing(false);
     }
@@ -247,7 +248,7 @@ export function SplitPaymentScreen() {
       // Show change if any
       const change = tendered - amount;
       if (change > 0) {
-        Alert.alert('Change Due', `Give customer ${formatCents(change, currency)} in change`);
+        Alert.alert(t('changeDueAlertTitle'), t('changeDueAlertMessage', { amount: formatCents(change, currency) }));
       }
 
       // Refresh payments
@@ -255,7 +256,7 @@ export function SplitPaymentScreen() {
       setShowAddPayment(false);
       resetPaymentForm();
     } catch (error: any) {
-      Alert.alert('Payment Failed', error.message || 'Failed to process cash payment');
+      Alert.alert(t('splitPaymentFailedTitle'), error.message || t('paymentFailed'));
     } finally {
       setIsProcessing(false);
     }
@@ -283,19 +284,19 @@ export function SplitPaymentScreen() {
 
   const handleAddPayment = async () => {
     if (amountCents <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid payment amount');
+      Alert.alert(t('invalidAmountTitle'), t('invalidAmountMessage'));
       return;
     }
 
     if (amountCents > remainingBalance) {
-      Alert.alert('Amount Too High', `Maximum payment is ${formatCents(remainingBalance, currency)}`);
+      Alert.alert(t('amountTooHighTitle'), t('amountTooHighMessage', { amount: formatCents(remainingBalance, currency) }));
       return;
     }
 
     if (selectedMethod === 'cash') {
       const tenderedCents = toSmallestUnit(parseFloat(cashTendered || '0'), currency);
       if (tenderedCents < amountCents) {
-        Alert.alert('Insufficient Cash', 'Cash tendered must be at least the payment amount');
+        Alert.alert(t('insufficientCashSplitTitle'), t('insufficientCashSplitMessage'));
         return;
       }
       await processCashPayment(amountCents, tenderedCents);
@@ -326,13 +327,13 @@ export function SplitPaymentScreen() {
   const getPaymentMethodLabel = (method: PaymentMethod): string => {
     switch (method) {
       case 'cash':
-        return 'Cash';
+        return t('cashMethodLabel');
       case 'card':
-        return 'Card';
+        return t('cardMethodLabel');
       case 'tap_to_pay':
-        return 'Tap to Pay';
+        return t('tapToPayMethodLabel');
       default:
-        return 'Card';
+        return t('cardMethodLabel');
     }
   };
 
@@ -340,7 +341,7 @@ export function SplitPaymentScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel="Loading payment details" />
+          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('loadingPaymentDetails')} />
         </View>
       </View>
     );
@@ -359,11 +360,11 @@ export function SplitPaymentScreen() {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={tc('goBack')}
           >
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>Split Payment</Text>
+          <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>{t('splitPaymentTitle')}</Text>
           <View style={{ width: 48 }} />
         </View>
 
@@ -374,19 +375,19 @@ export function SplitPaymentScreen() {
           automaticallyAdjustKeyboardInsets
         >
           {/* Order Summary */}
-          <View style={styles.summaryCard} accessibilityRole="summary" accessibilityLabel={`Order total ${formatCents(totalAmount, currency)}, paid ${formatCents(totalPaid, currency)}, remaining ${formatCents(remainingBalance, currency)}`}>
+          <View style={styles.summaryCard} accessibilityRole="summary" accessibilityLabel={t('orderSummaryAccessibility', { totalAmount: formatCents(totalAmount, currency), totalPaid: formatCents(totalPaid, currency), remainingBalance: formatCents(remainingBalance, currency) })}>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel} maxFontSizeMultiplier={1.5}>Order Total</Text>
+              <Text style={styles.summaryLabel} maxFontSizeMultiplier={1.5}>{t('orderTotal')}</Text>
               <Text style={styles.summaryValue} maxFontSizeMultiplier={1.3}>{formatCents(totalAmount, currency)}</Text>
             </View>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel} maxFontSizeMultiplier={1.5}>Total Paid</Text>
+              <Text style={styles.summaryLabel} maxFontSizeMultiplier={1.5}>{t('totalPaid')}</Text>
               <Text style={[styles.summaryValue, { color: colors.success }]} maxFontSizeMultiplier={1.3}>
                 {formatCents(totalPaid, currency)}
               </Text>
             </View>
             <View style={[styles.summaryRow, styles.remainingRow]}>
-              <Text style={styles.remainingLabel} maxFontSizeMultiplier={1.5}>Remaining</Text>
+              <Text style={styles.remainingLabel} maxFontSizeMultiplier={1.5}>{t('remaining')}</Text>
               <Text style={styles.remainingValue} maxFontSizeMultiplier={1.2}>{formatCents(remainingBalance, currency)}</Text>
             </View>
           </View>
@@ -394,7 +395,7 @@ export function SplitPaymentScreen() {
           {/* Existing Payments */}
           {payments.length > 0 && (
             <View style={styles.paymentsSection}>
-              <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>Payments</Text>
+              <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>{t('payments')}</Text>
               {payments.map((payment, index) => (
                 <View key={payment.id || index} style={styles.paymentRow}>
                   <View style={styles.paymentLeft}>
@@ -423,15 +424,15 @@ export function SplitPaymentScreen() {
                   style={styles.addPaymentButton}
                   onPress={() => setShowAddPayment(true)}
                   accessibilityRole="button"
-                  accessibilityLabel="Add payment"
-                  accessibilityHint={`${formatCents(remainingBalance, currency)} remaining`}
+                  accessibilityLabel={t('addPayment')}
+                  accessibilityHint={t('addPaymentHint', { amount: formatCents(remainingBalance, currency) })}
                 >
                   <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
-                  <Text style={styles.addPaymentButtonText} maxFontSizeMultiplier={1.3}>Add Payment</Text>
+                  <Text style={styles.addPaymentButtonText} maxFontSizeMultiplier={1.3}>{t('addPayment')}</Text>
                 </TouchableOpacity>
               ) : (
                 <View style={styles.paymentForm}>
-                  <Text style={styles.formTitle} maxFontSizeMultiplier={1.3}>Add Payment</Text>
+                  <Text style={styles.formTitle} maxFontSizeMultiplier={1.3}>{t('addPayment')}</Text>
 
                   {/* Payment Method Selection */}
                   <View style={styles.methodSelection}>
@@ -449,7 +450,7 @@ export function SplitPaymentScreen() {
                           onPress={() => setSelectedMethod(method)}
                           disabled={belowMin}
                           accessibilityRole="button"
-                          accessibilityLabel={`${getPaymentMethodLabel(method)}${belowMin ? ', unavailable, below minimum' : ''}`}
+                          accessibilityLabel={`${getPaymentMethodLabel(method)}${belowMin ? t('belowMinimumUnavailable') : ''}`}
                           accessibilityState={{ selected: selectedMethod === method, disabled: belowMin }}
                         >
                           <Ionicons
@@ -477,14 +478,14 @@ export function SplitPaymentScreen() {
                     <View style={styles.minimumWarning} accessibilityRole="alert">
                       <Ionicons name="warning" size={16} color={colors.warning} style={styles.minimumWarningIcon} />
                       <Text style={styles.minimumWarningText} maxFontSizeMultiplier={1.5}>
-                        {`Minimum for ${selectedMethod === 'tap_to_pay' ? 'Tap to Pay' : 'Card'} is ${formatCents(50, currency)}. Use cash for smaller amounts.`}
+                        {t('minimumWarningMessage', { method: selectedMethod === 'tap_to_pay' ? t('tapToPayMethodLabel') : t('cardMethodLabel'), amount: formatCents(50, currency) })}
                       </Text>
                     </View>
                   )}
 
                   {/* Amount Input */}
                   <View style={styles.inputGroup}>
-                    <Text style={styles.inputLabel} maxFontSizeMultiplier={1.5}>Payment Amount</Text>
+                    <Text style={styles.inputLabel} maxFontSizeMultiplier={1.5}>{t('paymentAmount')}</Text>
                     <View style={styles.amountInputContainer}>
                       <Text style={styles.dollarSign} maxFontSizeMultiplier={1.3}>{getCurrencySymbol(currency)}</Text>
                       <TextInput
@@ -492,17 +493,17 @@ export function SplitPaymentScreen() {
                         value={paymentAmount}
                         onChangeText={setPaymentAmount}
                         keyboardType="decimal-pad"
-                        placeholder={isZeroDecimal(currency) ? '0' : '0.00'}
+                        placeholder={isZeroDecimal(currency) ? t('zeroDecimalPlaceholder') : t('decimalPlaceholder')}
                         placeholderTextColor={colors.textMuted}
-                        accessibilityLabel="Payment amount"
+                        accessibilityLabel={t('paymentAmountAccessibility')}
                       />
                       <TouchableOpacity
                         style={styles.remainingButton}
                         onPress={handlePayRemaining}
                         accessibilityRole="button"
-                        accessibilityLabel={`Fill remaining balance ${formatCents(remainingBalance, currency)}`}
+                        accessibilityLabel={t('fillRemainingAccessibility', { amount: formatCents(remainingBalance, currency) })}
                       >
-                        <Text style={styles.remainingButtonText} maxFontSizeMultiplier={1.3}>Remaining</Text>
+                        <Text style={styles.remainingButtonText} maxFontSizeMultiplier={1.3}>{t('remainingButton')}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -510,7 +511,7 @@ export function SplitPaymentScreen() {
                   {/* Cash Tendered (for cash payments) */}
                   {selectedMethod === 'cash' && (
                     <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel} maxFontSizeMultiplier={1.5}>Cash Tendered</Text>
+                      <Text style={styles.inputLabel} maxFontSizeMultiplier={1.5}>{t('cashTenderedLabel')}</Text>
                       <View style={styles.amountInputContainer}>
                         <Text style={styles.dollarSign} maxFontSizeMultiplier={1.3}>{getCurrencySymbol(currency)}</Text>
                         <TextInput
@@ -518,15 +519,15 @@ export function SplitPaymentScreen() {
                           value={cashTendered}
                           onChangeText={setCashTendered}
                           keyboardType="decimal-pad"
-                          placeholder={isZeroDecimal(currency) ? '0' : '0.00'}
+                          placeholder={isZeroDecimal(currency) ? t('zeroDecimalPlaceholder') : t('decimalPlaceholder')}
                           placeholderTextColor={colors.textMuted}
-                          accessibilityLabel="Cash tendered amount"
+                          accessibilityLabel={t('cashTenderedAmountAccessibility')}
                         />
                       </View>
                       {/* Change calculation */}
                       {cashTendered && paymentAmount && (
                         <View style={styles.changeDisplay}>
-                          <Text style={styles.changeLabel} maxFontSizeMultiplier={1.5}>Change Due:</Text>
+                          <Text style={styles.changeLabel} maxFontSizeMultiplier={1.5}>{t('changeDueLabel')}</Text>
                           <Text style={styles.changeAmount} maxFontSizeMultiplier={1.3}>
                             {formatCents(toSmallestUnit(Math.max(0, parseFloat(cashTendered) - parseFloat(paymentAmount)), currency), currency)}
                           </Text>
@@ -538,14 +539,14 @@ export function SplitPaymentScreen() {
                   {/* Card Entry (for manual card payments) */}
                   {selectedMethod === 'card' && (
                     <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel} maxFontSizeMultiplier={1.5}>Card Details</Text>
+                      <Text style={styles.inputLabel} maxFontSizeMultiplier={1.5}>{t('cardDetails')}</Text>
                       <CardField
                         postalCodeEnabled={false}
                         cardStyle={{
                           backgroundColor: isDark ? colors.card : '#FFFFFF',
                           textColor: colors.text,
                           placeholderColor: colors.textMuted,
-                          borderColor: glassColors.border,
+                          borderColor: colors.border,
                           borderWidth: 1,
                           borderRadius: 12,
                           fontSize: 16,
@@ -565,9 +566,9 @@ export function SplitPaymentScreen() {
                         resetPaymentForm();
                       }}
                       accessibilityRole="button"
-                      accessibilityLabel="Cancel adding payment"
+                      accessibilityLabel={t('cancelAddingPayment')}
                     >
-                      <Text style={styles.cancelFormButtonText} maxFontSizeMultiplier={1.3}>Cancel</Text>
+                      <Text style={styles.cancelFormButtonText} maxFontSizeMultiplier={1.3}>{tc('cancel')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[
@@ -577,15 +578,15 @@ export function SplitPaymentScreen() {
                       onPress={handleAddPayment}
                       disabled={isProcessing || isBelowStripeMinimum}
                       accessibilityRole="button"
-                      accessibilityLabel={isProcessing ? 'Processing payment' : 'Process payment'}
+                      accessibilityLabel={isProcessing ? t('processingPaymentAccessibility') : t('processPaymentAccessibility')}
                       accessibilityState={{ disabled: isProcessing || isBelowStripeMinimum }}
                     >
                       {isProcessing ? (
-                        <ActivityIndicator color="#fff" size="small" accessibilityLabel="Processing payment" />
+                        <ActivityIndicator color="#fff" size="small" accessibilityLabel={t('processingPaymentIndicator')} />
                       ) : (
                         <>
                           <Ionicons name="checkmark-circle" size={20} color="#fff" />
-                          <Text style={styles.processButtonText} maxFontSizeMultiplier={1.3}>Process</Text>
+                          <Text style={styles.processButtonText} maxFontSizeMultiplier={1.3}>{t('process')}</Text>
                         </>
                       )}
                     </TouchableOpacity>
@@ -603,11 +604,11 @@ export function SplitPaymentScreen() {
               style={styles.completeButton}
               onPress={handleOrderComplete}
               accessibilityRole="button"
-              accessibilityLabel="Payment complete"
-              accessibilityHint="Finish the order and go to results"
+              accessibilityLabel={t('paymentCompleteAccessibility')}
+              accessibilityHint={t('paymentCompleteHint')}
             >
               <Ionicons name="checkmark-circle" size={24} color="#fff" />
-              <Text style={styles.completeButtonText} maxFontSizeMultiplier={1.3}>Payment Complete</Text>
+              <Text style={styles.completeButtonText} maxFontSizeMultiplier={1.3}>{t('paymentComplete')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -616,7 +617,7 @@ export function SplitPaymentScreen() {
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) =>
+const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -636,19 +637,19 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 12,
-      backgroundColor: glassColors.backgroundSubtle,
+      backgroundColor: colors.background,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.borderSubtle,
+      borderBottomColor: colors.borderSubtle,
     },
     backButton: {
       width: 48,
       height: 48,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     headerTitle: {
       fontSize: 18,
@@ -662,11 +663,11 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       padding: 20,
     },
     summaryCard: {
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 20,
       padding: 20,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       marginBottom: 20,
       ...shadows.md,
     },
@@ -690,7 +691,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       marginBottom: 0,
       paddingTop: 12,
       borderTopWidth: 1,
-      borderTopColor: glassColors.borderSubtle,
+      borderTopColor: colors.borderSubtle,
     },
     remainingLabel: {
       fontSize: 16,
@@ -715,11 +716,11 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 12,
       padding: 14,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       marginBottom: 8,
     },
     paymentLeft: {
@@ -746,7 +747,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       justifyContent: 'center',
       gap: 10,
       paddingVertical: 16,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 16,
       borderWidth: 1,
       borderColor: colors.primary + '40',
@@ -758,11 +759,11 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       color: colors.primary,
     },
     paymentForm: {
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 20,
       padding: 20,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       ...shadows.md,
     },
     formTitle: {
@@ -784,9 +785,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       gap: 6,
       paddingVertical: 12,
       borderRadius: 12,
-      backgroundColor: glassColors.background,
+      backgroundColor: colors.surface,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     methodButtonSelected: {
       backgroundColor: colors.primary,
@@ -840,10 +841,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     amountInputContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: glassColors.background,
+      backgroundColor: colors.surface,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       paddingHorizontal: 14,
     },
     dollarSign: {

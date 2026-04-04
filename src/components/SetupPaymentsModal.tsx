@@ -6,22 +6,21 @@
  * account yet. Stripe Connect must be configured before Tap to Pay can work.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Modal,
-  Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-
 import { useTheme } from '../context/ThemeContext';
-import { glow } from '../lib/shadows';
-import { radius, spacing } from '../lib/spacing';
+import { fonts } from '../lib/fonts';
+import { brandGradient, brandGradientLight } from '../lib/colors';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslations } from '../lib/i18n';
 
 interface SetupPaymentsModalProps {
   visible: boolean;
@@ -37,238 +36,163 @@ export function SetupPaymentsModal({
   onSkip,
 }: SetupPaymentsModalProps) {
   const { colors, isDark } = useTheme();
+  const t = useTranslations('components.setupPaymentsModal');
   const insets = useSafeAreaInsets();
 
-  // Animations
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(30)).current;
-  const iconPulseAnim = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    if (visible) {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(iconPulseAnim, {
-            toValue: 1.08,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(iconPulseAnim, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    }
-  }, [visible]);
-
-  const styles = createStyles(colors, isDark);
+  const styles = createStyles(colors);
 
   return (
     <Modal
       visible={visible}
       transparent
-      animationType="none"
+      animationType="fade"
       statusBarTranslucent
       accessibilityViewIsModal={true}
     >
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <View style={[styles.container, { paddingTop: insets.top + 60, paddingBottom: insets.bottom + 20 }]}>
-          <Animated.View style={[styles.content, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-            {/* Icon */}
-            <Animated.View
-              style={{ transform: [{ scale: iconPulseAnim }], marginBottom: spacing.xl }}
-              accessibilityLabel="Payment card icon"
+      <View style={styles.overlay}>
+        <View style={[styles.card, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+          {/* Icon */}
+          <View style={styles.iconContainer}>
+            <Ionicons
+              name="card-outline"
+              size={40}
+              color={colors.primary}
+              accessibilityLabel={t('title')}
+            />
+          </View>
+
+          {/* Title */}
+          <Text
+            style={[styles.title, { color: colors.text }]}
+            accessibilityRole="header"
+            maxFontSizeMultiplier={1.2}
+          >
+            {t('title')}
+          </Text>
+
+          {/* Description */}
+          <Text style={[styles.description, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
+            {t('description')}
+          </Text>
+
+          {/* Feature bullets */}
+          <View style={styles.featuresList}>
+            {(['featureSecure', 'featureDirectDeposits', 'featureTimeline'] as const).map((key) => (
+              <View key={key} style={styles.featureRow}>
+                <Ionicons name="checkmark" size={16} color={colors.primary} />
+                <Text style={[styles.featureText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>{t(key)}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Actions */}
+          <TouchableOpacity
+            onPress={onSetup}
+            activeOpacity={0.85}
+            style={styles.setupButtonWrap}
+            accessibilityRole="button"
+            accessibilityLabel={t('setupButtonText')}
+            accessibilityHint={t('setupButtonText')}
+          >
+            <LinearGradient
+              colors={isDark ? brandGradient : brandGradientLight}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.setupButton}
             >
-              <LinearGradient
-                colors={[colors.primary, colors.primary700]}
-                style={styles.iconGradient}
-              >
-                <Ionicons name="card" size={36} color="#fff" />
-              </LinearGradient>
-            </Animated.View>
+              <Text style={styles.setupButtonText} maxFontSizeMultiplier={1.3}>{t('setupButtonText')}</Text>
+            </LinearGradient>
+          </TouchableOpacity>
 
-            {/* Title */}
-            <Text
-              style={styles.title}
-              accessibilityRole="header"
-              maxFontSizeMultiplier={1.2}
-            >
-              Set Up Payments
-            </Text>
-
-            {/* Description */}
-            <Text style={styles.description} maxFontSizeMultiplier={1.5}>
-              Connect your bank account to start accepting payments. This only takes a few minutes.
-            </Text>
-
-            {/* Features */}
-            <View style={styles.featuresList}>
-              {[
-                { icon: 'shield-checkmark', text: 'Secure payment processing' },
-                { icon: 'cash', text: 'Direct deposits to your bank' },
-                { icon: 'time', text: 'Takes about 5 minutes' },
-              ].map((feature, index) => (
-                <View key={index} style={styles.featureRow}>
-                  <View style={styles.featureIconBg}>
-                    <Ionicons name={feature.icon as any} size={18} color={colors.primary} />
-                  </View>
-                  <Text style={styles.featureText} maxFontSizeMultiplier={1.5}>{feature.text}</Text>
-                </View>
-              ))}
-            </View>
-          </Animated.View>
-
-          {/* Bottom actions */}
-          <Animated.View style={[styles.bottomActions, { opacity: fadeAnim, paddingBottom: insets.bottom > 0 ? 0 : spacing.md }]}>
+          {onSkip && (
             <TouchableOpacity
-              onPress={onSetup}
-              activeOpacity={0.9}
-              style={styles.setupButtonWrapper}
+              onPress={onSkip}
+              activeOpacity={0.7}
+              style={styles.skipButton}
               accessibilityRole="button"
-              accessibilityLabel="Set Up Payments"
-              accessibilityHint="Opens Stripe Connect to set up your payment processing account"
+              accessibilityLabel={t('skipButtonText')}
+              accessibilityHint={t('skipButtonText')}
             >
-              <LinearGradient
-                colors={[colors.primary, colors.primary700]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.setupButton}
-              >
-                <Text style={styles.setupButtonText} maxFontSizeMultiplier={1.3}>Set Up Payments</Text>
-                <Ionicons name="arrow-forward" size={20} color="#fff" />
-              </LinearGradient>
+              <Text style={[styles.skipText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.3}>{t('skipButtonText')}</Text>
             </TouchableOpacity>
-
-            {onSkip && (
-              <TouchableOpacity
-                onPress={onSkip}
-                activeOpacity={0.7}
-                style={styles.skipButton}
-                accessibilityRole="button"
-                accessibilityLabel="Skip for now"
-                accessibilityHint="Skip payment setup and go to the app. You can set up payments later in Settings."
-              >
-                <Text style={styles.skipText} maxFontSizeMultiplier={1.3}>I'll do this later</Text>
-              </TouchableOpacity>
-            )}
-          </Animated.View>
+          )}
         </View>
       </View>
     </Modal>
   );
 }
 
-const createStyles = (colors: any, isDark: boolean) =>
+const createStyles = (colors: any) =>
   StyleSheet.create({
-    container: {
+    overlay: {
       flex: 1,
-      paddingHorizontal: spacing.xl,
-      justifyContent: 'space-between',
-    },
-    content: {
-      alignItems: 'center',
-      flex: 1,
+      backgroundColor: colors.overlay,
       justifyContent: 'center',
-    },
-    iconGradient: {
-      width: 88,
-      height: 88,
-      borderRadius: 28,
       alignItems: 'center',
-      justifyContent: 'center',
-      shadowColor: colors.primary,
-      shadowOffset: { width: 0, height: 8 },
-      shadowOpacity: 0.4,
-      shadowRadius: 24,
-      elevation: 12,
+      paddingHorizontal: 24,
+    },
+    card: {
+      width: '100%',
+      backgroundColor: colors.card,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 24,
+      alignItems: 'center',
+    },
+    iconContainer: {
+      marginBottom: 16,
     },
     title: {
-      fontSize: 28,
-      fontWeight: '700',
-      color: colors.text,
+      fontSize: 20,
+      fontFamily: fonts.bold,
       textAlign: 'center',
-      marginBottom: spacing.sm,
-      letterSpacing: -0.5,
+      marginBottom: 8,
     },
     description: {
-      fontSize: 16,
-      color: colors.textSecondary,
+      fontSize: 15,
+      fontFamily: fonts.regular,
       textAlign: 'center',
-      lineHeight: 24,
-      marginBottom: spacing.xl,
-      paddingHorizontal: spacing.md,
+      lineHeight: 22,
+      marginBottom: 20,
     },
     featuresList: {
       width: '100%',
-      backgroundColor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.03)',
-      borderRadius: radius.xl,
-      padding: spacing.lg,
-      borderWidth: 1,
-      borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.05)',
+      marginBottom: 24,
+      gap: 10,
     },
     featureRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: spacing.md,
-      paddingVertical: 10,
-    },
-    featureIconBg: {
-      width: 36,
-      height: 36,
-      borderRadius: 10,
-      backgroundColor: colors.primary + '18',
-      alignItems: 'center',
-      justifyContent: 'center',
+      gap: 10,
     },
     featureText: {
       fontSize: 15,
-      color: colors.text,
+      fontFamily: fonts.regular,
       flex: 1,
-      fontWeight: '500',
     },
-    bottomActions: {
+    setupButtonWrap: {
       width: '100%',
-      alignItems: 'center',
-    },
-    setupButtonWrapper: {
-      width: '100%',
-      ...glow(colors.primary, 'subtle'),
     },
     setupButton: {
-      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: spacing.sm,
-      paddingVertical: 18,
-      borderRadius: radius.lg,
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      borderRadius: 14,
     },
     setupButtonText: {
-      fontSize: 17,
-      fontWeight: '600',
+      fontSize: 16,
+      fontFamily: fonts.semiBold,
       color: '#fff',
     },
     skipButton: {
-      marginTop: spacing.lg,
-      paddingVertical: spacing.sm,
+      marginTop: 16,
+      paddingVertical: 8,
     },
     skipText: {
       fontSize: 15,
-      color: colors.textMuted,
+      fontFamily: fonts.regular,
       textAlign: 'center',
     },
   });

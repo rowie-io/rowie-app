@@ -144,7 +144,14 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
       socketRef.current = io(socketUrl, {
         path: '/socket.io',
-        auth: { token },
+        auth: (cb) => {
+          // Dynamic callback — fetches fresh token on each reconnect attempt
+          authService.getAccessToken().then((freshToken) => {
+            cb({ token: freshToken || token });
+          }).catch(() => {
+            cb({ token }); // Fall back to original token
+          });
+        },
         transports: ['websocket'],
         reconnection: true,
         reconnectionAttempts: 10,

@@ -13,8 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { Product } from '../lib/api/products';
-import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
+import { useTranslations } from '../lib/i18n';
 
 interface ItemNotesModalProps {
   visible: boolean;
@@ -24,17 +24,17 @@ interface ItemNotesModalProps {
   onCancel: () => void;
 }
 
-// Common quick-add notes for food service
-const QUICK_NOTES = [
-  'No ice',
-  'Extra ice',
-  'No straw',
-  'Light ice',
-  'No onions',
-  'Extra sauce',
-  'Gluten-free',
-  'Dairy-free',
-];
+// Quick note keys mapped to translation keys
+const QUICK_NOTE_KEYS = [
+  'quickNoteNoIce',
+  'quickNoteExtraIce',
+  'quickNoteNoStraw',
+  'quickNoteLightIce',
+  'quickNoteNoOnions',
+  'quickNoteExtraSauce',
+  'quickNoteGlutenFree',
+  'quickNoteDairyFree',
+] as const;
 
 export function ItemNotesModal({
   visible,
@@ -44,7 +44,8 @@ export function ItemNotesModal({
   onCancel,
 }: ItemNotesModalProps) {
   const { colors, isDark } = useTheme();
-  const glassColors = isDark ? glass.dark : glass.light;
+  const t = useTranslations('components.itemNotes');
+  const tc = useTranslations('common');
   const [notes, setNotes] = useState(initialNotes);
 
   // Reset notes when modal opens with new product
@@ -81,7 +82,7 @@ export function ItemNotesModal({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <Pressable style={styles.overlay} onPress={onCancel} accessibilityLabel="Close" accessibilityRole="button">
+        <Pressable style={styles.overlay} onPress={onCancel} accessibilityLabel={tc('close')} accessibilityRole="button">
           <Pressable
             style={[styles.container, { backgroundColor: colors.card }]}
             onPress={(e) => e.stopPropagation()}
@@ -90,27 +91,27 @@ export function ItemNotesModal({
             <View style={styles.header}>
               <View style={styles.headerLeft}>
                 <Text style={[styles.title, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-                  Add Notes
+                  {t('title')}
                 </Text>
                 <Text style={[styles.productName, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
                   {product.name}
                 </Text>
               </View>
               <TouchableOpacity
-                style={[styles.closeButton, { backgroundColor: glassColors.backgroundElevated }]}
+                style={[styles.closeButton, { backgroundColor: colors.card }]}
                 onPress={onCancel}
                 accessibilityRole="button"
-                accessibilityLabel="Close"
+                accessibilityLabel={tc('close')}
               >
                 <Ionicons name="close" size={20} color={colors.text} />
               </TouchableOpacity>
             </View>
 
             {/* Notes Input */}
-            <View style={[styles.inputContainer, { backgroundColor: glassColors.background, borderColor: glassColors.border }]}>
+            <View style={[styles.inputContainer, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <TextInput
                 style={[styles.input, { color: colors.text }]}
-                placeholder="Special instructions (e.g., no onions, extra sauce)"
+                placeholder={t('inputPlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 value={notes}
                 onChangeText={setNotes}
@@ -118,28 +119,31 @@ export function ItemNotesModal({
                 numberOfLines={3}
                 maxLength={500}
                 autoFocus
-                accessibilityLabel={`Special instructions for ${product.name}`}
+                accessibilityLabel={t('inputAccessibilityLabel', { name: product.name })}
               />
             </View>
 
             {/* Quick Notes */}
             <Text style={[styles.quickNotesLabel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-              Quick add:
+              {t('quickAddLabel')}
             </Text>
             <View style={styles.quickNotes}>
-              {QUICK_NOTES.map((note) => (
+              {QUICK_NOTE_KEYS.map((noteKey) => {
+                const noteText = t(noteKey);
+                return (
                 <TouchableOpacity
-                  key={note}
-                  style={[styles.quickNoteButton, { backgroundColor: glassColors.backgroundElevated, borderColor: glassColors.border }]}
-                  onPress={() => handleQuickNote(note)}
+                  key={noteKey}
+                  style={[styles.quickNoteButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+                  onPress={() => handleQuickNote(noteText)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Add ${note}`}
+                  accessibilityLabel={noteText}
                 >
                   <Text style={[styles.quickNoteText, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-                    {note}
+                    {noteText}
                   </Text>
                 </TouchableOpacity>
-              ))}
+                );
+              })}
             </View>
 
             {/* Buttons */}
@@ -148,22 +152,22 @@ export function ItemNotesModal({
                 style={[styles.button, styles.skipButton, { borderColor: colors.border }]}
                 onPress={() => onConfirm('')}
                 accessibilityRole="button"
-                accessibilityLabel="Skip notes"
-                accessibilityHint="Adds item to cart without special instructions"
+                accessibilityLabel={t('skipNotes')}
+                accessibilityHint={t('skipNotes')}
               >
                 <Text style={[styles.buttonText, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-                  Skip Notes
+                  {t('skipNotes')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.button, styles.addButton, { backgroundColor: colors.primary }]}
                 onPress={handleConfirm}
                 accessibilityRole="button"
-                accessibilityLabel="Add to cart"
-                accessibilityHint="Adds item with notes to cart"
+                accessibilityLabel={t('addToCart')}
+                accessibilityHint={t('addToCart')}
               >
                 <Text style={[styles.buttonText, { color: '#FFFFFF' }]} maxFontSizeMultiplier={1.3}>
-                  Add to Cart
+                  {t('addToCart')}
                 </Text>
               </TouchableOpacity>
             </View>

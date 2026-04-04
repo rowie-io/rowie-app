@@ -1,6 +1,6 @@
-import React, { memo, useRef } from 'react';
+import React, { memo, useState } from 'react';
 import {
-  Animated,
+  View,
   TextInput,
   TextInputProps,
   StyleSheet,
@@ -9,8 +9,9 @@ import {
   AccessibilityProps,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../lib/colors';
+import { useTheme } from '../context/ThemeContext';
 import { fonts } from '../lib/fonts';
+import { radius } from '../lib/spacing';
 
 interface InputProps extends Omit<TextInputProps, 'style'>, AccessibilityProps {
   icon?: keyof typeof Ionicons.glyphMap;
@@ -35,36 +36,27 @@ export const Input = memo(function Input({
   accessibilityHint,
   ...props
 }: InputProps) {
-  const focusAnim = useRef(new Animated.Value(0)).current;
+  const { colors } = useTheme();
+  const [isFocused, setIsFocused] = useState(false);
 
   const handleFocus = (e: any) => {
-    Animated.timing(focusAnim, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
+    setIsFocused(true);
     onFocus?.(e);
   };
 
   const handleBlur = (e: any) => {
-    Animated.timing(focusAnim, {
-      toValue: 0,
-      duration: 200,
-      useNativeDriver: false,
-    }).start();
+    setIsFocused(false);
     onBlur?.(e);
   };
 
-  const borderColor = focusAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [colors.gray700, colors.primary],
-  });
-
   return (
-    <Animated.View
+    <View
       style={[
         styles.container,
-        { borderColor },
+        {
+          backgroundColor: colors.inputBackground,
+          borderColor: isFocused ? colors.primary : colors.inputBorder,
+        },
         containerStyle,
       ]}
     >
@@ -72,18 +64,19 @@ export const Input = memo(function Input({
         <Ionicons
           name={icon}
           size={20}
-          color={colors.gray500}
+          color={colors.textMuted}
           style={styles.icon}
         />
       )}
       <TextInput
         style={[
           styles.input,
+          { color: colors.inputText },
           icon && styles.inputWithIcon,
           rightIcon && styles.inputWithRightIcon,
           inputStyle,
         ]}
-        placeholderTextColor={colors.gray500}
+        placeholderTextColor={colors.inputPlaceholder}
         selectionColor={colors.primary}
         onFocus={handleFocus}
         onBlur={handleBlur}
@@ -96,7 +89,7 @@ export const Input = memo(function Input({
         {...props}
       />
       {rightIcon}
-    </Animated.View>
+    </View>
   );
 });
 
@@ -104,10 +97,8 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(41, 37, 36, 0.5)',
-    borderWidth: 2,
-    borderColor: colors.gray700,
-    borderRadius: 12,
+    borderWidth: 1,
+    borderRadius: radius.lg,
   },
   icon: {
     marginLeft: 12,
@@ -115,10 +106,9 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     fontSize: 16,
     fontFamily: fonts.regular,
-    color: colors.text,
     outlineStyle: 'none',
   } as any,
   inputWithIcon: {

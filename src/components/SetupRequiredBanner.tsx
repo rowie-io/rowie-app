@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import { fonts } from '../lib/fonts';
+import { useTranslations } from '../lib/i18n';
 
 interface SetupRequiredBannerProps {
   compact?: boolean;
@@ -11,6 +12,8 @@ interface SetupRequiredBannerProps {
 
 export function SetupRequiredBanner({ compact = false }: SetupRequiredBannerProps) {
   const { colors, isDark } = useTheme();
+  const t = useTranslations('components.setupRequiredBanner');
+  const tc = useTranslations('common');
   const navigation = useNavigation<any>();
 
   // Solid colors for dark mode to prevent stars showing through
@@ -29,12 +32,12 @@ export function SetupRequiredBanner({ compact = false }: SetupRequiredBannerProp
         onPress={handleSetup}
         activeOpacity={0.7}
         accessibilityRole="button"
-        accessibilityLabel="Complete payment setup to accept payments"
-        accessibilityHint="Navigates to the Stripe onboarding screen to complete payment setup"
+        accessibilityLabel={t('compactText')}
+        accessibilityHint={t('compactText')}
       >
         <Ionicons name="warning" size={16} color={colors.warning} />
         <Text style={[styles.compactText, { color: colors.warning }]} maxFontSizeMultiplier={1.3}>
-          Complete payment setup to accept payments
+          {t('compactText')}
         </Text>
         <Ionicons name="chevron-forward" size={16} color={colors.warning} />
       </TouchableOpacity>
@@ -51,9 +54,9 @@ export function SetupRequiredBanner({ compact = false }: SetupRequiredBannerProp
           <Ionicons name="card-outline" size={24} color={colors.warning} />
         </View>
         <View style={styles.textContainer}>
-          <Text style={[styles.title, { color: colors.text }]} maxFontSizeMultiplier={1.5}>Payment Setup Required</Text>
+          <Text style={[styles.title, { color: colors.text }]} maxFontSizeMultiplier={1.5}>{t('title')}</Text>
           <Text style={[styles.description, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-            Complete your payment setup to start accepting payments
+            {t('description')}
           </Text>
         </View>
       </View>
@@ -62,10 +65,10 @@ export function SetupRequiredBanner({ compact = false }: SetupRequiredBannerProp
         onPress={handleSetup}
         activeOpacity={0.8}
         accessibilityRole="button"
-        accessibilityLabel="Complete Setup"
-        accessibilityHint="Navigates to the Stripe onboarding screen to complete payment setup"
+        accessibilityLabel={tc('completeSetup')}
+        accessibilityHint={t('description')}
       >
-        <Text style={styles.buttonText} maxFontSizeMultiplier={1.3}>Complete Setup</Text>
+        <Text style={styles.buttonText} maxFontSizeMultiplier={1.3}>{tc('completeSetup')}</Text>
         <Ionicons name="arrow-forward" size={16} color="#fff" />
       </TouchableOpacity>
     </View>

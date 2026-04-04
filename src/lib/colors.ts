@@ -1,52 +1,12 @@
 // Rowie brand design system — amber/stone warm palette
+// Clean & minimal: flat surfaces, thin borders, typography-driven hierarchy
 
-// Glass/Glassmorphism colors
-export const glass = {
-  dark: {
-    background: '#1C1917',
-    backgroundElevated: '#292524',
-    backgroundSubtle: '#0C0A09',
-    border: '#44403C',
-    borderLight: '#57534E',
-    borderSubtle: '#292524',
-    highlight: 'rgba(255, 255, 255, 0.15)',
-    overlay: 'rgba(0, 0, 0, 0.6)',
-  },
-  light: {
-    background: '#FFFFFF',
-    backgroundElevated: '#FFFFFF',
-    backgroundSubtle: '#FAFAF9',
-    border: 'rgba(0, 0, 0, 0.06)',
-    borderLight: 'rgba(0, 0, 0, 0.04)',
-    borderSubtle: 'rgba(0, 0, 0, 0.03)',
-    highlight: 'rgba(0, 0, 0, 0.05)',
-    overlay: 'rgba(255, 255, 255, 0.9)',
-  },
-};
-
-// Gradient presets
-export const gradients = {
-  // Primary amber gradient
-  primary: ['#F59E0B', '#D97706'] as const,
-  primaryReverse: ['#D97706', '#F59E0B'] as const,
-
-  // Surface gradients
-  surfaceDark: ['#1C1917', '#0C0A09'] as const,
-  surfaceLight: ['#FFFFFF', '#FAFAF9'] as const,
-
-  // Glass gradients (for borders/highlights)
-  glassDark: ['rgba(255,255,255,0.08)', 'rgba(255,255,255,0.02)'] as const,
-  glassLight: ['rgba(0,0,0,0.05)', 'rgba(0,0,0,0.01)'] as const,
-
-  // Background gradients
-  backgroundDark: ['#0C0A09', '#1C1917', '#0C0A09'] as const,
-  backgroundLight: ['#FFFFFF', '#FAFAF9', '#FFFFFF'] as const,
-
-  // Status gradients
-  success: ['#22c55e', '#16a34a'] as const,
-  error: ['#ef4444', '#dc2626'] as const,
-  warning: ['#f59e0b', '#d97706'] as const,
-};
+// Brand gradient — matches the wordmark and website
+// Use on: buttons, badges, icons, loaders, active states
+// Dark mode: full amber→deep orange gradient
+export const brandGradient: [string, string] = ['#F59E0B', '#C2410C'];
+// Light mode: softer amber→warm amber (less contrast, doesn't look harsh on white)
+export const brandGradientLight: [string, string] = ['#F59E0B', '#D97706'];
 
 // Primary amber palette (shared between themes)
 const primaryPalette = {
@@ -105,6 +65,7 @@ export const darkColors = {
   surface: '#292524',
   surfaceSecondary: '#292524',
   surfaceElevated: '#292524',
+  surfaceTertiary: '#1C1917',
 
   // Card styling
   card: '#292524',
@@ -115,6 +76,7 @@ export const darkColors = {
   border: '#44403C',
   borderLight: '#57534E',
   borderSubtle: '#292524',
+  divider: '#292524',
 
   // Text
   text: '#F5F5F4',
@@ -133,6 +95,13 @@ export const darkColors = {
   tabBarBorder: '#44403C',
   tabInactive: '#78716C',
   tabActive: '#F59E0B',
+
+  // Chips
+  chipBg: '#292524',
+  chipBgActive: 'rgba(245, 158, 11, 0.15)',
+
+  // Buttons
+  buttonSecondaryBg: '#292524',
 
   // Overlay
   overlay: 'rgba(0, 0, 0, 0.7)',
@@ -158,6 +127,7 @@ export const lightColors = {
   surface: '#FAFAF9',
   surfaceSecondary: '#F5F5F4',
   surfaceElevated: '#FFFFFF',
+  surfaceTertiary: '#FAFAF9',
 
   // Card styling
   card: '#FFFFFF',
@@ -168,6 +138,7 @@ export const lightColors = {
   border: '#E7E5E4',
   borderLight: '#F5F5F4',
   borderSubtle: '#F5F5F4',
+  divider: '#F5F5F4',
 
   // Text
   text: '#1C1917',
@@ -186,6 +157,13 @@ export const lightColors = {
   tabBarBorder: '#E7E5E4',
   tabInactive: '#78716C',
   tabActive: '#F59E0B',
+
+  // Chips
+  chipBg: '#F5F5F4',
+  chipBgActive: 'rgba(245, 158, 11, 0.1)',
+
+  // Buttons
+  buttonSecondaryBg: '#F5F5F4',
 
   // Overlay
   overlay: 'rgba(0, 0, 0, 0.5)',

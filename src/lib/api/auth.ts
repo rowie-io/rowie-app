@@ -28,6 +28,8 @@ export interface User {
   tapToPayDeviceIds?: string[];
   currency?: string;
   rates?: ComputedRates;
+  language?: string;
+  orgLanguage?: string;
 }
 
 export interface Organization {

@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 
-export type CatalogLayoutType = 'grid' | 'list' | 'large-grid' | 'compact';
+export type CatalogLayoutType = 'classic-grid' | 'split-view' | 'list' | 'cards' | 'mosaic' | 'compact';
 export type PreorderPaymentMode = 'pay_now' | 'pay_at_pickup' | 'both';
 
 export interface Catalog {

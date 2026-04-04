@@ -18,7 +18,7 @@ import {
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import { glass } from '../lib/colors';
+import { useTranslations } from '../lib/i18n';
 import type { Category } from '../lib/api';
 import { Toggle } from './Toggle';
 
@@ -42,8 +42,8 @@ export function CategoryManagerModal({
   onClose,
 }: CategoryManagerModalProps) {
   const { colors, isDark } = useTheme();
-  const glassColors = isDark ? glass.dark : glass.light;
-
+  const t = useTranslations('components.categoryManager');
+  const tc = useTranslations('common');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -71,7 +71,7 @@ export function CategoryManagerModal({
       await onCreateCategory(name);
       setNewCategoryName('');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create category');
+      Alert.alert(tc('error'), error.message || t('errorFailedToCreate'));
     } finally {
       setIsCreating(false);
     }
@@ -97,7 +97,7 @@ export function CategoryManagerModal({
       setEditingCategoryId(null);
       setEditingName('');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update category');
+      Alert.alert(tc('error'), error.message || t('errorFailedToUpdate'));
     } finally {
       setSavingIds(prev => {
         const next = new Set(prev);
@@ -112,7 +112,7 @@ export function CategoryManagerModal({
     try {
       await onUpdateCategory(category.id, { isActive: !category.isActive });
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update category');
+      Alert.alert(tc('error'), error.message || t('errorFailedToUpdate'));
     } finally {
       setSavingIds(prev => {
         const next = new Set(prev);
@@ -124,19 +124,19 @@ export function CategoryManagerModal({
 
   const handleDeleteCategory = async (category: Category) => {
     Alert.alert(
-      'Delete Category',
-      `Are you sure you want to delete "${category.name}"? Products in this category will become uncategorized.`,
+      t('deleteCategoryTitle'),
+      t('deleteCategoryMessage', { name: category.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: tc('cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: tc('delete'),
           style: 'destructive',
           onPress: async () => {
             setSavingIds(prev => new Set(prev).add(category.id));
             try {
               await onDeleteCategory(category.id);
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to delete category');
+              Alert.alert(tc('error'), error.message || t('errorFailedToDelete'));
             } finally {
               setSavingIds(prev => {
                 const next = new Set(prev);
@@ -150,7 +150,7 @@ export function CategoryManagerModal({
     );
   };
 
-  const styles = createStyles(colors, glassColors, isDark);
+  const styles = createStyles(colors, isDark);
 
   return (
     <Modal
@@ -163,13 +163,13 @@ export function CategoryManagerModal({
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Pressable style={styles.overlay} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
+        <Pressable style={styles.overlay} onPress={onClose} accessibilityLabel={tc('close')} accessibilityRole="button" />
 
         <View style={styles.content}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title} maxFontSizeMultiplier={1.3}>Manage Categories</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton} accessibilityRole="button" accessibilityLabel="Close">
+            <Text style={styles.title} maxFontSizeMultiplier={1.3}>{t('title')}</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeButton} accessibilityRole="button" accessibilityLabel={tc('close')}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
@@ -181,12 +181,12 @@ export function CategoryManagerModal({
                 style={styles.createInput}
                 value={newCategoryName}
                 onChangeText={setNewCategoryName}
-                placeholder="New category name"
+                placeholder={t('newCategoryPlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 maxLength={50}
                 onSubmitEditing={handleCreateCategory}
                 returnKeyType="done"
-                accessibilityLabel="New category name"
+                accessibilityLabel={t('newCategoryPlaceholder')}
               />
               <TouchableOpacity
                 style={[
@@ -196,10 +196,10 @@ export function CategoryManagerModal({
                 onPress={handleCreateCategory}
                 disabled={!newCategoryName.trim() || isCreating}
                 accessibilityRole="button"
-                accessibilityLabel={isCreating ? 'Creating category' : 'Create category'}
+                accessibilityLabel={isCreating ? tc('creating') : tc('create')}
               >
                 {isCreating ? (
-                  <ActivityIndicator size="small" color="#fff" accessibilityLabel="Creating" />
+                  <ActivityIndicator size="small" color="#fff" accessibilityLabel={tc('creating')} />
                 ) : (
                   <Ionicons name="add" size={24} color="#fff" />
                 )}
@@ -218,7 +218,7 @@ export function CategoryManagerModal({
               <View style={styles.infoHint}>
                 <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
                 <Text style={styles.infoHintText} maxFontSizeMultiplier={1.5}>
-                  Products can be assigned to categories when editing them
+                  {t('infoHint')}
                 </Text>
               </View>
             )}
@@ -226,9 +226,9 @@ export function CategoryManagerModal({
             {sortedCategories.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="folder-open-outline" size={56} color={colors.textMuted} />
-                <Text style={styles.emptyStateText} maxFontSizeMultiplier={1.3}>No categories yet</Text>
+                <Text style={styles.emptyStateText} maxFontSizeMultiplier={1.3}>{t('emptyStateTitle')}</Text>
                 <Text style={styles.emptyStateSubtext} maxFontSizeMultiplier={1.5}>
-                  Create your first category above to organize your products
+                  {t('emptyStateSubtext')}
                 </Text>
               </View>
             ) : (
@@ -247,17 +247,17 @@ export function CategoryManagerModal({
                           autoFocus
                           maxLength={50}
                           onSubmitEditing={() => handleSaveEdit(category.id)}
-                          accessibilityLabel="Edit category name"
+                          accessibilityLabel={t('editCategoryName')}
                         />
                         <TouchableOpacity
                           style={styles.editActionButton}
                           onPress={() => handleSaveEdit(category.id)}
                           disabled={isSaving}
                           accessibilityRole="button"
-                          accessibilityLabel="Save category name"
+                          accessibilityLabel={t('saveCategoryName')}
                         >
                           {isSaving ? (
-                            <ActivityIndicator size="small" color={colors.success} accessibilityLabel="Saving" />
+                            <ActivityIndicator size="small" color={colors.success} accessibilityLabel={tc('saving')} />
                           ) : (
                             <Ionicons name="checkmark" size={22} color={colors.success} />
                           )}
@@ -266,7 +266,7 @@ export function CategoryManagerModal({
                           style={styles.editActionButton}
                           onPress={handleCancelEdit}
                           accessibilityRole="button"
-                          accessibilityLabel="Cancel editing"
+                          accessibilityLabel={t('cancelEditing')}
                         >
                           <Ionicons name="close" size={22} color={colors.error} />
                         </TouchableOpacity>
@@ -277,8 +277,8 @@ export function CategoryManagerModal({
                           style={styles.categoryInfo}
                           onPress={() => handleStartEdit(category)}
                           accessibilityRole="button"
-                          accessibilityLabel={`Edit ${category.name}`}
-                          accessibilityHint="Tap to rename this category"
+                          accessibilityLabel={t('editCategory', { name: category.name })}
+                          accessibilityHint={t('tapToRenameHint')}
                         >
                           <View style={styles.categoryNameRow}>
                             <Text style={[
@@ -289,30 +289,30 @@ export function CategoryManagerModal({
                             </Text>
                             {!category.isActive && (
                               <View style={styles.hiddenBadge}>
-                                <Text style={styles.hiddenBadgeText} maxFontSizeMultiplier={1.5}>Hidden</Text>
+                                <Text style={styles.hiddenBadgeText} maxFontSizeMultiplier={1.5}>{tc('hidden')}</Text>
                               </View>
                             )}
                           </View>
                           <Text style={styles.productCount} maxFontSizeMultiplier={1.5}>
-                            {category.productCount} {category.productCount === 1 ? 'product' : 'products'}
+                            {category.productCount} {category.productCount === 1 ? tc('product') : tc('products')}
                           </Text>
                         </TouchableOpacity>
 
                         <View style={styles.categoryActions}>
                           {isSaving ? (
-                            <ActivityIndicator size="small" color={colors.primary} accessibilityLabel="Saving" />
+                            <ActivityIndicator size="small" color={colors.primary} accessibilityLabel={tc('saving')} />
                           ) : (
                             <>
                               <Toggle
                                 value={category.isActive}
                                 onValueChange={() => handleToggleActive(category)}
-                                accessibilityLabel={`${category.name} visibility`}
+                                accessibilityLabel={t('categoryVisibility', { name: category.name })}
                               />
                               <TouchableOpacity
                                 style={styles.deleteButton}
                                 onPress={() => handleDeleteCategory(category)}
                                 accessibilityRole="button"
-                                accessibilityLabel={`Delete ${category.name}`}
+                                accessibilityLabel={t('deleteCategory', { name: category.name })}
                               >
                                 <Ionicons name="trash-outline" size={20} color={colors.error} />
                               </TouchableOpacity>
@@ -332,7 +332,7 @@ export function CategoryManagerModal({
   );
 }
 
-const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
+const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -362,7 +362,7 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       paddingHorizontal: 20,
       paddingVertical: 16,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.border,
+      borderBottomColor: colors.border,
     },
     title: {
       fontSize: 18,
@@ -373,14 +373,14 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       alignItems: 'center',
       justifyContent: 'center',
     },
     createSection: {
       padding: 16,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.border,
+      borderBottomColor: colors.border,
     },
     createInputRow: {
       flexDirection: 'row',
@@ -389,9 +389,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
     },
     createInput: {
       flex: 1,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderRadius: 12,
       paddingHorizontal: 16,
       paddingVertical: 12,
@@ -451,9 +451,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
     categoryItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderRadius: 12,
       padding: 12,
       marginBottom: 8,

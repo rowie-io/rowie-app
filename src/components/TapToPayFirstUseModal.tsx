@@ -16,12 +16,11 @@ import {
   Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 
 import { useTheme } from '../context/ThemeContext';
-import { glass } from '../lib/colors';
 import { shadows } from '../lib/shadows';
+import { useTranslations } from '../lib/i18n';
 
 // Apple TTPOi 5.4: Region-correct copy
 const TAP_TO_PAY_NAME = Platform.OS === 'ios' ? 'Tap to Pay on iPhone' : 'Tap to Pay';
@@ -40,8 +39,8 @@ export function TapToPayFirstUseModal({
   onProceed,
 }: TapToPayFirstUseModalProps) {
   const { colors, isDark } = useTheme();
-  const glassColors = isDark ? glass.dark : glass.light;
-  const styles = createStyles(colors, glassColors, isDark);
+  const t = useTranslations('components.tapToPayFirstUse');
+  const styles = createStyles(colors, isDark);
 
   return (
     <Modal
@@ -55,44 +54,41 @@ export function TapToPayFirstUseModal({
           <View style={styles.card}>
             {/* Icon */}
             <View style={styles.iconContainer}>
-              <LinearGradient
-                colors={[colors.primary, colors.primary700]}
-                style={styles.iconGradient}
-              >
+              <View style={[styles.iconGradient, { backgroundColor: colors.primary }]}>
                 <View style={styles.iconInner}>
                   <Ionicons name="wifi" size={32} color="#fff" style={styles.wifiIcon} />
                 </View>
-              </LinearGradient>
+              </View>
             </View>
 
             {/* Title */}
-            <Text style={styles.title} maxFontSizeMultiplier={1.3}>Welcome to {TAP_TO_PAY_NAME}</Text>
+            <Text style={styles.title} maxFontSizeMultiplier={1.3}>{t('welcomeTitle', { name: TAP_TO_PAY_NAME })}</Text>
 
             {/* Description */}
             <Text style={styles.description} maxFontSizeMultiplier={1.5}>
-              Accept contactless payments directly on your device. No additional hardware needed.
+              {t('description')}
             </Text>
 
             {/* Features list */}
             <View style={styles.featuresList}>
               <View style={styles.featureRow}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                <Text style={styles.featureText} maxFontSizeMultiplier={1.5}>Quick and secure payments</Text>
+                <Text style={styles.featureText} maxFontSizeMultiplier={1.5}>{t('featureQuickSecure')}</Text>
               </View>
               <View style={styles.featureRow}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                <Text style={styles.featureText} maxFontSizeMultiplier={1.5}>Works with cards and digital wallets</Text>
+                <Text style={styles.featureText} maxFontSizeMultiplier={1.5}>{t('featureCardsWallets')}</Text>
               </View>
               <View style={styles.featureRow}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                <Text style={styles.featureText} maxFontSizeMultiplier={1.5}>No card reader required</Text>
+                <Text style={styles.featureText} maxFontSizeMultiplier={1.5}>{t('featureNoCardReader')}</Text>
               </View>
             </View>
 
             {/* Learn More Link */}
-            <TouchableOpacity style={styles.learnMoreButton} onPress={onLearnMore} accessibilityRole="button" accessibilityLabel="Learn how Tap to Pay works">
+            <TouchableOpacity style={styles.learnMoreButton} onPress={onLearnMore} accessibilityRole="button" accessibilityLabel={t('learnMore')}>
               <Ionicons name="school-outline" size={18} color={colors.primary} />
-              <Text style={styles.learnMoreText} maxFontSizeMultiplier={1.5}>Learn how it works</Text>
+              <Text style={styles.learnMoreText} maxFontSizeMultiplier={1.5}>{t('learnMore')}</Text>
             </TouchableOpacity>
 
             {/* Apple Terms Link - Apple TTPOi 3.3 */}
@@ -101,31 +97,26 @@ export function TapToPayFirstUseModal({
                 style={styles.termsLink}
                 onPress={() => Linking.openURL('https://www.apple.com/legal/privacy/en-ww/tap-to-pay/')}
                 accessibilityRole="link"
-                accessibilityLabel="Apple Tap to Pay Privacy Policy"
-                accessibilityHint="Opens the Apple privacy policy in your browser"
+                accessibilityLabel={t('applePrivacyPolicy')}
+                accessibilityHint={t('applePrivacyPolicy')}
               >
                 <Ionicons name="shield-checkmark-outline" size={14} color={colors.textMuted} />
                 <Text style={styles.termsLinkText} maxFontSizeMultiplier={1.5}>
-                  Apple Tap to Pay Privacy Policy
+                  {t('applePrivacyPolicy')}
                 </Text>
               </TouchableOpacity>
             )}
 
             {/* Action Buttons */}
             <View style={styles.buttonContainer}>
-              <TouchableOpacity style={styles.skipButton} onPress={onSkip} accessibilityRole="button" accessibilityLabel="Maybe later" accessibilityHint="Skips Tap to Pay setup for now">
-                <Text style={styles.skipButtonText} maxFontSizeMultiplier={1.3}>Maybe later</Text>
+              <TouchableOpacity style={styles.skipButton} onPress={onSkip} accessibilityRole="button" accessibilityLabel={t('skipButton')} accessibilityHint={t('skipButton')}>
+                <Text style={styles.skipButtonText} maxFontSizeMultiplier={1.3}>{t('skipButton')}</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity onPress={onProceed} activeOpacity={0.9} accessibilityRole="button" accessibilityLabel="Got it, let's go!" accessibilityHint="Proceeds with Tap to Pay setup">
-                <LinearGradient
-                  colors={[colors.primary, colors.primary700]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.proceedButton}
-                >
-                  <Text style={styles.proceedButtonText} maxFontSizeMultiplier={1.3}>Got it, let's go!</Text>
-                </LinearGradient>
+              <TouchableOpacity onPress={onProceed} activeOpacity={0.9} accessibilityRole="button" accessibilityLabel={t('proceedButton')} accessibilityHint={t('proceedButton')}>
+                <View style={[styles.proceedButton, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.proceedButtonText} maxFontSizeMultiplier={1.3}>{t('proceedButton')}</Text>
+                </View>
               </TouchableOpacity>
             </View>
           </View>
@@ -135,7 +126,7 @@ export function TapToPayFirstUseModal({
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) =>
+const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
@@ -148,7 +139,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       maxWidth: 400,
     },
     card: {
-      // Use solid opaque background instead of glass for better readability
+      // Solid opaque background for readability
       backgroundColor: isDark ? '#292524' : '#FFFFFF',
       borderRadius: 24,
       padding: 24,

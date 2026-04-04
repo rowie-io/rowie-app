@@ -19,7 +19,7 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import { glass } from '../lib/colors';
+import { useTranslations } from '../lib/i18n';
 import type { Catalog, CatalogLayoutType, UpdateCatalogData } from '../lib/api';
 import { Toggle } from './Toggle';
 
@@ -32,11 +32,13 @@ interface CatalogSettingsModalProps {
   onClose: () => void;
 }
 
-const LAYOUT_OPTIONS: { value: CatalogLayoutType; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { value: 'grid', label: 'Grid', icon: 'grid-outline' },
-  { value: 'list', label: 'List', icon: 'list-outline' },
-  { value: 'large-grid', label: 'Large', icon: 'square-outline' },
-  { value: 'compact', label: 'Compact', icon: 'menu-outline' },
+const LAYOUT_OPTIONS: { value: CatalogLayoutType; labelKey: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { value: 'classic-grid', labelKey: 'layoutClassicGrid', icon: 'grid-outline' },
+  { value: 'split-view', labelKey: 'layoutSplitView', icon: 'browsers-outline' },
+  { value: 'list', labelKey: 'layoutList', icon: 'list-outline' },
+  { value: 'cards', labelKey: 'layoutCards', icon: 'square-outline' },
+  { value: 'mosaic', labelKey: 'layoutMosaic', icon: 'apps-outline' },
+  { value: 'compact', labelKey: 'layoutCompact', icon: 'menu-outline' },
 ];
 
 export function CatalogSettingsModal({
@@ -48,8 +50,8 @@ export function CatalogSettingsModal({
   onClose,
 }: CatalogSettingsModalProps) {
   const { colors, isDark } = useTheme();
-  const glassColors = isDark ? glass.dark : glass.light;
-
+  const t = useTranslations('components.catalogSettings');
+  const tc = useTranslations('common');
   // Form state
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -62,7 +64,7 @@ export function CatalogSettingsModal({
   const [allowCustomTip, setAllowCustomTip] = useState(true);
   const [promptForEmail, setPromptForEmail] = useState(false);
   const [taxRateString, setTaxRateString] = useState('0');
-  const [layoutType, setLayoutType] = useState<CatalogLayoutType>('grid');
+  const [layoutType, setLayoutType] = useState<CatalogLayoutType>('classic-grid');
   const [isSaving, setIsSaving] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -114,13 +116,13 @@ export function CatalogSettingsModal({
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Menu name is required');
+      Alert.alert(tc('error'), t('errorMenuNameRequired'));
       return;
     }
 
     const taxRate = parseFloat(taxRateString) || 0;
     if (isNaN(taxRate) || taxRate < 0 || taxRate > 100) {
-      Alert.alert('Error', 'Please enter a valid tax rate (0-100%)');
+      Alert.alert(tc('error'), t('errorInvalidTaxRate'));
       return;
     }
 
@@ -141,7 +143,7 @@ export function CatalogSettingsModal({
       });
       onClose();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save menu');
+      Alert.alert(tc('error'), error.message || t('errorFailedToSave'));
     } finally {
       setIsSaving(false);
     }
@@ -151,19 +153,19 @@ export function CatalogSettingsModal({
     if (!catalog || !onDuplicate) return;
 
     Alert.alert(
-      'Duplicate Menu',
-      `Create a copy of "${catalog.name}" with all its products and settings?`,
+      t('duplicateMenuTitle'),
+      t('duplicateMenuMessage', { name: catalog.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: tc('cancel'), style: 'cancel' },
         {
-          text: 'Duplicate',
+          text: t('duplicateButton'),
           onPress: async () => {
             setIsDuplicating(true);
             try {
               await onDuplicate(catalog.id);
               onClose();
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to duplicate menu');
+              Alert.alert(tc('error'), error.message || t('errorFailedToDuplicate'));
             } finally {
               setIsDuplicating(false);
             }
@@ -177,12 +179,12 @@ export function CatalogSettingsModal({
     if (!catalog || !onDelete) return;
 
     Alert.alert(
-      'Delete Menu',
-      `Are you sure you want to delete "${catalog.name}"? This will remove all products from this menu. This action cannot be undone.`,
+      t('deleteMenuTitle'),
+      t('deleteMenuMessage', { name: catalog.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: tc('cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: tc('delete'),
           style: 'destructive',
           onPress: async () => {
             setIsDeleting(true);
@@ -190,7 +192,7 @@ export function CatalogSettingsModal({
               await onDelete(catalog.id);
               onClose();
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to delete menu');
+              Alert.alert(tc('error'), error.message || t('errorFailedToDelete'));
             } finally {
               setIsDeleting(false);
             }
@@ -202,7 +204,7 @@ export function CatalogSettingsModal({
 
   const handleAddTipPercentage = () => {
     if (tipPercentages.length >= 6) {
-      Alert.alert('Limit Reached', 'Maximum 6 tip percentages allowed');
+      Alert.alert(t('limitReachedTitle'), t('maxTipPercentages'));
       return;
     }
     // Add a new percentage that's higher than the current max
@@ -213,7 +215,7 @@ export function CatalogSettingsModal({
 
   const handleRemoveTipPercentage = (index: number) => {
     if (tipPercentages.length <= 1) {
-      Alert.alert('Error', 'At least one tip percentage is required');
+      Alert.alert(tc('error'), t('atLeastOneTip'));
       return;
     }
     setTipPercentages(tipPercentages.filter((_, i) => i !== index));
@@ -228,7 +230,7 @@ export function CatalogSettingsModal({
     if (editingTipIndex === null) return;
     const value = parseInt(editingTipValue, 10);
     if (isNaN(value) || value < 0 || value > 100) {
-      Alert.alert('Error', 'Please enter a valid percentage (0-100)');
+      Alert.alert(tc('error'), t('invalidPercentage'));
       return;
     }
     const newPercentages = [...tipPercentages];
@@ -243,7 +245,7 @@ export function CatalogSettingsModal({
     setEditingTipValue('');
   };
 
-  const styles = createStyles(colors, glassColors, isDark);
+  const styles = createStyles(colors, isDark);
 
   return (
     <Modal
@@ -253,7 +255,7 @@ export function CatalogSettingsModal({
       onRequestClose={onClose}
     >
       <View style={styles.container}>
-        <Pressable style={styles.overlay} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
+        <Pressable style={styles.overlay} onPress={onClose} accessibilityLabel={tc('close')} accessibilityRole="button" />
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -261,21 +263,21 @@ export function CatalogSettingsModal({
         >
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton} accessibilityRole="button" accessibilityLabel="Close">
+            <TouchableOpacity onPress={onClose} style={styles.closeButton} accessibilityRole="button" accessibilityLabel={tc('close')}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
-            <Text style={styles.title} maxFontSizeMultiplier={1.3}>Menu Settings</Text>
+            <Text style={styles.title} maxFontSizeMultiplier={1.3}>{t('title')}</Text>
             <TouchableOpacity
               onPress={handleSave}
               disabled={isSaving}
               style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
               accessibilityRole="button"
-              accessibilityLabel={isSaving ? 'Saving menu settings' : 'Save menu settings'}
+              accessibilityLabel={isSaving ? tc('saving') : tc('save')}
             >
               {isSaving ? (
-                <ActivityIndicator size="small" color="#fff" accessibilityLabel="Saving" />
+                <ActivityIndicator size="small" color="#fff" accessibilityLabel={tc('saving')} />
               ) : (
-                <Text style={styles.saveButtonText} maxFontSizeMultiplier={1.3}>Save</Text>
+                <Text style={styles.saveButtonText} maxFontSizeMultiplier={1.3}>{tc('save')}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -287,74 +289,74 @@ export function CatalogSettingsModal({
           >
             {/* Name */}
             <View style={styles.section}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>Menu Name *</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('menuNameLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
-                placeholder="e.g., Summer Menu"
+                placeholder={t('menuNamePlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 maxLength={100}
-                accessibilityLabel="Menu name"
+                accessibilityLabel={t('menuNameLabel')}
               />
             </View>
 
             {/* Description */}
             <View style={styles.section}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>Description</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('descriptionLabel')}</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
                 value={description}
                 onChangeText={setDescription}
-                placeholder="Optional description"
+                placeholder={t('descriptionPlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 multiline
                 numberOfLines={2}
                 maxLength={500}
-                accessibilityLabel="Menu description"
+                accessibilityLabel={t('descriptionLabel')}
               />
             </View>
 
             {/* Location */}
             <View style={styles.section}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>Location</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('locationLabel')}</Text>
               <View style={styles.inputWithIcon}>
                 <Ionicons name="location-outline" size={20} color={colors.textMuted} />
                 <TextInput
                   style={styles.inputInner}
                   value={location}
                   onChangeText={setLocation}
-                  placeholder="e.g., Main Stage"
+                  placeholder={t('locationPlaceholder')}
                   placeholderTextColor={colors.textMuted}
                   maxLength={100}
-                  accessibilityLabel="Menu location"
+                  accessibilityLabel={t('locationLabel')}
                 />
               </View>
             </View>
 
             {/* Date */}
             <View style={styles.section}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>Date</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('dateLabel')}</Text>
               <TouchableOpacity
                 style={styles.dateSelector}
                 onPress={() => setShowDatePicker(true)}
                 accessibilityRole="button"
-                accessibilityLabel={date ? `Date: ${formatDate(date)}` : 'Select a date'}
-                accessibilityHint="Opens date picker"
+                accessibilityLabel={date ? `${t('dateLabel')}: ${formatDate(date)}` : t('selectDateOptional')}
+                accessibilityHint={t('opensDatePicker')}
               >
                 <Ionicons name="calendar-outline" size={20} color={colors.textMuted} />
                 <Text style={[
                   styles.dateSelectorText,
                   !date && styles.dateSelectorPlaceholder
                 ]} maxFontSizeMultiplier={1.5}>
-                  {date ? formatDate(date) : 'Select a date (optional)'}
+                  {date ? formatDate(date) : t('selectDateOptional')}
                 </Text>
                 {date && (
                   <TouchableOpacity
                     onPress={handleClearDate}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     accessibilityRole="button"
-                    accessibilityLabel="Clear date"
+                    accessibilityLabel={t('clearDate')}
                   >
                     <Ionicons name="close-circle" size={20} color={colors.textMuted} />
                   </TouchableOpacity>
@@ -364,11 +366,11 @@ export function CatalogSettingsModal({
                 Platform.OS === 'ios' ? (
                   <View style={styles.datePickerContainer}>
                     <View style={styles.datePickerHeader}>
-                      <TouchableOpacity onPress={() => setShowDatePicker(false)} accessibilityRole="button" accessibilityLabel="Cancel date selection">
-                        <Text style={styles.datePickerCancel} maxFontSizeMultiplier={1.5}>Cancel</Text>
+                      <TouchableOpacity onPress={() => setShowDatePicker(false)} accessibilityRole="button" accessibilityLabel={tc('cancel')}>
+                        <Text style={styles.datePickerCancel} maxFontSizeMultiplier={1.5}>{tc('cancel')}</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => setShowDatePicker(false)} accessibilityRole="button" accessibilityLabel="Confirm date selection">
-                        <Text style={styles.datePickerDone} maxFontSizeMultiplier={1.5}>Done</Text>
+                      <TouchableOpacity onPress={() => setShowDatePicker(false)} accessibilityRole="button" accessibilityLabel={tc('done')}>
+                        <Text style={styles.datePickerDone} maxFontSizeMultiplier={1.5}>{tc('done')}</Text>
                       </TouchableOpacity>
                     </View>
                     <DateTimePicker
@@ -395,50 +397,53 @@ export function CatalogSettingsModal({
             <View style={styles.section}>
               <View style={styles.toggleRow}>
                 <View style={styles.toggleInfo}>
-                  <Text style={styles.label} maxFontSizeMultiplier={1.5}>Active</Text>
+                  <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('activeLabel')}</Text>
                   <Text style={styles.toggleDescription} maxFontSizeMultiplier={1.5}>
-                    Show this menu in the app
+                    {t('activeDescription')}
                   </Text>
                 </View>
-                <Toggle value={isActive} onValueChange={setIsActive} accessibilityLabel="Menu active" />
+                <Toggle value={isActive} onValueChange={setIsActive} accessibilityLabel={t('activeLabel')} />
               </View>
             </View>
 
             {/* Layout Type */}
             <View style={styles.section}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>Product Layout</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('productLayoutLabel')}</Text>
               <View style={styles.layoutOptions}>
-                {LAYOUT_OPTIONS.map(option => (
-                  <TouchableOpacity
-                    key={option.value}
-                    style={[
-                      styles.layoutOption,
-                      layoutType === option.value && styles.layoutOptionSelected
-                    ]}
-                    onPress={() => setLayoutType(option.value)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`${option.label} layout`}
-                    accessibilityState={{ selected: layoutType === option.value }}
-                  >
-                    <Ionicons
-                      name={option.icon}
-                      size={24}
-                      color={layoutType === option.value ? colors.primary : colors.textSecondary}
-                    />
-                    <Text style={[
-                      styles.layoutOptionText,
-                      layoutType === option.value && styles.layoutOptionTextSelected
-                    ]} maxFontSizeMultiplier={1.3}>
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {LAYOUT_OPTIONS.map(option => {
+                  const label = t(option.labelKey);
+                  return (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[
+                        styles.layoutOption,
+                        layoutType === option.value && styles.layoutOptionSelected
+                      ]}
+                      onPress={() => setLayoutType(option.value)}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('layoutAccessibilityLabel', { label })}
+                      accessibilityState={{ selected: layoutType === option.value }}
+                    >
+                      <Ionicons
+                        name={option.icon}
+                        size={24}
+                        color={layoutType === option.value ? colors.primary : colors.textSecondary}
+                      />
+                      <Text style={[
+                        styles.layoutOptionText,
+                        layoutType === option.value && styles.layoutOptionTextSelected
+                      ]} maxFontSizeMultiplier={1.3}>
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
             {/* Tax Rate */}
             <View style={styles.section}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>Tax Rate</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('taxRateLabel')}</Text>
               <View style={styles.taxInputContainer}>
                 <TextInput
                   style={styles.taxInput}
@@ -447,9 +452,9 @@ export function CatalogSettingsModal({
                   placeholder="0"
                   placeholderTextColor={colors.textMuted}
                   keyboardType="decimal-pad"
-                  accessibilityLabel="Tax rate percentage"
+                  accessibilityLabel={t('taxRateLabel')}
                 />
-                <Text style={styles.taxSymbol} maxFontSizeMultiplier={1.5}>%</Text>
+                <Text style={styles.taxSymbol} maxFontSizeMultiplier={1.5}>{tc('percentSymbol')}</Text>
               </View>
             </View>
 
@@ -460,12 +465,12 @@ export function CatalogSettingsModal({
             <View style={styles.section}>
               <View style={styles.toggleRow}>
                 <View style={styles.toggleInfo}>
-                  <Text style={styles.label} maxFontSizeMultiplier={1.5}>Show Tip Screen</Text>
+                  <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('showTipScreen')}</Text>
                   <Text style={styles.toggleDescription} maxFontSizeMultiplier={1.5}>
-                    Show tip options during checkout
+                    {t('showTipScreenDescription')}
                   </Text>
                 </View>
-                <Toggle value={showTipScreen} onValueChange={setShowTipScreen} accessibilityLabel="Show tip screen" />
+                <Toggle value={showTipScreen} onValueChange={setShowTipScreen} accessibilityLabel={t('showTipScreen')} />
               </View>
             </View>
 
@@ -474,9 +479,9 @@ export function CatalogSettingsModal({
               <>
                 <View style={styles.section}>
                   <View style={styles.tipHeader}>
-                    <Text style={styles.label} maxFontSizeMultiplier={1.5}>Tip Options</Text>
+                    <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('tipOptions')}</Text>
                     {tipPercentages.length < 6 && (
-                      <TouchableOpacity onPress={handleAddTipPercentage} accessibilityRole="button" accessibilityLabel="Add tip percentage">
+                      <TouchableOpacity onPress={handleAddTipPercentage} accessibilityRole="button" accessibilityLabel={t('addTipPercentage')}>
                         <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
                       </TouchableOpacity>
                     )}
@@ -494,12 +499,12 @@ export function CatalogSettingsModal({
                               autoFocus
                               maxLength={3}
                               onSubmitEditing={handleSaveTipEdit}
-                              accessibilityLabel="Edit tip percentage"
+                              accessibilityLabel={t('editTipPercentage')}
                             />
-                            <TouchableOpacity onPress={handleSaveTipEdit} accessibilityRole="button" accessibilityLabel="Save tip percentage">
+                            <TouchableOpacity onPress={handleSaveTipEdit} accessibilityRole="button" accessibilityLabel={t('saveTipPercentage')}>
                               <Ionicons name="checkmark" size={18} color={colors.success} />
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={handleCancelTipEdit} accessibilityRole="button" accessibilityLabel="Cancel editing tip">
+                            <TouchableOpacity onPress={handleCancelTipEdit} accessibilityRole="button" accessibilityLabel={t('cancelEditingTip')}>
                               <Ionicons name="close" size={18} color={colors.error} />
                             </TouchableOpacity>
                           </View>
@@ -509,7 +514,7 @@ export function CatalogSettingsModal({
                               onPress={() => handleStartEditTip(index)}
                               style={styles.tipValueButton}
                               accessibilityRole="button"
-                              accessibilityLabel={`Edit ${percentage}% tip option`}
+                              accessibilityLabel={t('editTipOption', { percentage })}
                             >
                               <Text style={styles.tipText} maxFontSizeMultiplier={1.5}>{percentage}%</Text>
                             </TouchableOpacity>
@@ -518,7 +523,7 @@ export function CatalogSettingsModal({
                                 onPress={() => handleRemoveTipPercentage(index)}
                                 style={styles.tipRemove}
                                 accessibilityRole="button"
-                                accessibilityLabel={`Remove ${percentage}% tip option`}
+                                accessibilityLabel={t('removeTipOption', { percentage })}
                               >
                                 <Ionicons name="close-circle" size={18} color={colors.textMuted} />
                               </TouchableOpacity>
@@ -533,12 +538,12 @@ export function CatalogSettingsModal({
                 <View style={styles.section}>
                   <View style={styles.toggleRow}>
                     <View style={styles.toggleInfo}>
-                      <Text style={styles.label} maxFontSizeMultiplier={1.5}>Allow Custom Tip</Text>
+                      <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('allowCustomTip')}</Text>
                       <Text style={styles.toggleDescription} maxFontSizeMultiplier={1.5}>
-                        Let customers enter a custom tip amount
+                        {t('allowCustomTipDescription')}
                       </Text>
                     </View>
-                    <Toggle value={allowCustomTip} onValueChange={setAllowCustomTip} accessibilityLabel="Allow custom tip" />
+                    <Toggle value={allowCustomTip} onValueChange={setAllowCustomTip} accessibilityLabel={t('allowCustomTip')} />
                   </View>
                 </View>
               </>
@@ -548,12 +553,12 @@ export function CatalogSettingsModal({
             <View style={styles.section}>
               <View style={styles.toggleRow}>
                 <View style={styles.toggleInfo}>
-                  <Text style={styles.label} maxFontSizeMultiplier={1.5}>Prompt for Email</Text>
+                  <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('promptForEmail')}</Text>
                   <Text style={styles.toggleDescription} maxFontSizeMultiplier={1.5}>
-                    Ask for customer email during checkout
+                    {t('promptForEmailDescription')}
                   </Text>
                 </View>
-                <Toggle value={promptForEmail} onValueChange={setPromptForEmail} accessibilityLabel="Prompt for email" />
+                <Toggle value={promptForEmail} onValueChange={setPromptForEmail} accessibilityLabel={t('promptForEmail')} />
               </View>
             </View>
 
@@ -564,11 +569,11 @@ export function CatalogSettingsModal({
             <View style={styles.section}>
               <View style={styles.toggleRow}>
                 <View style={styles.toggleInfo}>
-                  <Text style={styles.label} maxFontSizeMultiplier={1.5}>Pre-Orders</Text>
+                  <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('preOrdersLabel')}</Text>
                   <Text style={styles.toggleDescription} maxFontSizeMultiplier={1.5}>
                     {catalog?.preorderEnabled
-                      ? 'Pre-orders are enabled for this menu'
-                      : 'Allow customers to order ahead via QR code'}
+                      ? t('preOrdersEnabledDesc')
+                      : t('preOrdersDisabledDesc')}
                   </Text>
                 </View>
                 <View style={[
@@ -579,14 +584,14 @@ export function CatalogSettingsModal({
                     styles.preorderBadgeText,
                     catalog?.preorderEnabled && styles.preorderBadgeTextEnabled
                   ]} maxFontSizeMultiplier={1.5}>
-                    {catalog?.preorderEnabled ? 'Enabled' : 'Disabled'}
+                    {catalog?.preorderEnabled ? tc('enabled') : tc('disabled')}
                   </Text>
                 </View>
               </View>
               <View style={styles.preorderNote}>
                 <Ionicons name="information-circle-outline" size={16} color={colors.textMuted} />
                 <Text style={styles.preorderNoteText} maxFontSizeMultiplier={1.5}>
-                  Configure pre-order settings, QR codes, and payment options in the Vendor Dashboard
+                  {t('preOrdersConfigNote')}
                 </Text>
               </View>
             </View>
@@ -594,7 +599,7 @@ export function CatalogSettingsModal({
             {/* Catalog Actions */}
             {(onDuplicate || onDelete) && (
               <View style={styles.actionsSection}>
-                <Text style={styles.actionsSectionTitle} maxFontSizeMultiplier={1.5}>Menu Actions</Text>
+                <Text style={styles.actionsSectionTitle} maxFontSizeMultiplier={1.5}>{t('menuActionsTitle')}</Text>
 
                 {onDuplicate && (
                   <TouchableOpacity
@@ -602,15 +607,15 @@ export function CatalogSettingsModal({
                     onPress={handleDuplicate}
                     disabled={isDuplicating}
                     accessibilityRole="button"
-                    accessibilityLabel={isDuplicating ? 'Duplicating menu' : 'Duplicate menu'}
+                    accessibilityLabel={isDuplicating ? tc('duplicating') : t('duplicateMenuButton')}
                   >
                     {isDuplicating ? (
-                      <ActivityIndicator size="small" color={colors.primary} accessibilityLabel="Duplicating" />
+                      <ActivityIndicator size="small" color={colors.primary} accessibilityLabel={tc('duplicating')} />
                     ) : (
                       <>
                         <Ionicons name="copy-outline" size={20} color={colors.primary} />
                         <Text style={[styles.actionButtonText, { color: colors.primary }]} maxFontSizeMultiplier={1.3}>
-                          Duplicate Menu
+                          {t('duplicateMenuButton')}
                         </Text>
                       </>
                     )}
@@ -623,15 +628,15 @@ export function CatalogSettingsModal({
                     onPress={handleDelete}
                     disabled={isDeleting}
                     accessibilityRole="button"
-                    accessibilityLabel={isDeleting ? 'Deleting menu' : 'Delete menu'}
+                    accessibilityLabel={isDeleting ? tc('deleting') : t('deleteMenuButton')}
                   >
                     {isDeleting ? (
-                      <ActivityIndicator size="small" color={colors.error} accessibilityLabel="Deleting" />
+                      <ActivityIndicator size="small" color={colors.error} accessibilityLabel={tc('deleting')} />
                     ) : (
                       <>
                         <Ionicons name="trash-outline" size={20} color={colors.error} />
                         <Text style={[styles.actionButtonText, { color: colors.error }]} maxFontSizeMultiplier={1.3}>
-                          Delete Menu
+                          {t('deleteMenuButton')}
                         </Text>
                       </>
                     )}
@@ -646,7 +651,7 @@ export function CatalogSettingsModal({
   );
 }
 
-const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
+const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -676,13 +681,13 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       paddingHorizontal: 16,
       paddingVertical: 16,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.border,
+      borderBottomColor: colors.border,
     },
     closeButton: {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -722,9 +727,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       marginBottom: 8,
     },
     input: {
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderRadius: 12,
       paddingHorizontal: 16,
       paddingVertical: 14,
@@ -738,9 +743,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
     inputWithIcon: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderRadius: 12,
       paddingHorizontal: 12,
     },
@@ -754,9 +759,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
     dateSelector: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderRadius: 12,
       paddingHorizontal: 12,
       paddingVertical: 14,
@@ -772,11 +777,11 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
     },
     datePickerContainer: {
       marginTop: 8,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 12,
       overflow: 'hidden',
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     datePickerHeader: {
       flexDirection: 'row',
@@ -784,7 +789,7 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       paddingHorizontal: 16,
       paddingVertical: 12,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.border,
+      borderBottomColor: colors.border,
     },
     datePickerCancel: {
       fontSize: 16,
@@ -818,9 +823,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       alignItems: 'center',
       paddingVertical: 12,
       paddingHorizontal: 8,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderRadius: 12,
     },
     layoutOptionSelected: {
@@ -839,9 +844,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
     taxInputContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderRadius: 12,
       paddingHorizontal: 16,
     },
@@ -858,7 +863,7 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
     },
     divider: {
       height: 1,
-      backgroundColor: glassColors.border,
+      backgroundColor: colors.border,
       marginVertical: 8,
     },
     tipHeader: {
@@ -875,9 +880,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
     tipChip: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderRadius: 20,
       paddingVertical: 8,
       paddingHorizontal: 12,
@@ -909,7 +914,7 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       marginTop: 24,
       paddingTop: 24,
       borderTopWidth: 1,
-      borderTopColor: glassColors.border,
+      borderTopColor: colors.border,
     },
     actionsSectionTitle: {
       fontSize: 14,
@@ -945,9 +950,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 12,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     preorderBadgeEnabled: {
       backgroundColor: colors.success + '15',
@@ -967,7 +972,7 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       marginTop: 12,
       paddingTop: 12,
       borderTopWidth: 1,
-      borderTopColor: glassColors.border,
+      borderTopColor: colors.border,
       gap: 8,
     },
     preorderNoteText: {

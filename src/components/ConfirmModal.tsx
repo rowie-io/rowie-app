@@ -8,6 +8,7 @@ import {
   Pressable,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslations } from '../lib/i18n';
 
 interface ConfirmModalProps {
   visible: boolean;
@@ -24,13 +25,16 @@ export function ConfirmModal({
   visible,
   title,
   message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
+  confirmText: confirmTextProp,
+  cancelText: cancelTextProp,
   confirmStyle = 'default',
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
   const { colors } = useTheme();
+  const t = useTranslations('components.confirmModal');
+  const confirmText = confirmTextProp ?? t('defaultConfirmText');
+  const cancelText = cancelTextProp ?? t('defaultCancelText');
 
   return (
     <Modal
@@ -40,7 +44,7 @@ export function ConfirmModal({
       onRequestClose={onCancel}
       accessibilityViewIsModal={true}
     >
-      <Pressable style={styles.overlay} onPress={onCancel} accessibilityLabel="Close dialog" accessibilityRole="button">
+      <Pressable style={styles.overlay} onPress={onCancel} accessibilityLabel={t('closeDialog')} accessibilityRole="button">
         <Pressable style={[styles.container, { backgroundColor: colors.card }]}>
           <Text style={[styles.title, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{title}</Text>
           <Text style={[styles.message, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
@@ -52,7 +56,7 @@ export function ConfirmModal({
               onPress={onCancel}
               accessibilityRole="button"
               accessibilityLabel={cancelText}
-              accessibilityHint="Dismisses the dialog without taking action"
+              accessibilityHint={t('cancelHint')}
             >
               <Text style={[styles.buttonText, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
                 {cancelText}
@@ -72,8 +76,8 @@ export function ConfirmModal({
               accessibilityLabel={confirmText}
               accessibilityHint={
                 confirmStyle === 'destructive'
-                  ? 'Confirms the action. This cannot be undone.'
-                  : 'Confirms the action'
+                  ? t('confirmHintDestructive')
+                  : t('confirmHint')
               }
             >
               <Text style={[styles.buttonText, { color: '#FFFFFF' }]} maxFontSizeMultiplier={1.3}>

@@ -17,7 +17,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import PhoneInput, { ICountry, isValidPhoneNumber } from 'react-native-international-phone-number';
 
 import { useTheme } from '../context/ThemeContext';
@@ -26,13 +25,13 @@ import { Input } from '../components/Input';
 import { authService } from '../lib/api';
 import { iapService, SUBSCRIPTION_SKUS, SubscriptionProduct } from '../lib/iap';
 import { storeCredentials } from '../lib/biometricAuth';
-import { colors as appColors, glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { config } from '../lib/config';
 import logger from '../lib/logger';
 import { isValidEmail } from '../lib/validation';
 import { PRICING } from '../lib/pricing';
+import { useTranslations } from '../lib/i18n';
 
 // Types
 type Step = 'account' | 'business' | 'plan' | 'confirmation';
@@ -56,98 +55,105 @@ interface FormErrors {
   [key: string]: string;
 }
 
-// Business type options
-const BUSINESS_TYPES = [
-  'Event Vendor',
-  'Festival Organizer',
-  'Food Truck',
-  'Mobile Bar',
-  'Pop-up Shop',
-  'Restaurant',
-  'Other',
-];
+// Business type options — keys map to auth.businessType* translation keys
+const BUSINESS_TYPE_KEYS = [
+  'businessTypeEventVendor',
+  'businessTypeFestivalOrganizer',
+  'businessTypeFoodTruck',
+  'businessTypeMobileBar',
+  'businessTypePopUpShop',
+  'businessTypeRestaurant',
+  'businessTypeOther',
+] as const;
 
-// Countries where Stripe Terminal is generally available
+const SUPPORTED_COUNTRY_CODES = new Set([
+  'US', 'CA', 'GB', 'AU', 'NZ', 'IE', 'FR', 'DE', 'ES', 'IT',
+  'NL', 'BE', 'AT', 'PT', 'FI', 'SE', 'DK', 'NO', 'CH', 'LU',
+  'CZ', 'SG', 'MY',
+]);
+
+function getDeviceCountry(): string {
+  try {
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale || '';
+    const parts = locale.split('-');
+    const region = parts[parts.length - 1]?.toUpperCase();
+    if (region && region.length === 2 && SUPPORTED_COUNTRY_CODES.has(region)) {
+      return region;
+    }
+  } catch {}
+  return 'US';
+}
+
+// Countries where Stripe Terminal is generally available — i18nKey maps to auth.country* translation keys
 const SUPPORTED_COUNTRIES = [
-  { code: 'US', name: 'United States' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'NZ', name: 'New Zealand' },
-  { code: 'IE', name: 'Ireland' },
-  { code: 'FR', name: 'France' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'IT', name: 'Italy' },
-  { code: 'NL', name: 'Netherlands' },
-  { code: 'BE', name: 'Belgium' },
-  { code: 'AT', name: 'Austria' },
-  { code: 'PT', name: 'Portugal' },
-  { code: 'FI', name: 'Finland' },
-  { code: 'SE', name: 'Sweden' },
-  { code: 'DK', name: 'Denmark' },
-  { code: 'NO', name: 'Norway' },
-  { code: 'CH', name: 'Switzerland' },
-  { code: 'LU', name: 'Luxembourg' },
-  { code: 'CZ', name: 'Czechia' },
-  { code: 'SG', name: 'Singapore' },
-  { code: 'MY', name: 'Malaysia' },
-];
+  { code: 'US', i18nKey: 'countryUnitedStates' },
+  { code: 'CA', i18nKey: 'countryCanada' },
+  { code: 'GB', i18nKey: 'countryUnitedKingdom' },
+  { code: 'AU', i18nKey: 'countryAustralia' },
+  { code: 'NZ', i18nKey: 'countryNewZealand' },
+  { code: 'IE', i18nKey: 'countryIreland' },
+  { code: 'FR', i18nKey: 'countryFrance' },
+  { code: 'DE', i18nKey: 'countryGermany' },
+  { code: 'ES', i18nKey: 'countrySpain' },
+  { code: 'IT', i18nKey: 'countryItaly' },
+  { code: 'NL', i18nKey: 'countryNetherlands' },
+  { code: 'BE', i18nKey: 'countryBelgium' },
+  { code: 'AT', i18nKey: 'countryAustria' },
+  { code: 'PT', i18nKey: 'countryPortugal' },
+  { code: 'FI', i18nKey: 'countryFinland' },
+  { code: 'SE', i18nKey: 'countrySweden' },
+  { code: 'DK', i18nKey: 'countryDenmark' },
+  { code: 'NO', i18nKey: 'countryNorway' },
+  { code: 'CH', i18nKey: 'countrySwitzerland' },
+  { code: 'LU', i18nKey: 'countryLuxembourg' },
+  { code: 'CZ', i18nKey: 'countryCzechia' },
+  { code: 'SG', i18nKey: 'countrySingapore' },
+  { code: 'MY', i18nKey: 'countryMalaysia' },
+] as const;
 
 // Static constants — hoisted out of component to avoid re-creation on every render
 const STEPS: Step[] = ['account', 'business', 'plan', 'confirmation'];
 const STEP_CONFIG = [
-  { key: 'account', icon: 'mail-outline', label: 'Account' },
-  { key: 'business', icon: 'briefcase-outline', label: 'Business' },
-  { key: 'plan', icon: 'rocket-outline', label: 'Plan' },
+  { key: 'account', icon: 'mail-outline', i18nKey: 'signUpStepAccountLabel' },
+  { key: 'business', icon: 'briefcase-outline', i18nKey: 'signUpStepBusinessLabel' },
+  { key: 'plan', icon: 'rocket-outline', i18nKey: 'signUpStepPlanLabel' },
 ] as const;
 
-// Plan configurations
-const PLANS = {
-  starter: {
-    name: 'Starter',
-    price: 'Free',
-    priceSubtext: 'No monthly fee',
-    transactionFee: PRICING.starter.transactionFeeDisplay,
-    features: [
-      'Tap to Pay on iPhone & Android',
-      'Simple menu builder',
-      '1 custom menu',
-      'Events & ticketing',
-      'Daily payout summary',
-      '1 User',
-    ],
-    notIncluded: [
-      'Online ordering & preorders',
-      'Tip reports & tracking',
-      'Revenue splits',
-      'Additional staff accounts',
-    ],
-  },
-  pro: {
-    name: 'Pro',
-    price: PRICING.pro.monthlyPriceDisplay,
-    priceSubtext: '/month',
-    transactionFee: PRICING.pro.transactionFeeDisplay,
-    features: [
-      'Everything in Starter',
-      'Unlimited custom menus',
-      'Unlimited users & devices',
-      'Staff account management',
-      'Revenue splits',
-      'Tip reports & tracking',
-      'Tip pooling & tip-out rules',
-      'Custom invoicing',
-      'Analytics dashboard',
-      'Export to CSV/PDF',
-    ],
-  },
-};
+// Plan feature i18n keys — resolved with t() at render time
+const STARTER_FEATURE_KEYS = [
+  'starterFeatureTapToPay',
+  'starterFeatureMenuBuilder',
+  'starterFeatureOneMenu',
+  'starterFeatureEvents',
+  'starterFeaturePayoutSummary',
+  'starterFeatureOneUser',
+] as const;
+
+const STARTER_NOT_INCLUDED_KEYS = [
+  'starterNotIncludedOnlineOrdering',
+  'starterNotIncludedTipReports',
+  'starterNotIncludedRevenueSplits',
+  'starterNotIncludedAdditionalStaff',
+] as const;
+
+const PRO_FEATURE_KEYS = [
+  'proFeatureEverythingInStarter',
+  'proFeatureUnlimitedMenus',
+  'proFeatureUnlimitedUsers',
+  'proFeatureStaffManagement',
+  'proFeatureRevenueSplits',
+  'proFeatureTipReports',
+  'proFeatureTipPooling',
+  'proFeatureInvoicing',
+  'proFeatureAnalytics',
+  'proFeatureExport',
+] as const;
 
 export function SignUpScreen() {
   const { colors, isDark } = useTheme();
+  const t = useTranslations('auth');
+  const tc = useTranslations('common');
   const insets = useSafeAreaInsets();
-  const glassColors = isDark ? glass.dark : glass.light;
   const navigation = useNavigation<any>();
   const { signIn } = useAuth();
   const scrollViewRef = useRef<ScrollView>(null);
@@ -163,7 +169,7 @@ export function SignUpScreen() {
     lastName: '',
     businessName: '',
     businessType: '',
-    country: 'US',
+    country: getDeviceCountry(),
     phone: '',
     selectedPlan: 'starter',
     acceptTerms: false,
@@ -246,7 +252,7 @@ export function SignUpScreen() {
     };
   }, [currentStep, iapProduct]);
 
-  const styles = useMemo(() => createStyles(colors, glassColors, isDark), [colors, glassColors, isDark]);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   // Update form field — stable callback to prevent Input re-renders
   const updateField = useCallback((field: keyof FormData, value: string | boolean) => {
@@ -274,12 +280,12 @@ export function SignUpScreen() {
       onPress={toggleShowPassword}
       style={styles.eyeButton}
       accessibilityRole="button"
-      accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+      accessibilityLabel={showPassword ? t('hidePassword') : t('showPassword')}
     >
       <Ionicons
         name={showPassword ? 'eye-off-outline' : 'eye-outline'}
         size={20}
-        color={appColors.gray400}
+        color={colors.textSecondary}
       />
     </TouchableOpacity>
   ), [showPassword, toggleShowPassword, styles.eyeButton]);
@@ -309,18 +315,18 @@ export function SignUpScreen() {
 
     if (currentStep === 'account') {
       if (!formData.email) {
-        newErrors.email = 'Email is required';
+        newErrors.email = t('emailRequired');
       } else if (!isValidEmail(formData.email)) {
-        newErrors.email = 'Please enter a valid email';
+        newErrors.email = t('emailInvalid');
       } else {
         const isAvailable = await checkEmailAvailability(formData.email);
         if (!isAvailable) {
-          newErrors.email = 'This email is already in use';
+          newErrors.email = t('emailAlreadyInUse');
         }
       }
 
       if (!formData.password) {
-        newErrors.password = 'Password is required';
+        newErrors.password = t('passwordRequired');
       } else {
         // Check password against server-side policy
         try {
@@ -333,7 +339,7 @@ export function SignUpScreen() {
           logger.error('[SignUp] Password check error:', error);
           // Fall back to basic validation if API fails
           if (formData.password.length < 8) {
-            newErrors.password = 'Password must be at least 8 characters';
+            newErrors.password = t('passwordTooShort');
           }
         } finally {
           setIsCheckingPassword(false);
@@ -341,30 +347,32 @@ export function SignUpScreen() {
       }
 
       if (!formData.confirmPassword) {
-        newErrors.confirmPassword = 'Please confirm your password';
+        newErrors.confirmPassword = t('confirmPasswordRequired');
       } else if (formData.password !== formData.confirmPassword) {
-        newErrors.confirmPassword = 'Passwords do not match';
+        newErrors.confirmPassword = t('passwordsDoNotMatch');
       }
     }
 
     if (currentStep === 'business') {
       if (!formData.firstName.trim()) {
-        newErrors.firstName = 'First name is required';
+        newErrors.firstName = t('firstNameRequired');
       }
       if (!formData.lastName.trim()) {
-        newErrors.lastName = 'Last name is required';
+        newErrors.lastName = t('lastNameRequired');
       }
       if (!formData.businessName.trim()) {
-        newErrors.businessName = 'Business name is required';
+        newErrors.businessName = t('businessNameRequired');
+      } else if (formData.businessName.trim().length < 2) {
+        newErrors.businessName = t('businessNameTooShort');
       }
       if (!formData.businessType) {
-        newErrors.businessType = 'Please select a business type';
+        newErrors.businessType = t('businessTypeRequired');
       }
       if (!formData.acceptTerms) {
-        newErrors.acceptTerms = 'You must accept the terms and privacy policy';
+        newErrors.acceptTerms = t('acceptTermsRequired');
       }
       if (formData.phone && selectedCountry && !isValidPhoneNumber(formData.phone, selectedCountry)) {
-        newErrors.phone = 'Please enter a valid phone number';
+        newErrors.phone = t('phoneInvalid');
       }
     }
 
@@ -392,7 +400,7 @@ export function SignUpScreen() {
         setCurrentStep('plan');
       } catch (error: any) {
         logger.error('[SignUp] Account creation failed:', error);
-        Alert.alert('Error', error.message || 'Failed to create account. Please try again.');
+        Alert.alert(t('errorAlertTitle'), error.message || t('failedToCreateAccount'));
       } finally {
         setIsLoading(false);
       }
@@ -479,7 +487,7 @@ export function SignUpScreen() {
 
     if (!response.ok) {
       logger.error('[SignUp] Signup failed:', data.message || data.error);
-      throw new Error(data.message || 'Failed to create account');
+      throw new Error(data.message || t('failedToCreateAccount'));
     }
 
     logger.log('[SignUp] ========== ACCOUNT CREATED SUCCESSFULLY ==========');
@@ -492,11 +500,11 @@ export function SignUpScreen() {
   const handleProPurchase = async () => {
     if (!iapProduct) {
       Alert.alert(
-        'Subscription Not Available',
-        'Unable to load subscription details. Please try again or choose the Starter plan.',
+        t('subscriptionNotAvailableTitle'),
+        t('subscriptionNotAvailableMessage'),
         [
-          { text: 'Try Again', onPress: () => handleSignUp() },
-          { text: 'Use Starter', onPress: () => {
+          { text: tc('tryAgain'), onPress: () => handleSignUp() },
+          { text: t('useStarter'), onPress: () => {
             updateField('selectedPlan', 'starter');
           }},
         ]
@@ -554,18 +562,18 @@ export function SignUpScreen() {
             }
           } catch (error: any) {
             setIsLoading(false);
-            Alert.alert('Error', error.message || 'Failed to sign in. Please try logging in manually.');
+            Alert.alert(t('errorAlertTitle'), error.message || t('failedToSignIn'));
           }
         } else {
           if (result.error !== 'Purchase cancelled') {
-            Alert.alert('Purchase Failed', result.error || 'Unable to complete purchase. Please try again.');
+            Alert.alert(t('purchaseFailedTitle'), result.error || t('purchaseFailedMessage'));
           }
         }
       });
     } catch (error: any) {
       setIsPurchasing(false);
       logger.error('[SignUp] IAP purchase error:', error);
-      Alert.alert('Error', 'Unable to start purchase. Please try again.');
+      Alert.alert(t('errorAlertTitle'), t('unableToStartPurchase'));
     }
   };
 
@@ -591,7 +599,7 @@ export function SignUpScreen() {
 
     } catch (error: any) {
       logger.error('Sign up error:', error);
-      Alert.alert('Error', error.message || 'Failed to sign in. Please try again.');
+      Alert.alert(t('errorAlertTitle'), error.message || t('failedToSignIn'));
     } finally {
       setIsLoading(false);
     }
@@ -604,20 +612,20 @@ export function SignUpScreen() {
         <View style={styles.stepTitleIcon}>
           <Ionicons name="person-add-outline" size={20} color={colors.primary} />
         </View>
-        <Text maxFontSizeMultiplier={1.2} style={styles.stepTitle}>Create your account</Text>
+        <Text maxFontSizeMultiplier={1.2} style={styles.stepTitle}>{t('createYourAccount')}</Text>
       </View>
       <Text maxFontSizeMultiplier={1.5} style={styles.stepSubtitle}>
-        Enter your email and create a password to get started
+        {t('createYourAccountSubtitle')}
       </Text>
 
       <View style={styles.form}>
         <View style={styles.inputGroup}>
-          <Text maxFontSizeMultiplier={1.5} style={styles.label}>Email</Text>
+          <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('emailLabel')}</Text>
           <Input
             icon="mail-outline"
             value={formData.email}
             onChangeText={onChangeEmail}
-            placeholder="you@example.com"
+            placeholder={t('emailPlaceholder')}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -625,10 +633,10 @@ export function SignUpScreen() {
             textContentType="none"
             editable={!isFormDisabled}
             error={errors.email}
-            accessibilityLabel="Email address"
+            accessibilityLabel={t('emailAccessibilityLabel')}
             rightIcon={isCheckingEmail ? (
               <View style={styles.inputSpinner}>
-                <ActivityIndicator size="small" color={colors.primary} accessibilityLabel="Checking email availability" />
+                <ActivityIndicator size="small" color={colors.primary} accessibilityLabel={t('checkingEmailAccessibilityLabel')} />
               </View>
             ) : undefined}
           />
@@ -636,35 +644,35 @@ export function SignUpScreen() {
         </View>
 
         <View style={styles.inputGroup}>
-          <Text maxFontSizeMultiplier={1.5} style={styles.label}>Password</Text>
+          <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('passwordLabel')}</Text>
           <Input
             icon="lock-closed-outline"
             value={formData.password}
             onChangeText={onChangePassword}
-            placeholder="At least 8 characters"
+            placeholder={t('passwordPlaceholderSignUp')}
             secureTextEntry={!showPassword}
             textContentType="none"
             editable={!isFormDisabled}
             error={errors.password}
-            accessibilityLabel="Password"
-            accessibilityHint="Must be at least 8 characters"
+            accessibilityLabel={t('passwordAccessibilityLabel')}
+            accessibilityHint={t('passwordAccessibilityHint')}
             rightIcon={passwordRightIcon}
           />
           {errors.password && <Text maxFontSizeMultiplier={1.5} style={styles.errorText} accessibilityRole="alert">{errors.password}</Text>}
         </View>
 
         <View style={styles.inputGroup}>
-          <Text maxFontSizeMultiplier={1.5} style={styles.label}>Confirm Password</Text>
+          <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('confirmPasswordLabel')}</Text>
           <Input
             icon="lock-closed-outline"
             value={formData.confirmPassword}
             onChangeText={onChangeConfirmPassword}
-            placeholder="Re-enter your password"
+            placeholder={t('confirmPasswordPlaceholder')}
             secureTextEntry={!showPassword}
             textContentType="none"
             editable={!isFormDisabled}
             error={errors.confirmPassword}
-            accessibilityLabel="Confirm password"
+            accessibilityLabel={t('confirmPasswordAccessibilityLabel')}
           />
           {errors.confirmPassword && <Text maxFontSizeMultiplier={1.5} style={styles.errorText} accessibilityRole="alert">{errors.confirmPassword}</Text>}
         </View>
@@ -679,67 +687,67 @@ export function SignUpScreen() {
         <View style={styles.stepTitleIcon}>
           <Ionicons name="storefront-outline" size={20} color={colors.primary} />
         </View>
-        <Text maxFontSizeMultiplier={1.2} style={styles.stepTitle}>Tell us about your business</Text>
+        <Text maxFontSizeMultiplier={1.2} style={styles.stepTitle}>{t('tellUsAboutBusiness')}</Text>
       </View>
       <Text maxFontSizeMultiplier={1.5} style={styles.stepSubtitle}>
-        This information helps us customize your experience
+        {t('tellUsAboutBusinessSubtitle')}
       </Text>
 
       <View style={styles.form}>
         <View style={styles.row}>
           <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-            <Text maxFontSizeMultiplier={1.5} style={styles.label}>First Name</Text>
+            <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('firstNameLabel')}</Text>
             <Input
               icon="person-outline"
               value={formData.firstName}
               onChangeText={onChangeFirstName}
-              placeholder="John"
+              placeholder={t('firstNamePlaceholder')}
               autoCapitalize="words"
               autoComplete="given-name"
               textContentType="none"
               editable={!isFormDisabled}
               error={errors.firstName}
-              accessibilityLabel="First name"
+              accessibilityLabel={t('firstNameAccessibilityLabel')}
             />
             {errors.firstName && <Text maxFontSizeMultiplier={1.5} style={styles.errorText} accessibilityRole="alert">{errors.firstName}</Text>}
           </View>
 
           <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-            <Text maxFontSizeMultiplier={1.5} style={styles.label}>Last Name</Text>
+            <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('lastNameLabel')}</Text>
             <Input
               value={formData.lastName}
               onChangeText={onChangeLastName}
-              placeholder="Doe"
+              placeholder={t('lastNamePlaceholder')}
               autoCapitalize="words"
               autoComplete="family-name"
               textContentType="none"
               editable={!isFormDisabled}
               error={errors.lastName}
-              accessibilityLabel="Last name"
+              accessibilityLabel={t('lastNameAccessibilityLabel')}
             />
             {errors.lastName && <Text maxFontSizeMultiplier={1.5} style={styles.errorText} accessibilityRole="alert">{errors.lastName}</Text>}
           </View>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text maxFontSizeMultiplier={1.5} style={styles.label}>Business Name</Text>
+          <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('businessNameLabel')}</Text>
           <Input
             icon="storefront-outline"
             value={formData.businessName}
             onChangeText={onChangeBusinessName}
-            placeholder="The Rolling Bar Co."
+            placeholder={t('businessNamePlaceholder')}
             autoCapitalize="words"
             autoComplete="organization"
             textContentType="none"
             editable={!isFormDisabled}
             error={errors.businessName}
-            accessibilityLabel="Business name"
+            accessibilityLabel={t('businessNameAccessibilityLabel')}
           />
           {errors.businessName && <Text maxFontSizeMultiplier={1.5} style={styles.errorText} accessibilityRole="alert">{errors.businessName}</Text>}
         </View>
 
         <View style={styles.inputGroup}>
-          <Text maxFontSizeMultiplier={1.5} style={styles.label}>Business Type</Text>
+          <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('businessTypeLabel')}</Text>
           <TouchableOpacity
             style={[
               styles.selectButton,
@@ -752,24 +760,24 @@ export function SignUpScreen() {
             }}
             disabled={isFormDisabled}
             accessibilityRole="button"
-            accessibilityLabel={formData.businessType ? `Business type: ${formData.businessType}` : 'Select business type'}
-            accessibilityHint="Opens a list of business types to choose from"
+            accessibilityLabel={formData.businessType ? t('businessTypeAccessibilityLabel', { businessType: formData.businessType }) : t('selectBusinessType')}
+            accessibilityHint={t('businessTypeAccessibilityHint')}
             accessibilityState={{ disabled: isFormDisabled }}
           >
-            <Ionicons name="briefcase-outline" size={20} color={appColors.gray400} />
+            <Ionicons name="briefcase-outline" size={20} color={colors.textSecondary} />
             <Text maxFontSizeMultiplier={1.3} style={[
               styles.selectButtonText,
               !formData.businessType && styles.selectButtonPlaceholder,
             ]}>
-              {formData.businessType || 'Select business type'}
+              {formData.businessType || t('selectBusinessType')}
             </Text>
-            <Ionicons name="chevron-down" size={20} color={appColors.gray400} />
+            <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
           {errors.businessType && <Text maxFontSizeMultiplier={1.5} style={styles.errorText} accessibilityRole="alert">{errors.businessType}</Text>}
         </View>
 
         <View style={styles.inputGroup}>
-          <Text maxFontSizeMultiplier={1.5} style={styles.label}>Country</Text>
+          <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('countryLabel')}</Text>
           <TouchableOpacity
             style={[
               styles.selectButton,
@@ -781,27 +789,27 @@ export function SignUpScreen() {
             }}
             disabled={isFormDisabled}
             accessibilityRole="button"
-            accessibilityLabel={`Country: ${SUPPORTED_COUNTRIES.find(c => c.code === formData.country)?.name || formData.country}`}
-            accessibilityHint="Opens a list of countries to choose from"
+            accessibilityLabel={t('countryAccessibilityLabel', { countryName: SUPPORTED_COUNTRIES.find(c => c.code === formData.country)?.i18nKey ? t(SUPPORTED_COUNTRIES.find(c => c.code === formData.country)!.i18nKey) : formData.country })}
+            accessibilityHint={t('countryAccessibilityHint')}
             accessibilityState={{ disabled: isFormDisabled }}
           >
-            <Ionicons name="globe-outline" size={20} color={appColors.gray400} />
+            <Ionicons name="globe-outline" size={20} color={colors.textSecondary} />
             <Text maxFontSizeMultiplier={1.3} style={styles.selectButtonText}>
-              {SUPPORTED_COUNTRIES.find(c => c.code === formData.country)?.name || 'Select country'}
+              {(() => { const country = SUPPORTED_COUNTRIES.find(c => c.code === formData.country); return country ? t(country.i18nKey) : t('selectCountry'); })()}
             </Text>
-            <Ionicons name="chevron-down" size={20} color={appColors.gray400} />
+            <Ionicons name="chevron-down" size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.inputGroup}>
-          <Text maxFontSizeMultiplier={1.5} style={styles.label}>Phone Number (Optional)</Text>
+          <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('phoneLabel')}</Text>
           <PhoneInput
             value={phoneInputValue}
             onChangePhoneNumber={phoneOnChange}
             selectedCountry={selectedCountry}
             onChangeSelectedCountry={phoneOnChangeCountry}
             defaultCountry={formData.country as any}
-            placeholder="Phone Number"
+            placeholder={t('phonePlaceholder')}
             disabled={isFormDisabled}
             theme={isDark ? 'dark' : 'light'}
             phoneInputStyles={{
@@ -828,7 +836,7 @@ export function SignUpScreen() {
           activeOpacity={0.7}
           disabled={isFormDisabled}
           accessibilityRole="checkbox"
-          accessibilityLabel="I agree to the Terms of Service and Privacy Policy"
+          accessibilityLabel={t('agreeToTermsAccessibilityLabel')}
           accessibilityState={{ checked: formData.acceptTerms, disabled: isFormDisabled }}
         >
           <View style={[
@@ -841,7 +849,7 @@ export function SignUpScreen() {
             )}
           </View>
           <Text maxFontSizeMultiplier={1.3} style={styles.checkboxLabel}>
-            I agree to the{' '}
+            {t('agreeToTerms')}
             <Text
               maxFontSizeMultiplier={1.3}
               style={styles.link}
@@ -851,12 +859,12 @@ export function SignUpScreen() {
               }}
               suppressHighlighting
               accessibilityRole="link"
-              accessibilityLabel="Terms of Service"
-              accessibilityHint="Opens in your browser"
+              accessibilityLabel={t('termsOfServiceAccessibilityLabel')}
+              accessibilityHint={t('termsOfServiceAccessibilityHint')}
             >
-              Terms of Service
+              {t('termsOfService')}
             </Text>
-            {' '}and{' '}
+            {tc('and')}
             <Text
               maxFontSizeMultiplier={1.3}
               style={styles.link}
@@ -866,10 +874,10 @@ export function SignUpScreen() {
               }}
               suppressHighlighting
               accessibilityRole="link"
-              accessibilityLabel="Privacy Policy"
-              accessibilityHint="Opens in your browser"
+              accessibilityLabel={t('privacyPolicyAccessibilityLabel')}
+              accessibilityHint={t('privacyPolicyAccessibilityHint')}
             >
-              Privacy Policy
+              {t('privacyPolicy')}
             </Text>
           </Text>
         </TouchableOpacity>
@@ -883,42 +891,45 @@ export function SignUpScreen() {
             style={styles.pickerBackdrop}
             onPress={() => setShowBusinessTypePicker(false)}
             accessibilityRole="button"
-            accessibilityLabel="Close business type picker"
+            accessibilityLabel={t('closeBusinessTypePicker')}
           />
           <View style={styles.pickerContent}>
             <View style={styles.pickerHeader}>
-              <Text maxFontSizeMultiplier={1.3} style={styles.pickerTitle}>Select Business Type</Text>
-              <TouchableOpacity onPress={() => setShowBusinessTypePicker(false)} accessibilityRole="button" accessibilityLabel="Close">
+              <Text maxFontSizeMultiplier={1.3} style={styles.pickerTitle}>{t('selectBusinessTypePickerTitle')}</Text>
+              <TouchableOpacity onPress={() => setShowBusinessTypePicker(false)} accessibilityRole="button" accessibilityLabel={t('closeAccessibilityLabel')}>
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.pickerList}>
-              {BUSINESS_TYPES.map((type) => (
+              {BUSINESS_TYPE_KEYS.map((key) => {
+                const label = t(key);
+                return (
                 <TouchableOpacity
-                  key={type}
+                  key={key}
                   style={[
                     styles.pickerOption,
-                    formData.businessType === type && styles.pickerOptionSelected,
+                    formData.businessType === label && styles.pickerOptionSelected,
                   ]}
                   onPress={() => {
-                    updateField('businessType', type);
+                    updateField('businessType', label);
                     setShowBusinessTypePicker(false);
                   }}
                   accessibilityRole="radio"
-                  accessibilityLabel={type}
-                  accessibilityState={{ selected: formData.businessType === type }}
+                  accessibilityLabel={label}
+                  accessibilityState={{ selected: formData.businessType === label }}
                 >
                   <Text maxFontSizeMultiplier={1.3} style={[
                     styles.pickerOptionText,
-                    formData.businessType === type && styles.pickerOptionTextSelected,
+                    formData.businessType === label && styles.pickerOptionTextSelected,
                   ]}>
-                    {type}
+                    {label}
                   </Text>
-                  {formData.businessType === type && (
+                  {formData.businessType === label && (
                     <Ionicons name="checkmark" size={20} color={colors.primary} />
                   )}
                 </TouchableOpacity>
-              ))}
+                );
+              })}
             </ScrollView>
           </View>
         </View>
@@ -931,17 +942,19 @@ export function SignUpScreen() {
             style={styles.pickerBackdrop}
             onPress={() => setShowCountryPicker(false)}
             accessibilityRole="button"
-            accessibilityLabel="Close country picker"
+            accessibilityLabel={t('closeCountryPicker')}
           />
           <View style={styles.pickerContent}>
             <View style={styles.pickerHeader}>
-              <Text maxFontSizeMultiplier={1.3} style={styles.pickerTitle}>Select Country</Text>
-              <TouchableOpacity onPress={() => setShowCountryPicker(false)} accessibilityRole="button" accessibilityLabel="Close">
+              <Text maxFontSizeMultiplier={1.3} style={styles.pickerTitle}>{t('selectCountryPickerTitle')}</Text>
+              <TouchableOpacity onPress={() => setShowCountryPicker(false)} accessibilityRole="button" accessibilityLabel={t('closeAccessibilityLabel')}>
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
             <ScrollView style={styles.pickerList}>
-              {SUPPORTED_COUNTRIES.map((country) => (
+              {SUPPORTED_COUNTRIES.map((country) => {
+                const countryName = t(country.i18nKey);
+                return (
                 <TouchableOpacity
                   key={country.code}
                   style={[
@@ -953,20 +966,21 @@ export function SignUpScreen() {
                     setShowCountryPicker(false);
                   }}
                   accessibilityRole="radio"
-                  accessibilityLabel={country.name}
+                  accessibilityLabel={countryName}
                   accessibilityState={{ selected: formData.country === country.code }}
                 >
                   <Text maxFontSizeMultiplier={1.3} style={[
                     styles.pickerOptionText,
                     formData.country === country.code && styles.pickerOptionTextSelected,
                   ]}>
-                    {country.name}
+                    {countryName}
                   </Text>
                   {formData.country === country.code && (
                     <Ionicons name="checkmark" size={20} color={colors.primary} />
                   )}
                 </TouchableOpacity>
-              ))}
+                );
+              })}
             </ScrollView>
           </View>
         </View>
@@ -981,10 +995,10 @@ export function SignUpScreen() {
         <View style={styles.stepTitleIcon}>
           <Ionicons name="rocket-outline" size={20} color={colors.primary} />
         </View>
-        <Text maxFontSizeMultiplier={1.2} style={styles.stepTitle}>Choose your plan</Text>
+        <Text maxFontSizeMultiplier={1.2} style={styles.stepTitle}>{t('chooseYourPlan')}</Text>
       </View>
       <Text maxFontSizeMultiplier={1.5} style={styles.stepSubtitle}>
-        Start free or unlock all features with Pro
+        {t('chooseYourPlanSubtitle')}
       </Text>
 
       <View style={styles.plansContainer}>
@@ -998,33 +1012,33 @@ export function SignUpScreen() {
           onPress={() => updateField('selectedPlan', 'starter')}
           disabled={isFormDisabled}
           accessibilityRole="radio"
-          accessibilityLabel={`Starter plan, ${PLANS.starter.price}, ${PLANS.starter.transactionFee} per transaction`}
+          accessibilityLabel={t('starterPlanAccessibilityLabel', { price: t('starterPlanPrice'), transactionFee: PRICING.starter.transactionFeeDisplay })}
           accessibilityState={{ selected: formData.selectedPlan === 'starter', disabled: isFormDisabled }}
         >
           <View style={styles.planHeader}>
-            <Text maxFontSizeMultiplier={1.3} style={styles.planName}>{PLANS.starter.name}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.planName}>{t('starterPlanName')}</Text>
             <View style={styles.planPriceRow}>
-              <Text maxFontSizeMultiplier={1.2} style={styles.planPrice}>{PLANS.starter.price}</Text>
+              <Text maxFontSizeMultiplier={1.2} style={styles.planPrice}>{t('starterPlanPrice')}</Text>
             </View>
-            <Text maxFontSizeMultiplier={1.3} style={styles.planPriceSubtext}>{PLANS.starter.priceSubtext}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.planPriceSubtext}>{t('starterPlanPriceSubtext')}</Text>
           </View>
 
           <View style={styles.planFee}>
-            <Text maxFontSizeMultiplier={1.3} style={styles.planFeeLabel}>Transaction fee</Text>
-            <Text maxFontSizeMultiplier={1.3} style={styles.planFeeValue}>{PLANS.starter.transactionFee}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.planFeeLabel}>{t('transactionFeeLabel')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.planFeeValue}>{PRICING.starter.transactionFeeDisplay}</Text>
           </View>
 
           <View style={styles.planFeatures}>
-            {PLANS.starter.features.map((feature, index) => (
+            {STARTER_FEATURE_KEYS.map((key, index) => (
               <View key={index} style={styles.featureRow}>
                 <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-                <Text maxFontSizeMultiplier={1.3} style={styles.featureText}>{feature}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.featureText}>{t(key)}</Text>
               </View>
             ))}
-            {PLANS.starter.notIncluded?.map((feature, index) => (
+            {STARTER_NOT_INCLUDED_KEYS.map((key, index) => (
               <View key={`not-${index}`} style={styles.featureRow}>
                 <Ionicons name="close-circle" size={18} color={colors.textMuted} />
-                <Text maxFontSizeMultiplier={1.3} style={[styles.featureText, styles.featureTextMuted]}>{feature}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={[styles.featureText, styles.featureTextMuted]}>{t(key)}</Text>
               </View>
             ))}
           </View>
@@ -1032,7 +1046,7 @@ export function SignUpScreen() {
           {formData.selectedPlan === 'starter' && (
             <View style={styles.selectedBadge}>
               <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
-              <Text maxFontSizeMultiplier={1.3} style={styles.selectedBadgeText}>Selected</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.selectedBadgeText}>{t('selectedBadge')}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -1048,33 +1062,33 @@ export function SignUpScreen() {
           onPress={() => updateField('selectedPlan', 'pro')}
           disabled={isFormDisabled}
           accessibilityRole="radio"
-          accessibilityLabel={`Pro plan, ${iapProduct?.localizedPrice || PLANS.pro.price} per month, ${PLANS.pro.transactionFee} per transaction, most popular`}
+          accessibilityLabel={t('proPlanAccessibilityLabel', { price: iapProduct?.localizedPrice || PRICING.pro.monthlyPriceDisplay, transactionFee: PRICING.pro.transactionFeeDisplay })}
           accessibilityState={{ selected: formData.selectedPlan === 'pro', disabled: isFormDisabled }}
         >
           <View style={styles.popularBadge}>
-            <Text maxFontSizeMultiplier={1.3} style={styles.popularBadgeText}>Most Popular</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.popularBadgeText}>{t('mostPopularBadge')}</Text>
           </View>
 
           <View style={styles.planHeader}>
-            <Text maxFontSizeMultiplier={1.3} style={styles.planName}>{PLANS.pro.name}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.planName}>{t('proPlanName')}</Text>
             <View style={styles.planPriceRow}>
               <Text maxFontSizeMultiplier={1.2} style={styles.planPrice}>
-                {iapProduct?.localizedPrice || PLANS.pro.price}
+                {iapProduct?.localizedPrice || PRICING.pro.monthlyPriceDisplay}
               </Text>
             </View>
-            <Text maxFontSizeMultiplier={1.3} style={styles.planPriceSubtext}>{PLANS.pro.priceSubtext}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.planPriceSubtext}>{t('proPlanPriceSubtext')}</Text>
           </View>
 
           <View style={styles.planFee}>
-            <Text maxFontSizeMultiplier={1.3} style={styles.planFeeLabel}>Transaction fee</Text>
-            <Text maxFontSizeMultiplier={1.3} style={styles.planFeeValue}>{PLANS.pro.transactionFee}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.planFeeLabel}>{t('transactionFeeLabel')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.planFeeValue}>{PRICING.pro.transactionFeeDisplay}</Text>
           </View>
 
           <View style={styles.planFeatures}>
-            {PLANS.pro.features.map((feature, index) => (
+            {PRO_FEATURE_KEYS.map((key, index) => (
               <View key={index} style={styles.featureRow}>
                 <Ionicons name="checkmark-circle" size={18} color={colors.success} />
-                <Text maxFontSizeMultiplier={1.3} style={styles.featureText}>{feature}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.featureText}>{t(key)}</Text>
               </View>
             ))}
           </View>
@@ -1082,7 +1096,7 @@ export function SignUpScreen() {
           {formData.selectedPlan === 'pro' && (
             <View style={styles.selectedBadge}>
               <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
-              <Text maxFontSizeMultiplier={1.3} style={styles.selectedBadgeText}>Selected</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.selectedBadgeText}>{t('selectedBadge')}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -1092,17 +1106,17 @@ export function SignUpScreen() {
         <TouchableOpacity
           onPress={() => Linking.openURL(`${config.websiteUrl}/terms`)}
           accessibilityRole="link"
-          accessibilityLabel="Terms of Use"
+          accessibilityLabel={t('termsOfUseAccessibilityLabel')}
         >
-          <Text style={styles.legalLinkText} maxFontSizeMultiplier={1.5}>Terms of Use</Text>
+          <Text style={styles.legalLinkText} maxFontSizeMultiplier={1.5}>{t('termsOfUse')}</Text>
         </TouchableOpacity>
-        <Text style={styles.legalLinkSeparator} maxFontSizeMultiplier={1.5}> | </Text>
+        <Text style={styles.legalLinkSeparator} maxFontSizeMultiplier={1.5}>{t('legalSeparator')}</Text>
         <TouchableOpacity
           onPress={() => Linking.openURL(`${config.websiteUrl}/privacy`)}
           accessibilityRole="link"
-          accessibilityLabel="Privacy Policy"
+          accessibilityLabel={t('privacyPolicyAccessibilityLabel')}
         >
-          <Text style={styles.legalLinkText} maxFontSizeMultiplier={1.5}>Privacy Policy</Text>
+          <Text style={styles.legalLinkText} maxFontSizeMultiplier={1.5}>{t('privacyPolicy')}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -1111,24 +1125,19 @@ export function SignUpScreen() {
   // Render confirmation step
   const renderConfirmationStep = () => (
     <View style={styles.confirmationContent}>
-      {/* Success Icon with glow */}
+      {/* Success Icon */}
       <View style={styles.successIconWrapper}>
         <View style={styles.successIconGlow} />
         <View style={styles.successIconOuter}>
-          <LinearGradient
-            colors={[colors.success, '#059669']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.successIconGradient}
-          >
+          <View style={styles.successIconInner}>
             <Ionicons name="checkmark" size={40} color="#fff" />
-          </LinearGradient>
+          </View>
         </View>
       </View>
 
-      <Text maxFontSizeMultiplier={1.2} style={styles.confirmationTitle}>Welcome to Rowie!</Text>
+      <Text maxFontSizeMultiplier={1.2} style={styles.confirmationTitle}>{t('welcomeToRowie')}</Text>
       <Text maxFontSizeMultiplier={1.5} style={styles.confirmationSubtitle}>
-        Your account has been created successfully
+        {t('accountCreatedSuccessfully')}
       </Text>
 
       <View style={styles.confirmationChecklist}>
@@ -1136,35 +1145,35 @@ export function SignUpScreen() {
           <View style={styles.checklistIconWrapper}>
             <Ionicons name="checkmark" size={14} color={colors.success} />
           </View>
-          <Text maxFontSizeMultiplier={1.5} style={styles.checklistText}>Account created</Text>
+          <Text maxFontSizeMultiplier={1.5} style={styles.checklistText}>{t('accountCreated')}</Text>
         </View>
         <View style={styles.checklistItem}>
           <View style={styles.checklistIconWrapper}>
             <Ionicons name="checkmark" size={14} color={colors.success} />
           </View>
           <Text maxFontSizeMultiplier={1.5} style={styles.checklistText}>
-            {formData.selectedPlan === 'pro' ? 'Pro plan activated' : 'Starter plan activated'}
+            {formData.selectedPlan === 'pro' ? t('proPlanActivated') : t('starterPlanActivated')}
           </Text>
         </View>
         <View style={styles.checklistItem}>
           <View style={[styles.checklistIconWrapper, styles.checklistIconLoading]}>
-            <ActivityIndicator size="small" color={colors.primary} accessibilityLabel="Signing you in" />
+            <ActivityIndicator size="small" color={colors.primary} accessibilityLabel={t('signingYouInAccessibilityLabel')} />
           </View>
-          <Text maxFontSizeMultiplier={1.5} style={styles.checklistText}>Signing you in...</Text>
+          <Text maxFontSizeMultiplier={1.5} style={styles.checklistText}>{t('signingYouIn')}</Text>
         </View>
       </View>
 
       {/* Next Steps */}
       <View style={styles.nextStepsContainer}>
-        <Text maxFontSizeMultiplier={1.5} style={styles.nextStepsTitle}>Next Step</Text>
+        <Text maxFontSizeMultiplier={1.5} style={styles.nextStepsTitle}>{t('nextStep')}</Text>
         <View style={styles.nextStepsCard}>
           <View style={styles.nextStepsIconContainer}>
             <Ionicons name="wallet-outline" size={22} color={colors.primary} />
           </View>
           <View style={styles.nextStepsContent}>
-            <Text maxFontSizeMultiplier={1.5} style={styles.nextStepsHeading}>Link Your Bank Account</Text>
+            <Text maxFontSizeMultiplier={1.5} style={styles.nextStepsHeading}>{t('linkBankAccount')}</Text>
             <Text maxFontSizeMultiplier={1.5} style={styles.nextStepsDescription}>
-              Visit the Vendor Portal to connect your bank account and start accepting payments.
+              {t('linkBankAccountDescription')}
             </Text>
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
@@ -1174,18 +1183,12 @@ export function SignUpScreen() {
   );
 
   return (
-    <LinearGradient
-      colors={['#0C0A09', '#1C1917', '#0C0A09']}
-      locations={[0, 0.5, 1]}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-      style={styles.gradient}
-    >
+    <View style={styles.screenBackground}>
       <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         {/* Header */}
         <View style={styles.header}>
           {currentStep !== 'confirmation' ? (
-            <TouchableOpacity onPress={handleBack} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+            <TouchableOpacity onPress={handleBack} style={styles.backButton} accessibilityRole="button" accessibilityLabel={t('goBackAccessibilityLabel')}>
               <View style={styles.backButtonInner}>
                 <Ionicons name="chevron-back" size={20} color={colors.text} />
               </View>
@@ -1224,7 +1227,7 @@ export function SignUpScreen() {
               })}
             </View>
           ) : (
-            <Text maxFontSizeMultiplier={1.5} style={styles.stepLabel}>Complete</Text>
+            <Text maxFontSizeMultiplier={1.5} style={styles.stepLabel}>{t('signUpStepCompleteLabel')}</Text>
           )}
 
           <View style={styles.backButton} />
@@ -1276,26 +1279,21 @@ export function SignUpScreen() {
               accessibilityRole="button"
               accessibilityLabel={
                 isLoading || isPurchasing
-                  ? (isPurchasing ? 'Processing purchase' : 'Creating account')
+                  ? (isPurchasing ? t('processingPurchaseAccessibilityLabel') : t('creatingAccountAccessibilityLabel'))
                   : currentStep === 'plan'
                     ? formData.selectedPlan === 'pro'
-                      ? 'Subscribe to Pro'
-                      : 'Create Account'
-                    : 'Continue'
+                      ? t('subscribeToPro')
+                      : t('createAccountButton')
+                    : t('continueButton')
               }
               accessibilityState={{ disabled: isLoading || isCheckingEmail || isCheckingPassword || isPurchasing, busy: isLoading || isPurchasing }}
             >
-              <LinearGradient
-                colors={[colors.primary, '#D97706']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.nextButtonGradient}
-              >
+              <View style={styles.nextButtonInner}>
                 {isLoading || isPurchasing ? (
                   <View style={styles.buttonLoadingContent}>
-                    <ActivityIndicator color="#fff" size="small" accessibilityLabel={isPurchasing ? 'Processing purchase' : 'Creating account'} />
+                    <ActivityIndicator color="#fff" size="small" accessibilityLabel={isPurchasing ? t('processingPurchaseAccessibilityLabel') : t('creatingAccountAccessibilityLabel')} />
                     <Text maxFontSizeMultiplier={1.3} style={styles.nextButtonText}>
-                      {isPurchasing ? 'Processing...' : 'Creating account...'}
+                      {isPurchasing ? t('processingButton') : t('creatingAccountButton')}
                     </Text>
                   </View>
                 ) : (
@@ -1303,35 +1301,36 @@ export function SignUpScreen() {
                     <Text maxFontSizeMultiplier={1.3} style={styles.nextButtonText}>
                       {currentStep === 'plan'
                         ? formData.selectedPlan === 'pro'
-                          ? 'Subscribe to Pro'
-                          : 'Create Account'
-                        : 'Continue'}
+                          ? t('subscribeToPro')
+                          : t('createAccountButton')
+                        : t('continueButton')}
                     </Text>
                     <Ionicons name="arrow-forward" size={20} color="#fff" />
                   </>
                 )}
-              </LinearGradient>
+              </View>
             </TouchableOpacity>
 
             {currentStep === 'account' && (
               <View style={styles.signInRow}>
-                <Text maxFontSizeMultiplier={1.5} style={styles.signInText}>Already have an account? </Text>
-                <TouchableOpacity onPress={() => navigation.goBack()} accessibilityRole="link" accessibilityLabel="Sign in to existing account">
-                  <Text maxFontSizeMultiplier={1.3} style={styles.signInLink}>Sign in</Text>
+                <Text maxFontSizeMultiplier={1.5} style={styles.signInText}>{t('alreadyHaveAccount')}</Text>
+                <TouchableOpacity onPress={() => navigation.goBack()} accessibilityRole="link" accessibilityLabel={t('signInAccessibilityLabelLink')}>
+                  <Text maxFontSizeMultiplier={1.3} style={styles.signInLink}>{t('signInLink')}</Text>
                 </TouchableOpacity>
               </View>
             )}
           </View>
         )}
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) =>
+const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
-    gradient: {
+    screenBackground: {
       flex: 1,
+      backgroundColor: colors.background,
     },
     container: {
       flex: 1,
@@ -1353,9 +1352,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       width: 36,
       height: 36,
       borderRadius: 12,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1371,9 +1370,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       width: 32,
       height: 32,
       borderRadius: 10,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1391,7 +1390,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     stepConnector: {
       width: 24,
       height: 2,
-      backgroundColor: glassColors.border,
+      backgroundColor: colors.border,
       marginHorizontal: 4,
     },
     stepConnectorActive: {
@@ -1408,7 +1407,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     },
     progressTrack: {
       height: 3,
-      backgroundColor: glassColors.border,
+      backgroundColor: colors.border,
       borderRadius: 2,
       overflow: 'hidden',
     },
@@ -1464,7 +1463,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     label: {
       fontSize: 14,
       fontFamily: fonts.medium,
-      color: appColors.gray300,
+      color: colors.textSecondary,
       marginLeft: 4,
     },
     errorText: {
@@ -1511,7 +1510,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       color: colors.text,
     },
     selectButtonPlaceholder: {
-      color: appColors.gray500,
+      color: colors.textMuted,
     },
     checkboxRow: {
       flexDirection: 'row',
@@ -1526,7 +1525,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       height: 22,
       borderRadius: 6,
       borderWidth: 2,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       marginTop: 2,
@@ -1571,7 +1570,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       paddingHorizontal: 20,
       paddingVertical: 16,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.border,
+      borderBottomColor: colors.border,
     },
     pickerTitle: {
       fontSize: 18,
@@ -1606,10 +1605,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       gap: 16,
     },
     planCard: {
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 20,
       borderWidth: 2,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       padding: 20,
       ...shadows.sm,
     },
@@ -1688,7 +1687,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      backgroundColor: glassColors.background,
+      backgroundColor: colors.background,
       borderRadius: 12,
       padding: 12,
       marginBottom: 16,
@@ -1728,7 +1727,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       marginTop: 16,
       paddingTop: 16,
       borderTopWidth: 1,
-      borderTopColor: glassColors.border,
+      borderTopColor: colors.border,
     },
     selectedBadgeText: {
       fontSize: 14,
@@ -1781,10 +1780,12 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       shadowColor: colors.success,
       shadowOpacity: 0.4,
     },
-    successIconGradient: {
+    successIconInner: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
+      backgroundColor: colors.success,
+      borderRadius: 24,
     },
     confirmationTitle: {
       fontSize: 28,
@@ -1801,10 +1802,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       textAlign: 'center',
     },
     confirmationChecklist: {
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       padding: 20,
       width: '100%',
       gap: 14,
@@ -1846,10 +1847,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     nextStepsCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       padding: 16,
       gap: 14,
     },
@@ -1887,12 +1888,14 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       overflow: 'hidden',
       ...shadows.md,
     },
-    nextButtonGradient: {
+    nextButtonInner: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
       paddingVertical: 18,
+      backgroundColor: colors.primary,
+      borderRadius: 20,
     },
     nextButtonText: {
       fontSize: 18,
@@ -1927,10 +1930,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       backgroundColor: isDark ? 'rgba(41, 37, 36, 0.5)' : '#FFFFFF',
       borderRadius: 12,
       borderWidth: isDark ? 2 : 1,
-      borderColor: isDark ? appColors.gray700 : appColors.gray300,
+      borderColor: colors.border,
     },
     phoneFlagContainer: {
-      backgroundColor: isDark ? 'rgba(41, 37, 36, 0.5)' : appColors.gray100,
+      backgroundColor: isDark ? 'rgba(41, 37, 36, 0.5)' : colors.surfaceSecondary,
       borderTopLeftRadius: 11,
       borderBottomLeftRadius: 11,
     },
@@ -1946,7 +1949,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       color: colors.text,
     },
     phoneDivider: {
-      backgroundColor: isDark ? appColors.gray600 : appColors.gray300,
+      backgroundColor: colors.borderLight,
     },
     phoneCaret: {
       color: colors.textSecondary,

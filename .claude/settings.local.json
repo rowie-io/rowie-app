@@ -24,7 +24,14 @@
       "Bash(convert:*)",
       "Bash(python3:*)",
       "Bash(python:*)",
-      "Bash(xargs -I {} sh -c 'grep -H \"\"SafeAreaView\"\" {} | grep \"\"from [''''\\\\\"\"']react-native \")"
+      "Bash(xargs -I {} sh -c 'grep -H \"\"SafeAreaView\"\" {} | grep \"\"from [''''\\\\\"\"']react-native \")",
+      "Bash(wc -l /mnt/c/Users/skull/Rowie/rowie-app/src/screens/*.tsx)",
+      "Bash(echo \"EXIT CODE: $?\")",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//tmp/claude-1000/-mnt-c-Users-skull-Rowie-rowie-app/b4ff5ecf-4319-4ec8-861a-6c079abc560c/tasks/**)",
+      "Bash(done)"
     ]
   }
 }

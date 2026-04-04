@@ -10,7 +10,7 @@
 export const PRICING = {
   pro: {
     monthlyPriceCents: 2499,
-    monthlyPriceDisplay: '$24.99',
+    monthlyPriceDisplay: '€24.99',
     period: '/mo',
     transactionFeeRate: 0.028,
     transactionFeeFixedCents: 16,
@@ -25,5 +25,12 @@ export const PRICING = {
     transactionFeeFixedCents: 18,
     transactionFeeDisplay: '2.9% + $0.18 per tap',
     trialDays: 0,
+  },
+  referral: {
+    commissionRate: 0.10,
+    commissionDisplay: '10%',
+    durationMonths: 12,
+    payoutThresholdDisplay: '€1.00',
+    clearingWindowDays: 30,
   },
 } as const;

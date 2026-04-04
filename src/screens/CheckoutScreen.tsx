@@ -14,9 +14,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   Pressable,
-  Dimensions,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,7 +26,6 @@ import { useAuth } from '../context/AuthContext';
 import { useTerminal } from '../context/StripeTerminalContext';
 import { stripeTerminalApi, ordersApi } from '../lib/api';
 import { getDeviceId } from '../lib/device';
-import { glass } from '../lib/colors';
 import { shadows } from '../lib/shadows';
 import { fonts } from '../lib/fonts';
 import { PayoutsSetupBanner } from '../components/PayoutsSetupBanner';
@@ -36,10 +33,8 @@ import { SetupRequiredBanner } from '../components/SetupRequiredBanner';
 import logger from '../lib/logger';
 import { isValidEmailOrEmpty } from '../lib/validation';
 import { formatCents, getCurrencySymbol, toSmallestUnit, fromSmallestUnit } from '../utils/currency';
+import { useTranslations } from '../lib/i18n';
 
-
-// Apple TTPOi 5.4: Use region-correct copy
-const TAP_TO_PAY_LABEL = Platform.OS === 'ios' ? 'Tap to Pay on iPhone' : 'Tap to Pay';
 
 interface TipOption {
   label: string;
@@ -62,11 +57,15 @@ export function CheckoutScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'Checkout'>>();
-  const glassColors = isDark ? glass.dark : glass.light;
   const { items, itemCount, clearCart, incrementItem, decrementItem, removeItem, subtotal: cartSubtotal, orderNotes, setOrderNotes, customerEmail, setCustomerEmail, paymentMethod, setPaymentMethod, selectedTipIndex, setSelectedTipIndex, customTipAmount, setCustomTipAmount, showCustomTipInput, setShowCustomTipInput } = useCart();
   const { selectedCatalog } = useCatalog();
   const { isPaymentReady, connectLoading, connectStatus, currency } = useAuth();
   const { deviceCompatibility, isInitialized: isTerminalInitialized, isWarming, preferredReader } = useTerminal();
+  const t = useTranslations('checkout');
+  const tc = useTranslations('common');
+
+  // Apple TTPOi 5.4: Use region-correct, translated copy
+  const tapToPayLabel = Platform.OS === 'ios' ? t('tapToPayLabel') : t('tapToPayLabelAndroid');
 
   // Catalog data is automatically updated via socket events in CatalogContext
 
@@ -95,7 +94,7 @@ export function CheckoutScreen() {
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
 
   const { total: routeTotal, isQuickCharge, quickChargeDescription, resumedOrderId, resumedOrder } = route.params;
-  const styles = createStyles(colors, glassColors, isDark);
+  const styles = createStyles(colors, isDark);
 
   // NOTE: Do NOT clear cart on unmount — only clear after explicit hold/delete/complete actions
 
@@ -163,15 +162,15 @@ export function CheckoutScreen() {
 
       // Show confirmation dialog
       Alert.alert(
-        'What would you like to do?',
-        'This order needs to be held or deleted.',
+        t('backNavigationTitle'),
+        t('backNavigationMessage'),
         [
           {
-            text: 'Cancel',
+            text: tc('cancel'),
             style: 'cancel',
           },
           {
-            text: 'Delete Order',
+            text: t('deleteOrderButton'),
             style: 'destructive',
             onPress: async () => {
               try {
@@ -181,12 +180,12 @@ export function CheckoutScreen() {
                 navigation.dispatch(e.data.action);
               } catch (error: any) {
                 logger.error('Delete order error:', error);
-                Alert.alert('Error', error.error || error.message || 'Failed to delete order');
+                Alert.alert(t('errorTitle'), error.error || error.message || t('failedToDeleteOrder'));
               }
             },
           },
           {
-            text: 'Hold Order',
+            text: t('holdOrderButton'),
             onPress: async () => {
               try {
                 const vals = currentValuesRef.current;
@@ -209,7 +208,7 @@ export function CheckoutScreen() {
                 navigation.dispatch(e.data.action);
               } catch (error: any) {
                 logger.error('Re-hold order error:', error);
-                Alert.alert('Error', error.error || error.message || 'Failed to hold order');
+                Alert.alert(t('errorTitle'), error.error || error.message || t('failedToHoldOrder'));
               }
             },
           },
@@ -218,7 +217,7 @@ export function CheckoutScreen() {
     });
 
     return unsubscribe;
-  }, [resumedOrder, resumedOrderId, navigation]);
+  }, [resumedOrder, resumedOrderId, navigation, t, tc]);
 
   // Show setup required banner when charges aren't enabled
   const showSetupBanner = !connectLoading && connectStatus && !connectStatus.chargesEnabled;
@@ -256,12 +255,12 @@ export function CheckoutScreen() {
     }));
     // Add custom tip option if allowed
     if (allowCustomTip) {
-      options.push({ label: 'Custom', value: -1, isCustom: true });
+      options.push({ label: t('customTipOption'), value: -1, isCustom: true });
     }
     // Always add no tip option
-    options.push({ label: 'No Tip', value: 0 });
+    options.push({ label: t('noTipOption'), value: 0 });
     return options;
-  }, [tipPercentages, allowCustomTip]);
+  }, [tipPercentages, allowCustomTip, t]);
 
   // Calculate tip and grand total (subtotal + tax + tip) - use resumed order values if available
   const { tipAmount, grandTotal, tipPercentage } = useMemo(() => {
@@ -328,7 +327,7 @@ export function CheckoutScreen() {
 
     // Validate email if provided
     if (customerEmail.trim() && !isValidEmailOrEmpty(customerEmail)) {
-      setEmailError('Please enter a valid email address');
+      setEmailError(t('pleaseEnterValidEmail'));
       return;
     }
 
@@ -422,9 +421,12 @@ export function CheckoutScreen() {
       navigation.goBack();
 
       // Show confirmation
+      const displayName = holdName.trim() || resumedOrder?.holdName;
       Alert.alert(
-        'Order Held',
-        `Order "${holdName.trim() || resumedOrder?.holdName || `#${orderNumber}`}" has been saved. You can resume it from the History tab.`
+        t('orderHeldTitle'),
+        displayName
+          ? t('orderHeldMessage', { name: displayName })
+          : t('orderHeldMessageFallback', { orderNumber })
       );
     } catch (error: any) {
       logger.error('Hold order error:', error);
@@ -437,7 +439,7 @@ export function CheckoutScreen() {
       });
 
       // Extract error message properly - error.error might be an object (ZodError)
-      let errorMessage = 'Failed to hold order';
+      let errorMessage = t('failedToHoldOrder');
       if (typeof error.error === 'string') {
         errorMessage = error.error;
       } else if (error.error?.issues) {
@@ -449,7 +451,7 @@ export function CheckoutScreen() {
         errorMessage = error.message;
       }
 
-      Alert.alert('Error', errorMessage);
+      Alert.alert(t('errorTitle'), errorMessage);
     } finally {
       setIsHolding(false);
     }
@@ -472,18 +474,18 @@ export function CheckoutScreen() {
   const handlePayment = async () => {
     // Validate email if provided
     if (customerEmail.trim() && !isValidEmailOrEmpty(customerEmail)) {
-      setEmailError('Please enter a valid email address');
+      setEmailError(t('pleaseEnterValidEmail'));
       return;
     }
 
     // Check if payment setup is complete
     if (connectStatus && !connectStatus.chargesEnabled) {
       Alert.alert(
-        'Payment Setup Required',
-        'You need to complete your payment setup before accepting payments.',
+        t('paymentSetupRequiredTitle'),
+        t('paymentSetupRequiredMessage'),
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Complete Setup', onPress: () => navigation.navigate('StripeOnboarding') },
+          { text: tc('cancel'), style: 'cancel' },
+          { text: t('completeSetupButton'), onPress: () => navigation.navigate('StripeOnboarding') },
         ]
       );
       return;
@@ -492,9 +494,9 @@ export function CheckoutScreen() {
     // Check if terminal is warming up
     if (isWarming) {
       Alert.alert(
-        'Preparing Terminal',
-        'Please wait while Tap to Pay is being prepared...',
-        [{ text: 'OK' }]
+        t('preparingTerminalTitle'),
+        t('preparingTerminalMessage'),
+        [{ text: tc('ok') }]
       );
       return;
     }
@@ -507,11 +509,12 @@ export function CheckoutScreen() {
       const receiptEmail = customerEmail.trim() || undefined;
 
       // Build description based on checkout type
+      const tipSuffix = tipAmount > 0 ? ` ${t('tipIncluded', { amount: formatCents(tipAmount, currency) })}` : '';
       const description = isQuickCharge
-        ? `${quickChargeDescription || 'Quick Charge'}${tipAmount > 0 ? ` (includes ${formatCents(tipAmount, currency)} tip)` : ''}`
+        ? `${quickChargeDescription || t('quickChargeDescription')}${tipSuffix}`
         : resumedOrder
-          ? `${resumedOrder.holdName || 'Resumed Order'} - ${resumedOrder.items?.length || 0} items${tipAmount > 0 ? ` (includes ${formatCents(tipAmount, currency)} tip)` : ''}`
-          : `Order - ${items.length} items${tipAmount > 0 ? ` (includes ${formatCents(tipAmount, currency)} tip)` : ''}`;
+          ? `${resumedOrder.holdName ? t('resumedOrderDescription', { holdName: resumedOrder.holdName, itemCount: resumedOrder.items?.length || 0 }) : t('resumedOrderDescriptionDefault', { itemCount: resumedOrder.items?.length || 0 })}${tipSuffix}`
+          : `${t('orderDescription', { itemCount: items.length })}${tipSuffix}`;
 
       // 1. Get or create order in database
       let order;
@@ -585,7 +588,7 @@ export function CheckoutScreen() {
           orderId: order.id,
           orderNumber: order.orderNumber,
           customerEmail: receiptEmail,
-          errorMessage: deviceCompatibility.errorMessage || `This device does not support ${TAP_TO_PAY_LABEL}.`,
+          errorMessage: deviceCompatibility.errorMessage || t('deviceNotSupportedMessage', { tapToPayLabel }),
         });
         return;
       }
@@ -626,8 +629,8 @@ export function CheckoutScreen() {
     } catch (error: any) {
       logger.error('Payment error:', error);
       Alert.alert(
-        'Payment Error',
-        error.message || 'Failed to initiate payment. Please try again.'
+        t('paymentErrorTitle'),
+        error.message || t('paymentErrorMessage')
       );
     } finally {
       setIsProcessing(false);
@@ -648,12 +651,12 @@ export function CheckoutScreen() {
             style={styles.closeButton}
             onPress={handleClose}
             accessibilityRole="button"
-            accessibilityLabel="Close checkout"
+            accessibilityLabel={t('closeCheckoutAccessibilityLabel')}
           >
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>
-            {resumedOrder ? 'Resume Order' : 'Checkout'}
+            {resumedOrder ? t('resumeOrderTitle') : t('checkoutTitle')}
           </Text>
           <View style={styles.headerRight}>
             {/* Hold Order Button (not for quick charge or resumed orders) */}
@@ -662,15 +665,15 @@ export function CheckoutScreen() {
                 style={styles.holdButton}
                 onPress={() => {
                   if (customerEmail.trim() && !isValidEmailOrEmpty(customerEmail)) {
-                    setEmailError('Please enter a valid email address');
+                    setEmailError(t('pleaseEnterValidEmail'));
                     return;
                   }
                   setShowHoldModal(true);
                 }}
                 disabled={isProcessing}
                 accessibilityRole="button"
-                accessibilityLabel="Hold order"
-                accessibilityHint="Save this order to complete later"
+                accessibilityLabel={t('holdOrderAccessibilityLabel')}
+                accessibilityHint={t('holdOrderAccessibilityHint')}
               >
                 <Ionicons name="pause-circle-outline" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -684,10 +687,10 @@ export function CheckoutScreen() {
                   navigation.goBack();
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="Clear cart"
-                accessibilityHint="Remove all items and go back"
+                accessibilityLabel={t('clearCartAccessibilityLabel')}
+                accessibilityHint={t('clearCartAccessibilityHint')}
               >
-                <Text style={styles.clearButtonText} maxFontSizeMultiplier={1.3}>Clear</Text>
+                <Text style={styles.clearButtonText} maxFontSizeMultiplier={1.3}>{t('clearButton')}</Text>
               </TouchableOpacity>
             ) : (
               <View style={{ width: 44 }} />
@@ -710,7 +713,7 @@ export function CheckoutScreen() {
         {/* 1. Tip Selection (first) - hide for resumed orders since tip is already set */}
         {showTipScreen && !resumedOrder && (
           <View style={styles.tipSection}>
-            <Text style={styles.tipTitle} maxFontSizeMultiplier={1.3}>Add a Tip</Text>
+            <Text style={styles.tipTitle} maxFontSizeMultiplier={1.3}>{t('addTipTitle')}</Text>
             <View style={styles.tipOptions}>
               {tipOptions.map((option, index) => {
                 const isSelected = selectedTipIndex === index;
@@ -724,7 +727,7 @@ export function CheckoutScreen() {
                       ]}
                       onPress={() => handleTipSelect(index)}
                       accessibilityRole="button"
-                      accessibilityLabel={option.isCustom ? 'Custom tip' : option.value === 0 ? 'No tip' : `${option.label} tip${calculatedTip > 0 ? `, ${formatCents(calculatedTip, currency)}` : ''}`}
+                      accessibilityLabel={option.isCustom ? t('customTipAccessibilityLabel') : option.value === 0 ? t('noTipAccessibilityLabel') : t('tipAccessibilityLabel', { label: option.label, amount: calculatedTip > 0 ? formatCents(calculatedTip, currency) : '' })}
                       accessibilityState={{ selected: isSelected }}
                     >
                       <Text
@@ -756,18 +759,18 @@ export function CheckoutScreen() {
             {/* Custom Tip Input */}
             {showCustomTipInput && (
               <View style={styles.customTipContainer}>
-                <Text style={styles.customTipLabel} maxFontSizeMultiplier={1.5}>Custom amount:</Text>
+                <Text style={styles.customTipLabel} maxFontSizeMultiplier={1.5}>{t('customTipAmountLabel')}</Text>
                 <View style={styles.customTipInputRow}>
                   <Text style={styles.customTipDollar} maxFontSizeMultiplier={1.2}>{getCurrencySymbol(currency)}</Text>
                   <TextInput
                     style={styles.customTipInput}
-                    placeholder="0"
+                    placeholder={t('customTipPlaceholder')}
                     placeholderTextColor={colors.inputPlaceholder}
                     value={customTipAmount}
                     onChangeText={setCustomTipAmount}
                     keyboardType="number-pad"
                     autoFocus
-                    accessibilityLabel={`Custom tip amount in ${currency.toUpperCase()}`}
+                    accessibilityLabel={t('customTipAccessibilityLabelInput', { currency: currency.toUpperCase() })}
                   />
                 </View>
               </View>
@@ -781,13 +784,13 @@ export function CheckoutScreen() {
               style={styles.customerInfoHeader}
               onPress={() => setShowCustomerInfo(!showCustomerInfo)}
               accessibilityRole="button"
-              accessibilityLabel={showCustomerInfo ? 'Collapse customer info' : 'Expand customer info'}
+              accessibilityLabel={showCustomerInfo ? t('collapseCustomerInfo') : t('expandCustomerInfo')}
               accessibilityState={{ expanded: showCustomerInfo }}
             >
               <View style={styles.customerInfoHeaderLeft}>
                 <Ionicons name="person-outline" size={18} color={colors.textSecondary} />
                 <Text style={styles.customerInfoTitle} maxFontSizeMultiplier={1.5}>
-                  {customerEmail || orderNotes ? 'Customer Info' : 'Add Customer Info'}
+                  {customerEmail || orderNotes ? t('customerInfoTitle') : t('addCustomerInfoTitle')}
                 </Text>
                 {(customerEmail || orderNotes) && !showCustomerInfo && (
                   <View style={styles.customerInfoBadge}>
@@ -807,28 +810,28 @@ export function CheckoutScreen() {
                   <View style={styles.customerInfoField}>
                     <TextInput
                       style={[styles.customerInfoInput, emailError && styles.inputError]}
-                      placeholder="Email for receipt (optional)"
+                      placeholder={t('emailPlaceholder')}
                       placeholderTextColor={colors.textMuted}
                       value={customerEmail}
                       onChangeText={handleEmailChange}
                       keyboardType="email-address"
                       autoCapitalize="none"
                       autoCorrect={false}
-                      accessibilityLabel="Customer email for receipt"
+                      accessibilityLabel={t('emailAccessibilityLabel')}
                     />
                     {emailError && <Text style={styles.inputErrorText} maxFontSizeMultiplier={1.5} accessibilityRole="alert">{emailError}</Text>}
                   </View>
                 )}
                 <TextInput
                   style={styles.customerInfoNotesInput}
-                  placeholder="Order notes (optional)"
+                  placeholder={t('orderNotesPlaceholder')}
                   placeholderTextColor={colors.textMuted}
                   value={orderNotes}
                   onChangeText={setOrderNotes}
                   multiline
                   numberOfLines={2}
                   maxLength={500}
-                  accessibilityLabel="Order notes"
+                  accessibilityLabel={t('orderNotesAccessibilityLabel')}
                 />
               </View>
             )}
@@ -836,7 +839,7 @@ export function CheckoutScreen() {
 
         {/* 3. Payment Method Selection */}
           <View style={styles.paymentMethodSection}>
-            <Text style={styles.paymentMethodTitle} maxFontSizeMultiplier={1.3}>Payment Method</Text>
+            <Text style={styles.paymentMethodTitle} maxFontSizeMultiplier={1.3}>{t('paymentMethodTitle')}</Text>
             <View style={styles.paymentMethodOptions}>
               <TouchableOpacity
                 style={[
@@ -845,7 +848,7 @@ export function CheckoutScreen() {
                 ]}
                 onPress={() => setPaymentMethod('tap_to_pay')}
                 accessibilityRole="button"
-                accessibilityLabel={Platform.OS === 'ios' ? 'Tap to Pay' : 'Card payment'}
+                accessibilityLabel={Platform.OS === 'ios' ? t('tapToPayAccessibilityLabel') : t('cardAccessibilityLabel')}
                 accessibilityState={{ selected: paymentMethod === 'tap_to_pay' }}
               >
                 <Ionicons
@@ -860,7 +863,7 @@ export function CheckoutScreen() {
                   ]}
                   maxFontSizeMultiplier={1.3}
                 >
-                  {Platform.OS === 'ios' ? 'Tap to Pay' : 'Card'}
+                  {Platform.OS === 'ios' ? t('tapToPayButton') : t('tapToPayButtonAndroid')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -870,7 +873,7 @@ export function CheckoutScreen() {
                 ]}
                 onPress={() => setPaymentMethod('cash')}
                 accessibilityRole="button"
-                accessibilityLabel="Cash payment"
+                accessibilityLabel={t('cashAccessibilityLabel')}
                 accessibilityState={{ selected: paymentMethod === 'cash' }}
               >
                 <Ionicons
@@ -885,7 +888,7 @@ export function CheckoutScreen() {
                   ]}
                   maxFontSizeMultiplier={1.3}
                 >
-                  Cash
+                  {t('cashButton')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -895,7 +898,7 @@ export function CheckoutScreen() {
                 ]}
                 onPress={() => setPaymentMethod('split')}
                 accessibilityRole="button"
-                accessibilityLabel="Split payment"
+                accessibilityLabel={t('splitAccessibilityLabel')}
                 accessibilityState={{ selected: paymentMethod === 'split' }}
               >
                 <Ionicons
@@ -910,7 +913,7 @@ export function CheckoutScreen() {
                   ]}
                   maxFontSizeMultiplier={1.3}
                 >
-                  Split
+                  {t('splitButton')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -922,24 +925,24 @@ export function CheckoutScreen() {
             <>
               <View style={styles.totalsSection}>
                 <View style={styles.totalsRow}>
-                  <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>Quick Charge</Text>
+                  <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('quickChargeLabel')}</Text>
                   <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(subtotal, currency)}</Text>
                 </View>
                 {taxAmount > 0 && (
                   <View style={styles.totalsRow}>
-                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>Tax ({taxRate}%)</Text>
+                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('taxLabel', { rate: taxRate })}</Text>
                     <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(taxAmount, currency)}</Text>
                   </View>
                 )}
                 {tipAmount > 0 && (
                   <View style={styles.totalsRow}>
-                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>Tip ({tipPercentage}%)</Text>
+                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('tipLabel', { percentage: tipPercentage })}</Text>
                     <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(tipAmount, currency)}</Text>
                   </View>
                 )}
                 <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel} maxFontSizeMultiplier={1.3}>Total</Text>
-                  <Text style={styles.totalAmount} maxFontSizeMultiplier={1.2} accessibilityRole="summary" accessibilityLabel={`Total ${formatCents(grandTotal, currency)}`}>{formatCents(grandTotal, currency)}</Text>
+                  <Text style={styles.totalLabel} maxFontSizeMultiplier={1.3}>{t('totalLabel')}</Text>
+                  <Text style={styles.totalAmount} maxFontSizeMultiplier={1.2} accessibilityRole="summary" accessibilityLabel={t('totalAccessibilityLabel', { amount: formatCents(grandTotal, currency) })}>{formatCents(grandTotal, currency)}</Text>
                 </View>
               </View>
             </>
@@ -962,11 +965,11 @@ export function CheckoutScreen() {
                     {item.notes ? (
                       <Text style={styles.itemNotes} maxFontSizeMultiplier={1.5} numberOfLines={1}>{item.notes}</Text>
                     ) : (
-                      <Text style={styles.itemUnitPrice} maxFontSizeMultiplier={1.5}>{formatCents(item.unitPrice, currency)} each</Text>
+                      <Text style={styles.itemUnitPrice} maxFontSizeMultiplier={1.5}>{t('unitPriceEach', { price: formatCents(item.unitPrice, currency) })}</Text>
                     )}
                   </View>
                   <View style={styles.quantityControls}>
-                    <Text style={styles.quantityText} maxFontSizeMultiplier={1.5}>x{item.quantity}</Text>
+                    <Text style={styles.quantityText} maxFontSizeMultiplier={1.5}>{t('quantityPrefix', { quantity: item.quantity })}</Text>
                   </View>
                   <Text style={styles.itemPrice} maxFontSizeMultiplier={1.5} numberOfLines={1} adjustsFontSizeToFit>
                     {formatCents(item.unitPrice * item.quantity, currency)}
@@ -976,24 +979,24 @@ export function CheckoutScreen() {
               {/* Totals */}
               <View style={styles.totalsSection}>
                 <View style={styles.totalsRow}>
-                  <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>Subtotal</Text>
+                  <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('subtotalLabel')}</Text>
                   <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(subtotal, currency)}</Text>
                 </View>
                 {taxAmount > 0 && (
                   <View style={styles.totalsRow}>
-                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>Tax ({taxRate}%)</Text>
+                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('taxLabel', { rate: taxRate })}</Text>
                     <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(taxAmount, currency)}</Text>
                   </View>
                 )}
                 {tipAmount > 0 && (
                   <View style={styles.totalsRow}>
-                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>Tip ({tipPercentage}%)</Text>
+                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('tipLabel', { percentage: tipPercentage })}</Text>
                     <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(tipAmount, currency)}</Text>
                   </View>
                 )}
                 <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel} maxFontSizeMultiplier={1.3}>Total</Text>
-                  <Text style={styles.totalAmount} maxFontSizeMultiplier={1.2} accessibilityRole="summary" accessibilityLabel={`Total ${formatCents(grandTotal, currency)}`}>{formatCents(grandTotal, currency)}</Text>
+                  <Text style={styles.totalLabel} maxFontSizeMultiplier={1.3}>{t('totalLabel')}</Text>
+                  <Text style={styles.totalAmount} maxFontSizeMultiplier={1.2} accessibilityRole="summary" accessibilityLabel={t('totalAccessibilityLabel', { amount: formatCents(grandTotal, currency) })}>{formatCents(grandTotal, currency)}</Text>
                 </View>
               </View>
             </>
@@ -1021,7 +1024,7 @@ export function CheckoutScreen() {
                       onPress={() => removeItem(item.cartKey)}
                       activeOpacity={0.8}
                       accessibilityRole="button"
-                      accessibilityLabel={`Remove ${item.product.name} from cart`}
+                      accessibilityLabel={t('removeFromCartAccessibilityLabel', { name: item.product.name })}
                     >
                       <Animated.View
                         style={[styles.deleteActionContent, { transform: [{ scale }], opacity }]}
@@ -1054,7 +1057,7 @@ export function CheckoutScreen() {
                         {item.notes ? (
                           <Text style={styles.itemNotes} maxFontSizeMultiplier={1.5} numberOfLines={1}>{item.notes}</Text>
                         ) : (
-                          <Text style={styles.itemUnitPrice} maxFontSizeMultiplier={1.5}>{formatCents(item.product.price, currency)} each</Text>
+                          <Text style={styles.itemUnitPrice} maxFontSizeMultiplier={1.5}>{t('unitPriceEach', { price: formatCents(item.product.price, currency) })}</Text>
                         )}
                       </View>
                       <View style={styles.quantityControls}>
@@ -1062,7 +1065,7 @@ export function CheckoutScreen() {
                           style={styles.quantityButton}
                           onPress={() => decrementItem(item.cartKey)}
                           accessibilityRole="button"
-                          accessibilityLabel={item.quantity === 1 ? `Remove ${item.product.name}` : `Decrease ${item.product.name} quantity`}
+                          accessibilityLabel={item.quantity === 1 ? t('removeFromCartAccessibilityLabel', { name: item.product.name }) : t('decreaseQuantityAccessibilityLabel', { name: item.product.name })}
                         >
                           <Ionicons
                             name={item.quantity === 1 ? 'trash-outline' : 'remove'}
@@ -1070,12 +1073,12 @@ export function CheckoutScreen() {
                             color={item.quantity === 1 ? colors.error : colors.text}
                           />
                         </TouchableOpacity>
-                        <Text style={styles.quantityText} maxFontSizeMultiplier={1.5} accessibilityRole="text" accessibilityLabel={`Quantity ${item.quantity}`}>{item.quantity}</Text>
+                        <Text style={styles.quantityText} maxFontSizeMultiplier={1.5} accessibilityRole="text" accessibilityLabel={t('quantityAccessibilityLabel', { quantity: item.quantity })}>{item.quantity}</Text>
                         <TouchableOpacity
                           style={styles.quantityButton}
                           onPress={() => incrementItem(item.cartKey)}
                           accessibilityRole="button"
-                          accessibilityLabel={`Increase ${item.product.name} quantity`}
+                          accessibilityLabel={t('increaseQuantityAccessibilityLabel', { name: item.product.name })}
                         >
                           <Ionicons name="add" size={16} color={colors.text} />
                         </TouchableOpacity>
@@ -1090,24 +1093,24 @@ export function CheckoutScreen() {
               {/* Totals */}
               <View style={styles.totalsSection}>
                 <View style={styles.totalsRow}>
-                  <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>Subtotal ({itemCount} items)</Text>
+                  <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('subtotalWithCount', { count: itemCount })}</Text>
                   <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(subtotal, currency)}</Text>
                 </View>
                 {taxAmount > 0 && (
                   <View style={styles.totalsRow}>
-                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>Tax ({taxRate}%)</Text>
+                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('taxLabel', { rate: taxRate })}</Text>
                     <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(taxAmount, currency)}</Text>
                   </View>
                 )}
                 {tipAmount > 0 && (
                   <View style={styles.totalsRow}>
-                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>Tip ({tipPercentage}%)</Text>
+                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('tipLabel', { percentage: tipPercentage })}</Text>
                     <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(tipAmount, currency)}</Text>
                   </View>
                 )}
                 <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel} maxFontSizeMultiplier={1.3}>Total</Text>
-                  <Text style={styles.totalAmount} maxFontSizeMultiplier={1.2} accessibilityRole="summary" accessibilityLabel={`Total ${formatCents(grandTotal, currency)}`}>{formatCents(grandTotal, currency)}</Text>
+                  <Text style={styles.totalLabel} maxFontSizeMultiplier={1.3}>{t('totalLabel')}</Text>
+                  <Text style={styles.totalAmount} maxFontSizeMultiplier={1.2} accessibilityRole="summary" accessibilityLabel={t('totalAccessibilityLabel', { amount: formatCents(grandTotal, currency) })}>{formatCents(grandTotal, currency)}</Text>
                 </View>
               </View>
             </>
@@ -1129,11 +1132,11 @@ export function CheckoutScreen() {
             isProcessing && styles.payButtonDisabled,
           ]}
           accessibilityRole="button"
-          accessibilityLabel={isProcessing ? 'Processing payment' : paymentMethod === 'tap_to_pay' ? `${TAP_TO_PAY_LABEL}, ${formatCents(grandTotal, currency)}` : paymentMethod === 'cash' ? `Pay with cash, ${formatCents(grandTotal, currency)}` : `Split payment, ${formatCents(grandTotal, currency)}`}
+          accessibilityLabel={isProcessing ? t('processingPaymentAccessibilityLabel') : paymentMethod === 'tap_to_pay' ? t('payButtonTapToPayAccessibilityLabel', { tapToPayLabel, amount: formatCents(grandTotal, currency) }) : paymentMethod === 'cash' ? t('payButtonCashAccessibilityLabel', { amount: formatCents(grandTotal, currency) }) : t('payButtonSplitAccessibilityLabel', { amount: formatCents(grandTotal, currency) })}
           accessibilityState={{ disabled: isProcessing }}
         >
           {isProcessing ? (
-            <ActivityIndicator color={paymentMethod === 'tap_to_pay' ? (isDark ? '#1C1917' : '#fff') : '#fff'} accessibilityLabel="Processing payment" />
+            <ActivityIndicator color={paymentMethod === 'tap_to_pay' ? (isDark ? '#1C1917' : '#fff') : '#fff'} accessibilityLabel={t('processingPaymentAccessibilityLabel')} />
           ) : (
             <>
               {paymentMethod === 'tap_to_pay' ? (
@@ -1143,17 +1146,17 @@ export function CheckoutScreen() {
                     <Ionicons name="wifi" size={22} color={isDark ? '#1C1917' : '#fff'} style={styles.tapToPayIconRotated} />
                   </View>
                   {/* Apple TTPOi 5.4: Region-correct copy */}
-                  <Text style={[styles.payButtonText, { color: isDark ? '#1C1917' : '#fff' }]} maxFontSizeMultiplier={1.3}>{TAP_TO_PAY_LABEL}</Text>
+                  <Text style={[styles.payButtonText, { color: isDark ? '#1C1917' : '#fff' }]} maxFontSizeMultiplier={1.3}>{tapToPayLabel}</Text>
                 </>
               ) : paymentMethod === 'cash' ? (
                 <>
                   <Ionicons name="cash-outline" size={22} color="#fff" />
-                  <Text style={styles.payButtonText} maxFontSizeMultiplier={1.3}>Pay with Cash</Text>
+                  <Text style={styles.payButtonText} maxFontSizeMultiplier={1.3}>{t('payWithCashButton')}</Text>
                 </>
               ) : (
                 <>
                   <Ionicons name="git-branch-outline" size={22} color="#fff" />
-                  <Text style={styles.payButtonText} maxFontSizeMultiplier={1.3}>Split Payment</Text>
+                  <Text style={styles.payButtonText} maxFontSizeMultiplier={1.3}>{t('splitPaymentButton')}</Text>
                 </>
               )}
             </>
@@ -1175,27 +1178,27 @@ export function CheckoutScreen() {
           style={styles.modalOverlay}
           onPress={() => setShowHoldModal(false)}
           accessibilityRole="button"
-          accessibilityLabel="Close hold order dialog"
+          accessibilityLabel={t('closeHoldDialogAccessibilityLabel')}
         >
           <Pressable
             style={[styles.modalContent, { backgroundColor: colors.card }]}
             onPress={(e) => e.stopPropagation()}
             accessibilityRole="none"
           >
-            <Text style={styles.modalTitle} maxFontSizeMultiplier={1.3}>Hold Order</Text>
+            <Text style={styles.modalTitle} maxFontSizeMultiplier={1.3}>{t('holdOrderModalTitle')}</Text>
             <Text style={styles.modalSubtitle} maxFontSizeMultiplier={1.5}>
-              Give this order a name so you can find it later
+              {t('holdOrderModalSubtitle')}
             </Text>
             <TextInput
               ref={holdNameInputRef}
               style={styles.holdNameInput}
-              placeholder="e.g., Table 5, John's order"
+              placeholder={t('holdNamePlaceholder')}
               placeholderTextColor={colors.textMuted}
               value={holdName}
               onChangeText={setHoldName}
               maxLength={50}
-              accessibilityLabel="Order name"
-              accessibilityHint="Give this order a name so you can find it later"
+              accessibilityLabel={t('holdNameAccessibilityLabel')}
+              accessibilityHint={t('holdNameAccessibilityHint')}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -1205,24 +1208,24 @@ export function CheckoutScreen() {
                   setHoldName('');
                 }}
                 accessibilityRole="button"
-                accessibilityLabel="Cancel hold order"
+                accessibilityLabel={t('cancelHoldAccessibilityLabel')}
               >
-                <Text style={styles.modalCancelButtonText} maxFontSizeMultiplier={1.3}>Cancel</Text>
+                <Text style={styles.modalCancelButtonText} maxFontSizeMultiplier={1.3}>{tc('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalConfirmButton, isHolding && styles.modalConfirmButtonDisabled]}
                 onPress={handleHoldOrder}
                 disabled={isHolding}
                 accessibilityRole="button"
-                accessibilityLabel={isHolding ? 'Holding order' : 'Hold order'}
+                accessibilityLabel={isHolding ? t('holdingOrderAccessibilityLabel') : t('holdOrderAccessibilityLabel')}
                 accessibilityState={{ disabled: isHolding }}
               >
                 {isHolding ? (
-                  <ActivityIndicator color="#fff" size="small" accessibilityLabel="Holding order" />
+                  <ActivityIndicator color="#fff" size="small" accessibilityLabel={t('holdingOrderAccessibilityLabel')} />
                 ) : (
                   <>
                     <Ionicons name="pause-circle" size={18} color="#fff" />
-                    <Text style={styles.modalConfirmButtonText} maxFontSizeMultiplier={1.3}>Hold Order</Text>
+                    <Text style={styles.modalConfirmButtonText} maxFontSizeMultiplier={1.3}>{t('holdOrderModalTitle')}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -1236,7 +1239,7 @@ export function CheckoutScreen() {
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) => {
+const createStyles = (colors: any, isDark: boolean) => {
   const headerBackground = isDark ? '#1C1917' : colors.background;
 
   return StyleSheet.create({
@@ -1259,10 +1262,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       height: 48,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     headerTitle: {
       fontSize: 20,
@@ -1279,11 +1282,11 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       width: 44,
       height: 44,
       borderRadius: 12,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     clearButton: {
       paddingHorizontal: 16,
@@ -1304,7 +1307,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       paddingBottom: 20,
     },
     summaryCard: {
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 16,
       padding: 16,
       marginBottom: 16,
@@ -1316,8 +1319,8 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       paddingVertical: 12,
       paddingHorizontal: 15,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.border,
-      backgroundColor: glassColors.backgroundElevated,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.card,
       borderRadius: 12,
     },
     deleteAction: {
@@ -1347,7 +1350,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     itemImagePlaceholder: {
       width: '100%',
       height: '100%',
-      backgroundColor: glassColors.background,
+      backgroundColor: colors.surface,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1368,10 +1371,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     quantityControls: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: glassColors.background,
+      backgroundColor: colors.surface,
       borderRadius: 10,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       marginRight: 10,
     },
     quantityButton: {
@@ -1401,7 +1404,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       marginTop: 12,
       paddingTop: 12,
       borderTopWidth: 1,
-      borderTopColor: glassColors.border,
+      borderTopColor: colors.border,
     },
     totalsRow: {
       flexDirection: 'row',
@@ -1424,7 +1427,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       marginTop: 8,
       paddingTop: 8,
       borderTopWidth: 1,
-      borderTopColor: glassColors.border,
+      borderTopColor: colors.border,
     },
     totalLabel: {
       fontSize: 18,
@@ -1485,7 +1488,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     // Tip section styles
     tipSection: {
       marginBottom: 16,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 16,
       padding: 14,
     },
@@ -1506,7 +1509,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       marginBottom: 8,
     },
     tipButtonInner: {
-      backgroundColor: glassColors.background,
+      backgroundColor: colors.surface,
       borderRadius: 12,
       minHeight: 70,
       paddingVertical: 8,
@@ -1538,7 +1541,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       marginTop: 10,
       paddingTop: 16,
       borderTopWidth: 1,
-      borderTopColor: glassColors.border,
+      borderTopColor: colors.border,
     },
     customTipLabel: {
       fontSize: 14,
@@ -1560,12 +1563,12 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       fontSize: 24,
       fontWeight: '600',
       color: colors.text,
-      backgroundColor: glassColors.background,
+      backgroundColor: colors.surface,
       borderRadius: 12,
       paddingHorizontal: 16,
       paddingVertical: 12,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     // Item notes style
     itemNotes: {
@@ -1577,7 +1580,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     // Customer info section styles (combined email + notes)
     customerInfoSection: {
       marginBottom: 16,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 16,
       overflow: 'hidden',
     },
@@ -1609,7 +1612,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       gap: 4,
     },
     customerInfoInput: {
-      backgroundColor: glassColors.background,
+      backgroundColor: colors.surface,
       borderRadius: 10,
       paddingHorizontal: 14,
       paddingVertical: 10,
@@ -1618,7 +1621,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       color: colors.text,
     },
     customerInfoNotesInput: {
-      backgroundColor: glassColors.background,
+      backgroundColor: colors.surface,
       borderRadius: 10,
       paddingHorizontal: 14,
       paddingVertical: 10,
@@ -1631,7 +1634,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     // Payment method section styles
     paymentMethodSection: {
       marginBottom: 16,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 16,
       padding: 14,
     },
@@ -1653,7 +1656,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       gap: 6,
       paddingVertical: 12,
       borderRadius: 12,
-      backgroundColor: glassColors.background,
+      backgroundColor: colors.surface,
     },
     paymentMethodButtonSelected: {
       backgroundColor: colors.primary,
@@ -1701,9 +1704,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       marginBottom: 20,
     },
     holdNameInput: {
-      backgroundColor: glassColors.background,
+      backgroundColor: colors.surface,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderRadius: 14,
       paddingHorizontal: 18,
       paddingVertical: 14,

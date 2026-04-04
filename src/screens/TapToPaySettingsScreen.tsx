@@ -15,15 +15,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-
 import { useTheme } from '../context/ThemeContext';
 import { useCatalog } from '../context/CatalogContext';
+import { useTranslations } from '../lib/i18n';
 import { catalogsApi } from '../lib/api';
 import { Toggle } from '../components/Toggle';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { fonts } from '../lib/fonts';
-import { glass } from '../lib/colors';
 import { shadows } from '../lib/shadows';
 import logger from '../lib/logger';
 
@@ -35,7 +33,9 @@ interface CatalogSettings {
 }
 
 export function TapToPaySettingsScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  const t = useTranslations('tapToPay');
+  const tc = useTranslations('common');
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { selectedCatalog, refreshCatalogs } = useCatalog();
@@ -142,7 +142,7 @@ export function TapToPaySettingsScreen() {
       showToastAndNavigate();
     } catch (error) {
       logger.error('Failed to save settings:', error);
-      Alert.alert('Error', 'Failed to save settings. Please try again.');
+      Alert.alert(t('settingsErrorSaveTitle'), t('settingsErrorSaveMessage'));
     } finally {
       setIsSaving(false);
     }
@@ -150,7 +150,7 @@ export function TapToPaySettingsScreen() {
 
   const handleAddTipPercentage = () => {
     if (settings.tipPercentages.length >= 6) {
-      Alert.alert('Limit Reached', 'You can have up to 6 tip options.');
+      Alert.alert(t('settingsTipLimitTitle'), t('settingsTipLimitMessage'));
       return;
     }
     const common = [5, 10, 15, 18, 20, 22, 25, 30];
@@ -163,7 +163,7 @@ export function TapToPaySettingsScreen() {
 
   const handleRemoveTipPercentage = (index: number) => {
     if (settings.tipPercentages.length <= 1) {
-      Alert.alert('Minimum Required', 'You must have at least one tip option.');
+      Alert.alert(t('settingsTipMinimumTitle'), t('settingsTipMinimumMessage'));
       return;
     }
     setSettings({
@@ -192,23 +192,22 @@ export function TapToPaySettingsScreen() {
     setEditingTipValue('');
   };
 
-  const glassColors = isDark ? glass.dark : glass.light;
-  const styles = createStyles(colors, glassColors);
+  const styles = createStyles(colors);
 
   if (!selectedCatalog) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Go back">
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel={t('settingsGoBackAccessibilityLabel')}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>Payment Settings</Text>
+          <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>{t('settingsHeaderTitle')}</Text>
           <View style={styles.headerRight} />
         </View>
         <View style={styles.emptyContainer}>
           <Ionicons name="folder-open-outline" size={48} color={colors.textMuted} />
-          <Text style={styles.emptyText} maxFontSizeMultiplier={1.3}>No menu selected</Text>
-          <Text style={styles.emptySubtext} maxFontSizeMultiplier={1.5}>Please select a menu first</Text>
+          <Text style={styles.emptyText} maxFontSizeMultiplier={1.3}>{t('settingsNoMenuSelected')}</Text>
+          <Text style={styles.emptySubtext} maxFontSizeMultiplier={1.5}>{t('settingsSelectMenuFirst')}</Text>
         </View>
       </View>
     );
@@ -217,23 +216,23 @@ export function TapToPaySettingsScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack} accessibilityRole="button" accessibilityLabel="Go back">
+        <TouchableOpacity style={styles.backButton} onPress={handleBack} accessibilityRole="button" accessibilityLabel={t('settingsGoBackAccessibilityLabel')}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>Payment Settings</Text>
+        <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>{t('settingsHeaderTitle')}</Text>
         <TouchableOpacity
           style={styles.saveButtonContainer}
           onPress={saveSettings}
           disabled={!hasChanges || isSaving}
           accessibilityRole="button"
-          accessibilityLabel="Save settings"
+          accessibilityLabel={t('settingsSaveAccessibilityLabel')}
           accessibilityState={{ disabled: !hasChanges || isSaving }}
         >
           {isSaving ? (
-            <ActivityIndicator size="small" color={colors.primary} accessibilityLabel="Saving" />
+            <ActivityIndicator size="small" color={colors.primary} accessibilityLabel={t('settingsSaving')} />
           ) : (
             <Text style={[styles.saveText, !hasChanges && styles.saveTextDisabled]} maxFontSizeMultiplier={1.3}>
-              Save
+              {t('settingsSave')}
             </Text>
           )}
         </TouchableOpacity>
@@ -256,18 +255,18 @@ export function TapToPaySettingsScreen() {
             <View style={styles.cardHeaderIcon}>
               <Ionicons name="cash-outline" size={20} color={colors.primary} />
             </View>
-            <Text style={styles.cardTitle} maxFontSizeMultiplier={1.3}>Tips</Text>
+            <Text style={styles.cardTitle} maxFontSizeMultiplier={1.3}>{t('settingsTipsCardTitle')}</Text>
           </View>
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel} maxFontSizeMultiplier={1.5}>Show Tip Screen</Text>
-              <Text style={styles.settingDescription} maxFontSizeMultiplier={1.5}>Display tip options during checkout</Text>
+              <Text style={styles.settingLabel} maxFontSizeMultiplier={1.5}>{t('settingsShowTipScreen')}</Text>
+              <Text style={styles.settingDescription} maxFontSizeMultiplier={1.5}>{t('settingsShowTipScreenDescription')}</Text>
             </View>
             <Toggle
               value={settings.showTipScreen}
               onValueChange={(v) => setSettings({ ...settings, showTipScreen: v })}
-              accessibilityLabel="Show Tip Screen"
+              accessibilityLabel={t('settingsShowTipScreen')}
             />
           </View>
 
@@ -275,9 +274,9 @@ export function TapToPaySettingsScreen() {
             <>
               {/* Tip Percentages */}
               <View style={styles.tipPercentagesSection}>
-                <Text style={styles.tipPercentagesLabel} maxFontSizeMultiplier={1.5}>Tip Percentages</Text>
+                <Text style={styles.tipPercentagesLabel} maxFontSizeMultiplier={1.5}>{t('settingsTipPercentages')}</Text>
                 <Text style={styles.tipPercentagesDescription} maxFontSizeMultiplier={1.5}>
-                  Tap to edit, long press to remove
+                  {t('settingsTipPercentagesDescription')}
                 </Text>
                 <View style={styles.tipPercentagesRow}>
                   {settings.tipPercentages.map((pct, index) => (
@@ -290,8 +289,8 @@ export function TapToPaySettingsScreen() {
                       onPress={() => handleStartEditTip(index)}
                       onLongPress={() => handleRemoveTipPercentage(index)}
                       accessibilityRole="button"
-                      accessibilityLabel={`${pct} percent tip option`}
-                      accessibilityHint="Tap to edit, long press to remove"
+                      accessibilityLabel={`${pct} ${tc('percentSymbol')}`}
+                      accessibilityHint={t('settingsTipPercentagesDescription')}
                     >
                       {editingTipIndex === index ? (
                         <TextInput
@@ -304,7 +303,7 @@ export function TapToPaySettingsScreen() {
                           autoFocus
                           selectTextOnFocus
                           maxLength={3}
-                          accessibilityLabel="Edit tip percentage"
+                          accessibilityLabel={t('settingsEditTipAccessibilityLabel')}
                         />
                       ) : (
                         <Text style={styles.tipChipText} maxFontSizeMultiplier={1.3}>{pct}%</Text>
@@ -316,7 +315,7 @@ export function TapToPaySettingsScreen() {
                       style={styles.tipChipAdd}
                       onPress={handleAddTipPercentage}
                       accessibilityRole="button"
-                      accessibilityLabel="Add tip percentage"
+                      accessibilityLabel={t('settingsAddTipAccessibilityLabel')}
                     >
                       <Ionicons name="add" size={20} color={colors.primary} />
                     </TouchableOpacity>
@@ -327,13 +326,13 @@ export function TapToPaySettingsScreen() {
               {/* Allow Custom Tip */}
               <View style={[styles.settingRow, styles.settingRowBorder]}>
                 <View style={styles.settingInfo}>
-                  <Text style={styles.settingLabel} maxFontSizeMultiplier={1.5}>Allow Custom Tip</Text>
-                  <Text style={styles.settingDescription} maxFontSizeMultiplier={1.5}>Let customers enter their own amount</Text>
+                  <Text style={styles.settingLabel} maxFontSizeMultiplier={1.5}>{t('settingsAllowCustomTip')}</Text>
+                  <Text style={styles.settingDescription} maxFontSizeMultiplier={1.5}>{t('settingsAllowCustomTipDescription')}</Text>
                 </View>
                 <Toggle
                   value={settings.allowCustomTip}
                   onValueChange={(v) => setSettings({ ...settings, allowCustomTip: v })}
-                  accessibilityLabel="Allow Custom Tip"
+                  accessibilityLabel={t('settingsAllowCustomTip')}
                 />
               </View>
             </>
@@ -346,18 +345,18 @@ export function TapToPaySettingsScreen() {
             <View style={styles.cardHeaderIcon}>
               <Ionicons name="receipt-outline" size={20} color={colors.primary} />
             </View>
-            <Text style={styles.cardTitle} maxFontSizeMultiplier={1.3}>Receipts</Text>
+            <Text style={styles.cardTitle} maxFontSizeMultiplier={1.3}>{t('settingsReceiptsCardTitle')}</Text>
           </View>
 
           <View style={styles.settingRow}>
             <View style={styles.settingInfo}>
-              <Text style={styles.settingLabel} maxFontSizeMultiplier={1.5}>Prompt for Email</Text>
-              <Text style={styles.settingDescription} maxFontSizeMultiplier={1.5}>Ask customer for email to send receipt</Text>
+              <Text style={styles.settingLabel} maxFontSizeMultiplier={1.5}>{t('settingsPromptForEmail')}</Text>
+              <Text style={styles.settingDescription} maxFontSizeMultiplier={1.5}>{t('settingsPromptForEmailDescription')}</Text>
             </View>
             <Toggle
               value={settings.promptForEmail}
               onValueChange={(v) => setSettings({ ...settings, promptForEmail: v })}
-              accessibilityLabel="Prompt for Email"
+              accessibilityLabel={t('settingsPromptForEmail')}
             />
           </View>
         </View>
@@ -366,7 +365,7 @@ export function TapToPaySettingsScreen() {
         <View style={styles.infoNote}>
           <Ionicons name="information-circle-outline" size={18} color={colors.textMuted} />
           <Text style={styles.infoNoteText} maxFontSizeMultiplier={1.5}>
-            These settings only apply to the "{selectedCatalog.name}" menu. Each menu can have different checkout settings.
+            {t('settingsInfoNote', { catalogName: selectedCatalog.name })}
           </Text>
         </View>
 
@@ -376,10 +375,10 @@ export function TapToPaySettingsScreen() {
 
       <ConfirmModal
         visible={showDiscardModal}
-        title="Discard changes?"
-        message="You have unsaved changes that will be lost."
-        confirmText="Discard"
-        cancelText="Keep Editing"
+        title={t('settingsDiscardTitle')}
+        message={t('settingsDiscardMessage')}
+        confirmText={t('settingsDiscardConfirm')}
+        cancelText={t('settingsDiscardCancel')}
         confirmStyle="destructive"
         onConfirm={handleDiscardConfirm}
         onCancel={() => setShowDiscardModal(false)}
@@ -396,24 +395,19 @@ export function TapToPaySettingsScreen() {
             },
           ]}
         >
-          <LinearGradient
-            colors={['#1a3a2a', '#0f2920', '#0a1f18']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.toast}
-          >
+          <View style={styles.toast}>
             <View style={styles.toastIcon}>
               <Ionicons name="checkmark" size={18} color="#4ade80" />
             </View>
-            <Text style={styles.toastText} maxFontSizeMultiplier={1.5} accessibilityRole="alert">Settings saved</Text>
-          </LinearGradient>
+            <Text style={styles.toastText} maxFontSizeMultiplier={1.5} accessibilityRole="alert">{t('settingsToastSaved')}</Text>
+          </View>
         </Animated.View>
       )}
     </View>
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark) => {
+const createStyles = (colors: any) => {
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -425,19 +419,19 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
       justifyContent: 'space-between',
       height: 56,
       paddingHorizontal: 16,
-      backgroundColor: glassColors.backgroundSubtle,
+      backgroundColor: colors.background,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.borderSubtle,
+      borderBottomColor: colors.borderSubtle,
     },
     backButton: {
       width: 44,
       height: 44,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     headerTitle: {
       fontSize: 18,
@@ -450,10 +444,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
     saveButtonContainer: {
       paddingHorizontal: 16,
       paddingVertical: 8,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 10,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     saveText: {
       fontSize: 15,
@@ -502,12 +496,12 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
       color: colors.text,
     },
     card: {
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 20,
       marginBottom: 16,
       overflow: 'hidden',
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       ...shadows.sm,
     },
     cardHeader: {
@@ -516,7 +510,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
       padding: 16,
       paddingBottom: 12,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.borderSubtle,
+      borderBottomColor: colors.borderSubtle,
     },
     cardHeaderIcon: {
       width: 36,
@@ -555,12 +549,12 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
     },
     settingRowBorder: {
       borderTopWidth: 1,
-      borderTopColor: glassColors.borderSubtle,
+      borderTopColor: colors.borderSubtle,
     },
     tipPercentagesSection: {
       padding: 16,
       borderTopWidth: 1,
-      borderTopColor: glassColors.borderSubtle,
+      borderTopColor: colors.borderSubtle,
     },
     tipPercentagesLabel: {
       fontSize: 14,
@@ -582,10 +576,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
     tipChip: {
       paddingHorizontal: 16,
       paddingVertical: 10,
-      backgroundColor: glassColors.background,
+      backgroundColor: colors.background,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     tipChipEditing: {
       borderColor: colors.primary,
@@ -617,11 +611,11 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
       flexDirection: 'row',
       alignItems: 'flex-start',
       padding: 16,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 16,
       gap: 10,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     infoNoteText: {
       flex: 1,
@@ -644,6 +638,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
       alignItems: 'center',
       paddingHorizontal: 20,
       paddingVertical: 16,
+      backgroundColor: '#0f2920',
       borderWidth: 1,
       borderColor: 'rgba(74, 222, 128, 0.2)',
       borderRadius: 16,

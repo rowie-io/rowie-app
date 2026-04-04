@@ -6,9 +6,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../context/ThemeContext';
 import { fonts } from '../lib/fonts';
+import { useTranslations } from '../lib/i18n';
 
 export function NetworkStatus() {
   const { colors } = useTheme();
+  const t = useTranslations('components.networkStatus');
   const insets = useSafeAreaInsets();
   const [isConnected, setIsConnected] = useState<boolean | null>(true);
   const [showBanner, setShowBanner] = useState(false);
@@ -66,7 +68,7 @@ export function NetworkStatus() {
         },
       ]}
       accessibilityRole="alert"
-      accessibilityLabel={isOffline ? 'No Internet Connection' : 'Back Online'}
+      accessibilityLabel={isOffline ? t('noInternetConnection') : t('backOnline')}
       accessibilityLiveRegion="assertive"
     >
       <Ionicons
@@ -75,7 +77,7 @@ export function NetworkStatus() {
         color="#fff"
       />
       <Text style={styles.text} maxFontSizeMultiplier={1.5}>
-        {isOffline ? 'No Internet Connection' : 'Back Online'}
+        {isOffline ? t('noInternetConnection') : t('backOnline')}
       </Text>
     </Animated.View>
   );

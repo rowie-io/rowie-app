@@ -31,6 +31,7 @@ export interface Preorder {
   readyAt: string | null;
   pickedUpAt: string | null;
   orderNotes: string | null;
+  tableIdentifier: string | null;
   stripePaymentIntentId: string | null;
   items: PreorderItem[];
   createdAt: string;

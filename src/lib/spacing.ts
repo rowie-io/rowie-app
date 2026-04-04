@@ -24,7 +24,7 @@ export const radius = {
 // Common layout values
 export const layout = {
   // Screen padding
-  screenPaddingHorizontal: spacing.lg,
+  screenPaddingHorizontal: 20,
   screenPaddingVertical: spacing.lg,
 
   // Card padding
@@ -33,7 +33,7 @@ export const layout = {
 
   // Gap between items
   itemGap: spacing.md,
-  sectionGap: spacing.xl,
+  sectionGap: spacing.xxl,
 
   // Tab bar
   tabBarHeight: 70,

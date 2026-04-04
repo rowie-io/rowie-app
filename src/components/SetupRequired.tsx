@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Animated,
-  Dimensions,
   Modal,
   TextInput,
   Pressable,
@@ -17,49 +16,51 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useMutation } from '@tanstack/react-query';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useTranslations } from '../lib/i18n';
 import { useCatalog } from '../context/CatalogContext';
 import { catalogsApi, CreateCatalogData, CatalogLayoutType } from '../lib/api';
 import { openVendorDashboard } from '../lib/auth-handoff';
-import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
-import { shadows } from '../lib/shadows';
+import { brandGradient, brandGradientLight } from '../lib/colors';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Toggle } from './Toggle';
 
-const LAYOUT_OPTIONS: { value: CatalogLayoutType; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { value: 'grid', label: 'Grid', icon: 'grid-outline' },
-  { value: 'list', label: 'List', icon: 'list-outline' },
-  { value: 'large-grid', label: 'Large', icon: 'square-outline' },
-  { value: 'compact', label: 'Compact', icon: 'menu-outline' },
+const LAYOUT_OPTIONS: { value: CatalogLayoutType; labelKey: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { value: 'classic-grid', labelKey: 'layoutClassicGrid', icon: 'grid-outline' },
+  { value: 'split-view', labelKey: 'layoutSplitView', icon: 'browsers-outline' },
+  { value: 'list', labelKey: 'layoutList', icon: 'list-outline' },
+  { value: 'cards', labelKey: 'layoutCards', icon: 'square-outline' },
+  { value: 'mosaic', labelKey: 'layoutMosaic', icon: 'apps-outline' },
+  { value: 'compact', labelKey: 'layoutCompact', icon: 'menu-outline' },
 ];
 
 export type SetupType = 'no-catalogs' | 'no-payment-account';
 
 interface SetupRequiredProps {
   type: SetupType;
+  onQuickCharge?: () => void;
 }
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Payment account setup - simple version
 function PaymentSetupRequired({ colors, isManager }: { colors: any; isManager: boolean }) {
+  const t = useTranslations('components.setupRequired');
   const styles = createSimpleStyles(colors);
 
   return (
     <View style={styles.container} accessibilityRole="alert">
       <View style={styles.iconContainer}>
-        <Ionicons name="card-outline" size={64} color={colors.textMuted} />
+        <Ionicons name="card-outline" size={48} color={colors.textMuted} />
       </View>
-      <Text style={styles.title} maxFontSizeMultiplier={1.2}>Payment Setup Required</Text>
+      <Text style={styles.title} maxFontSizeMultiplier={1.2}>{t('paymentSetupTitle')}</Text>
       <Text style={styles.message} maxFontSizeMultiplier={1.5}>
         {isManager
-          ? 'Set up your payment account in the Vendor Portal to accept payments.'
-          : 'Ask your manager to set up the payment account to accept payments.'}
+          ? t('paymentSetupMessageManager')
+          : t('paymentSetupMessageStaff')}
       </Text>
       {isManager && (
         <TouchableOpacity
@@ -67,11 +68,11 @@ function PaymentSetupRequired({ colors, isManager }: { colors: any; isManager: b
           onPress={() => openVendorDashboard('/banking')}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel="Set Up Payments"
-          accessibilityHint="Opens the Vendor Portal to set up your payment account"
+          accessibilityLabel={t('setUpPaymentsLabel')}
+          accessibilityHint={t('setUpPaymentsHint')}
         >
           <Ionicons name="card" size={18} color="#fff" />
-          <Text style={styles.buttonText} maxFontSizeMultiplier={1.3}>Set Up Payments</Text>
+          <Text style={styles.buttonText} maxFontSizeMultiplier={1.3}>{t('setUpPaymentsLabel')}</Text>
           <Ionicons name="open-outline" size={16} color="#fff" />
         </TouchableOpacity>
       )}
@@ -79,71 +80,15 @@ function PaymentSetupRequired({ colors, isManager }: { colors: any; isManager: b
   );
 }
 
-// Star component for Apple-style sparkle effect
-function Star({ style, size = 8, color = 'rgba(255,255,255,0.8)' }: { style?: any; size?: number; color?: string }) {
-  return (
-    <View style={[{ position: 'absolute' }, style]}>
-      <View style={{
-        width: size,
-        height: size,
-        backgroundColor: color,
-        borderRadius: size / 2,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: size * 1.5,
-      }} />
-    </View>
-  );
-}
-
-// Four-point star for larger sparkles
-function FourPointStar({ style, size = 16, color = 'rgba(255,255,255,0.9)' }: { style?: any; size?: number; color?: string }) {
-  return (
-    <View style={[{ position: 'absolute', width: size, height: size }, style]}>
-      {/* Vertical line */}
-      <View style={{
-        position: 'absolute',
-        left: size / 2 - 1,
-        top: 0,
-        width: 2,
-        height: size,
-        backgroundColor: color,
-        borderRadius: 1,
-      }} />
-      {/* Horizontal line */}
-      <View style={{
-        position: 'absolute',
-        top: size / 2 - 1,
-        left: 0,
-        width: size,
-        height: 2,
-        backgroundColor: color,
-        borderRadius: 1,
-      }} />
-      {/* Center glow */}
-      <View style={{
-        position: 'absolute',
-        left: size / 2 - 2,
-        top: size / 2 - 2,
-        width: 4,
-        height: 4,
-        backgroundColor: color,
-        borderRadius: 2,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: size / 2,
-      }} />
-    </View>
-  );
-}
-
 // No catalogs - full welcome experience
-function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors: any; glassColors: typeof glass.dark; isDark: boolean; isManager: boolean }) {
+function NoCatalogsWelcome({ colors, isDark, isManager, onQuickCharge }: { colors: any; isDark: boolean; isManager: boolean; onQuickCharge?: () => void }) {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { organization } = useAuth();
+  const { organization, connectStatus, isPaymentReady } = useAuth();
+  const t = useTranslations('components.setupRequired');
+  const ts = useTranslations('components.catalogSettings');
+  const tc = useTranslations('common');
+  const isPaymentConnected = connectStatus?.chargesEnabled === true;
   const { refreshCatalogs, setSelectedCatalog } = useCatalog();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -153,7 +98,7 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
   const [catalogDate, setCatalogDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [taxRateString, setTaxRateString] = useState('0');
-  const [layoutType, setLayoutType] = useState<CatalogLayoutType>('grid');
+  const [layoutType, setLayoutType] = useState<CatalogLayoutType>('classic-grid');
   const [showTipScreen, setShowTipScreen] = useState(true);
   const [tipPercentages, setTipPercentages] = useState<number[]>([15, 18, 20, 25]);
   const [allowCustomTip, setAllowCustomTip] = useState(true);
@@ -163,8 +108,6 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
-  const sparkleAnim = useRef(new Animated.Value(0)).current;
 
   // Create catalog mutation
   const createCatalogMutation = useMutation({
@@ -180,27 +123,27 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
       setCatalogLocation('');
       setCatalogDate(null);
       setTaxRateString('0');
-      setLayoutType('grid');
+      setLayoutType('classic-grid');
       setShowTipScreen(true);
       setTipPercentages([15, 18, 20, 25]);
       setAllowCustomTip(true);
       setPromptForEmail(false);
     },
     onError: (error: any) => {
-      Alert.alert('Error', error.message || 'Failed to create menu');
+      Alert.alert(tc('error'), error.message || t('errorFailedToCreate'));
     },
   });
 
   const handleCreateCatalog = () => {
     const name = catalogName.trim();
     if (!name) {
-      Alert.alert('Error', 'Please enter a menu name');
+      Alert.alert(tc('error'), t('errorMenuNameRequired'));
       return;
     }
 
     const taxRate = parseFloat(taxRateString) || 0;
     if (isNaN(taxRate) || taxRate < 0 || taxRate > 100) {
-      Alert.alert('Error', 'Please enter a valid tax rate (0-100%)');
+      Alert.alert(tc('error'), t('errorInvalidTaxRate'));
       return;
     }
 
@@ -247,7 +190,7 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
   // Tip percentage handlers
   const handleAddTipPercentage = () => {
     if (tipPercentages.length >= 6) {
-      Alert.alert('Limit Reached', 'Maximum 6 tip percentages allowed');
+      Alert.alert(ts('limitReachedTitle'), ts('maxTipPercentages'));
       return;
     }
     const maxTip = Math.max(...tipPercentages, 0);
@@ -257,7 +200,7 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
 
   const handleRemoveTipPercentage = (index: number) => {
     if (tipPercentages.length <= 1) {
-      Alert.alert('Error', 'At least one tip percentage is required');
+      Alert.alert(tc('error'), ts('atLeastOneTip'));
       return;
     }
     setTipPercentages(tipPercentages.filter((_, i) => i !== index));
@@ -272,7 +215,7 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
     if (editingTipIndex === null) return;
     const value = parseInt(editingTipValue, 10);
     if (isNaN(value) || value < 0 || value > 100) {
-      Alert.alert('Error', 'Please enter a valid percentage (0-100)');
+      Alert.alert(tc('error'), ts('invalidPercentage'));
       return;
     }
     const newPercentages = [...tipPercentages];
@@ -291,43 +234,21 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 600,
+        duration: 500,
         useNativeDriver: true,
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        tension: 50,
-        friction: 8,
+        duration: 500,
         useNativeDriver: true,
       }),
     ]).start();
-
-    // Subtle sparkle animation
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(sparkleAnim, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(sparkleAnim, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
   }, []);
 
-  const styles = createWelcomeStyles(colors, glassColors, isDark);
+  const styles = createWelcomeStyles(colors, isDark);
 
   const handleQuickCharge = () => {
-    navigation.navigate('QuickCharge');
+    onQuickCharge?.();
   };
 
   const handleOpenCreateModal = () => {
@@ -340,174 +261,156 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        bounces={true}
+        overScrollMode="always"
       >
-        {/* Welcome Header - Dark with Apple-style stars */}
         <Animated.View
-        style={[
-          styles.headerContainer,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }],
-          }
-        ]}
-      >
-        <View style={[styles.headerBackground, { backgroundColor: isDark ? '#1C1917' : colors.background }]}>
-          {/* Subtle gradient overlay */}
-          <LinearGradient
-            colors={isDark
-              ? ['transparent', 'rgba(245, 158, 11, 0.08)', 'rgba(245, 158, 11, 0.05)', 'transparent']
-              : ['transparent', 'rgba(245, 158, 11, 0.05)', 'rgba(245, 158, 11, 0.03)', 'transparent']
+          style={[
+            styles.headerContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }],
             }
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFill}
-          />
-
-          {/* Star field - Group 1 (fades in/out) */}
-          <Animated.View style={[StyleSheet.absoluteFill, { opacity: sparkleAnim }]}>
-            <FourPointStar style={{ top: 25, left: 25 }} size={14} color={isDark ? 'rgba(255,255,255,0.7)' : 'rgba(245,158,11,0.4)'} />
-            <Star style={{ top: 50, left: 80 }} size={4} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(245,158,11,0.3)'} />
-            <Star style={{ top: 35, right: 60 }} size={6} color={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(245,158,11,0.35)'} />
-            <FourPointStar style={{ top: 70, right: 30 }} size={12} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(245,158,11,0.3)'} />
-            <Star style={{ top: 90, left: 50 }} size={3} color={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(245,158,11,0.25)'} />
-            <Star style={{ top: 40, left: SCREEN_WIDTH * 0.45 }} size={5} color={isDark ? 'rgba(255,255,255,0.55)' : 'rgba(245,158,11,0.3)'} />
-            <Star style={{ top: 110, right: 90 }} size={4} color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(245,158,11,0.25)'} />
-          </Animated.View>
-
-          {/* Star field - Group 2 (opposite fade) */}
-          <Animated.View style={[StyleSheet.absoluteFill, { opacity: Animated.subtract(1, sparkleAnim) }]}>
-            <Star style={{ top: 30, left: 55 }} size={5} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(245,158,11,0.3)'} />
-            <FourPointStar style={{ top: 55, right: 45 }} size={16} color={isDark ? 'rgba(255,255,255,0.6)' : 'rgba(245,158,11,0.35)'} />
-            <Star style={{ top: 80, left: 35 }} size={4} color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(245,158,11,0.25)'} />
-            <Star style={{ top: 45, left: SCREEN_WIDTH * 0.55 }} size={6} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(245,158,11,0.3)'} />
-            <FourPointStar style={{ top: 20, right: 100 }} size={10} color={isDark ? 'rgba(255,255,255,0.4)' : 'rgba(245,158,11,0.25)'} />
-            <Star style={{ top: 100, right: 50 }} size={3} color={isDark ? 'rgba(255,255,255,0.5)' : 'rgba(245,158,11,0.25)'} />
-            <Star style={{ top: 65, left: 100 }} size={5} color={isDark ? 'rgba(255,255,255,0.55)' : 'rgba(245,158,11,0.3)'} />
-          </Animated.View>
-
-          {/* Welcome Content */}
-          <View style={styles.headerContent}>
-            <View style={[styles.headerIconContainer, {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.1)',
-              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.15)'
-            }]}>
-              <Ionicons name="storefront" size={44} color={isDark ? 'rgba(255,255,255,0.95)' : colors.primary} />
-            </View>
-            <Text style={[styles.headerTitle, { color: isDark ? '#fff' : colors.text }]} maxFontSizeMultiplier={1.2}>
-              {organization?.name ? `Welcome, ${organization.name}!` : 'Welcome to Rowie!'}
+          ]}
+        >
+          {/* Greeting */}
+          <View style={styles.greetingSection}>
+            <Text style={[styles.orgName, { color: colors.text }]} maxFontSizeMultiplier={1.2}>
+              {organization?.name || t('welcome')}
             </Text>
-            <Text style={[styles.headerSubtitle, { color: isDark ? 'rgba(255,255,255,0.55)' : colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-              Let's get your menu set up so you can start selling
+            <Text style={[styles.welcomeSub, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
+              {t('setUpMenuSubtitle')}
             </Text>
           </View>
 
-          {/* Create Menu Card - Primary Action */}
-          <Animated.View
-            style={[
-              styles.cardContainer,
-              {
-                opacity: fadeAnim,
-                transform: [{ scale: scaleAnim }],
-              }
-            ]}
-          >
+          {/* Primary CTA — Create Menu */}
+          <View style={styles.ctaSection}>
             <TouchableOpacity
-              style={[styles.primaryCard, { backgroundColor: glassColors.backgroundElevated, borderColor: glassColors.border }]}
               onPress={handleOpenCreateModal}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
               accessibilityRole="button"
-              accessibilityLabel="Create Your Menu"
-              accessibilityHint="Opens a form to create your first menu"
+              accessibilityLabel={t('createFirstMenuTitle')}
             >
-              <View style={styles.cardHeader}>
-                <View style={[styles.primaryIconContainer, { backgroundColor: colors.primary + '20' }]}>
-                  <Ionicons name="grid" size={28} color={colors.primary} />
-                </View>
-                <View style={[styles.cardBadge, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.cardBadgeText} maxFontSizeMultiplier={1.3}>GET STARTED</Text>
-                </View>
-              </View>
-
-              <Text style={[styles.primaryCardTitle, { color: colors.text }]} maxFontSizeMultiplier={1.2}>Create Your Menu</Text>
-              <Text style={[styles.primaryCardDescription, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                Create a menu to start adding products. You can add photos, set prices, and organize into categories.
-              </Text>
-
-              <View style={styles.featureList}>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-                  <Text style={[styles.featureText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>Add products with photos & prices</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-                  <Text style={[styles.featureText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>Organize into categories</Text>
-                </View>
-                <View style={styles.featureItem}>
-                  <Ionicons name="checkmark-circle" size={18} color={colors.primary} />
-                  <Text style={[styles.featureText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>Configure tips & tax settings</Text>
-                </View>
-              </View>
-
-              <View style={[styles.primaryCardButton, { backgroundColor: isDark ? '#fff' : '#1C1917' }]}>
-                <Ionicons name="add" size={20} color={isDark ? '#1C1917' : '#fff'} />
-                <Text style={[styles.primaryCardButtonText, { color: isDark ? '#1C1917' : '#fff' }]} maxFontSizeMultiplier={1.3}>Create Menu</Text>
-              </View>
-            </TouchableOpacity>
-          </Animated.View>
-
-          {/* Quick Charge Option - Secondary */}
-          <Animated.View
-            style={[
-              styles.quickChargeContainer,
-              { opacity: fadeAnim }
-            ]}
-          >
-            <View style={[styles.quickChargeCard, { backgroundColor: glassColors.backgroundSubtle, borderColor: glassColors.border }]}>
-              <View style={styles.quickChargeContent}>
-                <View style={[styles.quickChargeIcon, { backgroundColor: colors.primary + '15' }]}>
-                  <Ionicons name="flash" size={20} color={colors.primary} />
-                </View>
-                <View style={styles.quickChargeText}>
-                  <Text style={[styles.quickChargeTitle, { color: colors.text }]} maxFontSizeMultiplier={1.5}>Need to charge now?</Text>
-                  <Text style={[styles.quickChargeSubtitle, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-                    Use Quick Charge for custom amounts — no menu needed
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={[styles.quickChargeButton, { borderColor: colors.primary }]}
-                onPress={handleQuickCharge}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel="Go to Quick Charge"
+              <LinearGradient
+                colors={isDark ? brandGradient : brandGradientLight}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.ctaCard}
               >
-                <Text style={[styles.quickChargeButtonText, { color: colors.primary }]} maxFontSizeMultiplier={1.3}>Quick Charge</Text>
-                <Ionicons name="arrow-forward" size={16} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-
-          {/* Vendor Portal Hint - owners/admins only */}
-          {isManager && (
-            <Animated.View style={[styles.vendorHint, { opacity: fadeAnim }]}>
-              <Ionicons name="desktop-outline" size={16} color={colors.textMuted} />
-              <Text style={[styles.vendorHintText, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-                Need advanced management? Open the{' '}
-                <Text
-                  style={{ color: colors.primary, fontFamily: fonts.semiBold }}
-                  onPress={() => openVendorDashboard('/products')}
-                  maxFontSizeMultiplier={1.5}
-                  accessibilityRole="link"
-                  accessibilityLabel="Open Vendor Portal"
-                  accessibilityHint="Opens the Vendor Portal for advanced management"
-                >
-                  Vendor Portal
+                <View style={styles.ctaIconWrap}>
+                  <Ionicons name="add-circle" size={32} color="#fff" />
+                </View>
+                <Text style={styles.ctaTitle} maxFontSizeMultiplier={1.3}>
+                  {t('createFirstMenuTitle')}
                 </Text>
-              </Text>
-            </Animated.View>
-          )}
-        </View>
-      </Animated.View>
+                <Text style={styles.ctaDesc} maxFontSizeMultiplier={1.5}>
+                  {t('createFirstMenuDesc')}
+                </Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          {/* What's next — steps preview */}
+          <View style={styles.stepsSection}>
+            <Text style={[styles.sectionLabel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.3}>
+              {t('whatsNextLabel')}
+            </Text>
+            <View style={[styles.stepsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {isPaymentConnected ? (
+                <View style={styles.stepRow}>
+                  <View style={[styles.stepDot, { backgroundColor: colors.success }]} />
+                  <View style={styles.stepTextWrap}>
+                    <Text style={[styles.stepLabel, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{t('paymentsConnectedLabel')}</Text>
+                    <Text style={[styles.stepHint, { color: colors.success }]} maxFontSizeMultiplier={1.5}>{t('bankAccountLinked')}</Text>
+                  </View>
+                  <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={styles.stepRow}
+                  onPress={() => navigation.navigate('StripeOnboarding', { returnTo: 'home' })}
+                  activeOpacity={0.6}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('connectPaymentsLabel')}
+                  accessibilityHint={t('linkBankViaStripe')}
+                >
+                  <LinearGradient colors={isDark ? brandGradient : brandGradientLight} style={styles.stepDot} />
+                  <View style={styles.stepTextWrap}>
+                    <Text style={[styles.stepLabel, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{t('connectPaymentsLabel')}</Text>
+                    <Text style={[styles.stepHint, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>{t('linkBankViaStripe')}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+              <View style={[styles.stepDivider, { backgroundColor: colors.divider }]} />
+              {isPaymentConnected ? (
+                <TouchableOpacity
+                  style={styles.stepRow}
+                  onPress={handleOpenCreateModal}
+                  activeOpacity={0.6}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('createFirstMenuStepLabel')}
+                >
+                  <LinearGradient colors={isDark ? brandGradient : brandGradientLight} style={styles.stepDot} />
+                  <View style={styles.stepTextWrap}>
+                    <Text style={[styles.stepLabel, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{t('createFirstMenuStepLabel')}</Text>
+                    <Text style={[styles.stepHint, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>{t('addProductsStartOrders')}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.stepRow}>
+                  <View style={[styles.stepDot, { backgroundColor: colors.border }]} />
+                  <View style={styles.stepTextWrap}>
+                    <Text style={[styles.stepLabel, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{t('createFirstMenuStepLabel')}</Text>
+                    <Text style={[styles.stepHint, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>{t('addProductsStartOrders')}</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {/* Quick Charge + Vendor Portal */}
+          <View style={styles.linksSection}>
+            <TouchableOpacity
+              style={[styles.linkCard, { backgroundColor: colors.card, borderColor: colors.border, opacity: isPaymentReady ? 1 : 0.35 }]}
+              onPress={isPaymentReady ? handleQuickCharge : undefined}
+              disabled={!isPaymentReady}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={t('quickChargeLabel')}
+              accessibilityState={{ disabled: !isPaymentReady }}
+            >
+              <View style={[styles.linkIconWrap, { backgroundColor: colors.chipBgActive }]}>
+                <Ionicons name="flash" size={18} color={colors.primary} />
+              </View>
+              <View style={styles.linkTextWrap}>
+                <Text style={[styles.linkTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{t('quickChargeLabel')}</Text>
+                <Text style={[styles.linkHint, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>{t('quickChargeDesc')}</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+            </TouchableOpacity>
+
+            {isManager && (
+              <TouchableOpacity
+                style={[styles.linkCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={() => openVendorDashboard('/products')}
+                activeOpacity={0.7}
+                accessibilityRole="link"
+                accessibilityLabel={t('openVendorPortal')}
+              >
+                <View style={[styles.linkIconWrap, { backgroundColor: colors.chipBg }]}>
+                  <Ionicons name="desktop-outline" size={18} color={colors.textSecondary} />
+                </View>
+                <View style={styles.linkTextWrap}>
+                  <Text style={[styles.linkTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{t('vendorPortalLabel')}</Text>
+                  <Text style={[styles.linkHint, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>{t('vendorPortalDesc')}</Text>
+                </View>
+                <Ionicons name="open-outline" size={16} color={colors.textMuted} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </Animated.View>
       </ScrollView>
 
       {/* Create Menu Modal */}
@@ -518,19 +421,19 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
         onRequestClose={() => setShowCreateModal(false)}
       >
         <View style={styles.modalContainer}>
-          <Pressable style={styles.modalOverlay} onPress={() => setShowCreateModal(false)} accessibilityLabel="Close" accessibilityRole="button" />
+          <Pressable style={styles.modalOverlay} onPress={() => setShowCreateModal(false)} accessibilityLabel={tc('close')} accessibilityRole="button" />
           <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
             {/* Modal Header */}
-            <View style={[styles.modalHeader, { borderBottomColor: glassColors.border }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
               <TouchableOpacity
                 onPress={() => setShowCreateModal(false)}
-                style={[styles.modalCloseButton, { backgroundColor: glassColors.backgroundElevated }]}
+                style={[styles.modalCloseButton, { backgroundColor: colors.card }]}
                 accessibilityRole="button"
-                accessibilityLabel="Close"
+                accessibilityLabel={tc('close')}
               >
                 <Ionicons name="close" size={24} color={colors.text} />
               </TouchableOpacity>
-              <Text style={[styles.modalTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>Create Menu</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{t('createMenuTitle')}</Text>
               <TouchableOpacity
                 onPress={handleCreateCatalog}
                 disabled={createCatalogMutation.isPending || !catalogName.trim()}
@@ -540,12 +443,12 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
                   (!catalogName.trim() || createCatalogMutation.isPending) && styles.modalSaveButtonDisabled
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel={createCatalogMutation.isPending ? 'Creating menu' : 'Create menu'}
+                accessibilityLabel={createCatalogMutation.isPending ? tc('creating') : tc('create')}
               >
                 {createCatalogMutation.isPending ? (
-                  <ActivityIndicator size="small" color="#fff" accessibilityLabel="Creating" />
+                  <ActivityIndicator size="small" color="#fff" accessibilityLabel={tc('creating')} />
                 ) : (
-                  <Text style={styles.modalSaveButtonText} maxFontSizeMultiplier={1.3}>Create</Text>
+                  <Text style={styles.modalSaveButtonText} maxFontSizeMultiplier={1.3}>{tc('create')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -559,87 +462,87 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
               automaticallyAdjustKeyboardInsets
             >
               <View style={styles.inputSection}>
-                <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>Menu Name *</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>{ts('menuNameLabel')}</Text>
                 <TextInput
                   style={[styles.textInput, {
-                    backgroundColor: glassColors.backgroundElevated,
-                    borderColor: glassColors.border,
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
                     color: colors.text,
                   }]}
                   value={catalogName}
                   onChangeText={setCatalogName}
-                  placeholder="e.g., Summer Menu, Food Truck, Bar Menu"
+                  placeholder={t('menuNamePlaceholder')}
                   placeholderTextColor={colors.textMuted}
                   maxLength={100}
                   autoFocus
-                  accessibilityLabel="Menu name"
+                  accessibilityLabel={ts('menuNameLabel')}
                 />
               </View>
 
               <View style={styles.inputSection}>
-                <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>Description</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>{ts('descriptionLabel')}</Text>
                 <TextInput
                   style={[styles.textInput, styles.textArea, {
-                    backgroundColor: glassColors.backgroundElevated,
-                    borderColor: glassColors.border,
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
                     color: colors.text,
                   }]}
                   value={catalogDescription}
                   onChangeText={setCatalogDescription}
-                  placeholder="Optional description for this menu"
+                  placeholder={t('descriptionPlaceholder')}
                   placeholderTextColor={colors.textMuted}
                   maxLength={500}
                   multiline
                   numberOfLines={2}
-                  accessibilityLabel="Menu description"
+                  accessibilityLabel={ts('descriptionLabel')}
                 />
               </View>
 
               <View style={styles.inputSection}>
-                <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>Location</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>{ts('locationLabel')}</Text>
                 <View style={[styles.inputWithIcon, {
-                  backgroundColor: glassColors.backgroundElevated,
-                  borderColor: glassColors.border,
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
                 }]}>
                   <Ionicons name="location-outline" size={20} color={colors.textMuted} />
                   <TextInput
                     style={[styles.inputInner, { color: colors.text }]}
                     value={catalogLocation}
                     onChangeText={setCatalogLocation}
-                    placeholder="e.g., Main Stage, North Tent"
+                    placeholder={t('locationPlaceholder')}
                     placeholderTextColor={colors.textMuted}
                     maxLength={100}
-                    accessibilityLabel="Menu location"
+                    accessibilityLabel={ts('locationLabel')}
                   />
                 </View>
               </View>
 
               {/* Date */}
               <View style={styles.inputSection}>
-                <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>Date</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>{ts('dateLabel')}</Text>
                 <TouchableOpacity
                   style={[styles.dateSelector, {
-                    backgroundColor: glassColors.backgroundElevated,
-                    borderColor: glassColors.border,
+                    backgroundColor: colors.card,
+                    borderColor: colors.border,
                   }]}
                   onPress={() => setShowDatePicker(true)}
                   accessibilityRole="button"
-                  accessibilityLabel={catalogDate ? `Date: ${formatDate(catalogDate)}` : 'Select a date'}
-                  accessibilityHint="Opens date picker"
+                  accessibilityLabel={catalogDate ? `${ts('dateLabel')}: ${formatDate(catalogDate)}` : ts('selectDateOptional')}
+                  accessibilityHint={ts('opensDatePicker')}
                 >
                   <Ionicons name="calendar-outline" size={20} color={colors.textMuted} />
                   <Text style={[
                     styles.dateSelectorText,
                     { color: catalogDate ? colors.text : colors.textMuted }
                   ]} maxFontSizeMultiplier={1.5}>
-                    {catalogDate ? formatDate(catalogDate) : 'Select a date (optional)'}
+                    {catalogDate ? formatDate(catalogDate) : ts('selectDateOptional')}
                   </Text>
                   {catalogDate && (
                     <TouchableOpacity
                       onPress={handleClearDate}
                       hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       accessibilityRole="button"
-                      accessibilityLabel="Clear date"
+                      accessibilityLabel={ts('clearDate')}
                     >
                       <Ionicons name="close-circle" size={20} color={colors.textMuted} />
                     </TouchableOpacity>
@@ -648,15 +551,15 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
                 {showDatePicker && (
                   Platform.OS === 'ios' ? (
                     <View style={[styles.datePickerContainer, {
-                      backgroundColor: glassColors.backgroundElevated,
-                      borderColor: glassColors.border,
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
                     }]}>
-                      <View style={[styles.datePickerHeader, { borderBottomColor: glassColors.border }]}>
-                        <TouchableOpacity onPress={() => setShowDatePicker(false)} accessibilityRole="button" accessibilityLabel="Cancel date selection">
-                          <Text style={[styles.datePickerCancel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>Cancel</Text>
+                      <View style={[styles.datePickerHeader, { borderBottomColor: colors.border }]}>
+                        <TouchableOpacity onPress={() => setShowDatePicker(false)} accessibilityRole="button" accessibilityLabel={tc('cancel')}>
+                          <Text style={[styles.datePickerCancel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>{tc('cancel')}</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setShowDatePicker(false)} accessibilityRole="button" accessibilityLabel="Confirm date selection">
-                          <Text style={[styles.datePickerDone, { color: colors.primary }]} maxFontSizeMultiplier={1.5}>Done</Text>
+                        <TouchableOpacity onPress={() => setShowDatePicker(false)} accessibilityRole="button" accessibilityLabel={tc('done')}>
+                          <Text style={[styles.datePickerDone, { color: colors.primary }]} maxFontSizeMultiplier={1.5}>{tc('done')}</Text>
                         </TouchableOpacity>
                       </View>
                       <DateTimePicker
@@ -681,42 +584,45 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
 
               {/* Layout Type */}
               <View style={styles.inputSection}>
-                <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>Product Layout</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>{ts('productLayoutLabel')}</Text>
                 <View style={styles.layoutOptions}>
-                  {LAYOUT_OPTIONS.map(option => (
-                    <TouchableOpacity
-                      key={option.value}
-                      style={[
-                        styles.layoutOption,
-                        { backgroundColor: glassColors.backgroundElevated, borderColor: glassColors.border },
-                        layoutType === option.value && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }
-                      ]}
-                      onPress={() => setLayoutType(option.value)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${option.label} layout`}
-                      accessibilityState={{ selected: layoutType === option.value }}
-                    >
-                      <Ionicons
-                        name={option.icon}
-                        size={24}
-                        color={layoutType === option.value ? colors.primary : colors.textSecondary}
-                      />
-                      <Text style={[
-                        styles.layoutOptionText,
-                        { color: layoutType === option.value ? colors.primary : colors.textSecondary }
-                      ]} maxFontSizeMultiplier={1.3}>
-                        {option.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {LAYOUT_OPTIONS.map(option => {
+                    const label = ts(option.labelKey);
+                    return (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[
+                          styles.layoutOption,
+                          { backgroundColor: colors.card, borderColor: colors.border },
+                          layoutType === option.value && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }
+                        ]}
+                        onPress={() => setLayoutType(option.value)}
+                        accessibilityRole="button"
+                        accessibilityLabel={ts('layoutAccessibilityLabel', { label })}
+                        accessibilityState={{ selected: layoutType === option.value }}
+                      >
+                        <Ionicons
+                          name={option.icon}
+                          size={24}
+                          color={layoutType === option.value ? colors.primary : colors.textSecondary}
+                        />
+                        <Text style={[
+                          styles.layoutOptionText,
+                          { color: layoutType === option.value ? colors.primary : colors.textSecondary }
+                        ]} maxFontSizeMultiplier={1.3}>
+                          {label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
 
               <View style={styles.inputSection}>
-                <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>Tax Rate</Text>
+                <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>{ts('taxRateLabel')}</Text>
                 <View style={[styles.taxInputContainer, {
-                  backgroundColor: glassColors.backgroundElevated,
-                  borderColor: glassColors.border,
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
                 }]}>
                   <TextInput
                     style={[styles.taxInput, { color: colors.text }]}
@@ -725,25 +631,25 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
                     placeholder="0"
                     placeholderTextColor={colors.textMuted}
                     keyboardType="decimal-pad"
-                    accessibilityLabel="Tax rate percentage"
+                    accessibilityLabel={ts('taxRateLabel')}
                   />
-                  <Text style={[styles.taxSymbol, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>%</Text>
+                  <Text style={[styles.taxSymbol, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>{tc('percentSymbol')}</Text>
                 </View>
               </View>
 
               {/* Divider */}
-              <View style={[styles.divider, { backgroundColor: glassColors.border }]} />
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
               {/* Show Tip Screen Toggle */}
               <View style={styles.inputSection}>
                 <View style={styles.toggleRow}>
                   <View style={styles.toggleInfo}>
-                    <Text style={[styles.inputLabel, { color: colors.text, marginBottom: 0 }]} maxFontSizeMultiplier={1.5}>Show Tip Screen</Text>
+                    <Text style={[styles.inputLabel, { color: colors.text, marginBottom: 0 }]} maxFontSizeMultiplier={1.5}>{ts('showTipScreen')}</Text>
                     <Text style={[styles.toggleDescription, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-                      Show tip options during checkout
+                      {ts('showTipScreenDescription')}
                     </Text>
                   </View>
-                  <Toggle value={showTipScreen} onValueChange={setShowTipScreen} accessibilityLabel="Show tip screen" />
+                  <Toggle value={showTipScreen} onValueChange={setShowTipScreen} accessibilityLabel={ts('showTipScreen')} />
                 </View>
               </View>
 
@@ -752,9 +658,9 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
                 <>
                   <View style={styles.inputSection}>
                     <View style={styles.tipHeader}>
-                      <Text style={[styles.inputLabel, { color: colors.text, marginBottom: 0 }]} maxFontSizeMultiplier={1.5}>Tip Options</Text>
+                      <Text style={[styles.inputLabel, { color: colors.text, marginBottom: 0 }]} maxFontSizeMultiplier={1.5}>{ts('tipOptions')}</Text>
                       {tipPercentages.length < 6 && (
-                        <TouchableOpacity onPress={handleAddTipPercentage} accessibilityRole="button" accessibilityLabel="Add tip percentage">
+                        <TouchableOpacity onPress={handleAddTipPercentage} accessibilityRole="button" accessibilityLabel={ts('addTipPercentage')}>
                           <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
                         </TouchableOpacity>
                       )}
@@ -762,8 +668,8 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
                     <View style={styles.tipPercentages}>
                       {tipPercentages.map((percentage, index) => (
                         <View key={index} style={[styles.tipChip, {
-                          backgroundColor: glassColors.backgroundElevated,
-                          borderColor: glassColors.border,
+                          backgroundColor: colors.card,
+                          borderColor: colors.border,
                         }]}>
                           {editingTipIndex === index ? (
                             <View style={styles.tipEditRow}>
@@ -775,12 +681,12 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
                                 autoFocus
                                 maxLength={3}
                                 onSubmitEditing={handleSaveTipEdit}
-                                accessibilityLabel="Edit tip percentage"
+                                accessibilityLabel={ts('editTipPercentage')}
                               />
-                              <TouchableOpacity onPress={handleSaveTipEdit} accessibilityRole="button" accessibilityLabel="Save tip percentage">
+                              <TouchableOpacity onPress={handleSaveTipEdit} accessibilityRole="button" accessibilityLabel={ts('saveTipPercentage')}>
                                 <Ionicons name="checkmark" size={18} color={colors.success} />
                               </TouchableOpacity>
-                              <TouchableOpacity onPress={handleCancelTipEdit} accessibilityRole="button" accessibilityLabel="Cancel editing tip">
+                              <TouchableOpacity onPress={handleCancelTipEdit} accessibilityRole="button" accessibilityLabel={ts('cancelEditingTip')}>
                                 <Ionicons name="close" size={18} color={colors.error} />
                               </TouchableOpacity>
                             </View>
@@ -790,7 +696,7 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
                                 onPress={() => handleStartEditTip(index)}
                                 style={styles.tipValueButton}
                                 accessibilityRole="button"
-                                accessibilityLabel={`Edit ${percentage}% tip option`}
+                                accessibilityLabel={ts('editTipOption', { percentage })}
                               >
                                 <Text style={[styles.tipText, { color: colors.text }]} maxFontSizeMultiplier={1.5}>{percentage}%</Text>
                               </TouchableOpacity>
@@ -799,7 +705,7 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
                                   onPress={() => handleRemoveTipPercentage(index)}
                                   style={styles.tipRemove}
                                   accessibilityRole="button"
-                                  accessibilityLabel={`Remove ${percentage}% tip option`}
+                                  accessibilityLabel={ts('removeTipOption', { percentage })}
                                 >
                                   <Ionicons name="close-circle" size={18} color={colors.textMuted} />
                                 </TouchableOpacity>
@@ -814,12 +720,12 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
                   <View style={styles.inputSection}>
                     <View style={styles.toggleRow}>
                       <View style={styles.toggleInfo}>
-                        <Text style={[styles.inputLabel, { color: colors.text, marginBottom: 0 }]} maxFontSizeMultiplier={1.5}>Allow Custom Tip</Text>
+                        <Text style={[styles.inputLabel, { color: colors.text, marginBottom: 0 }]} maxFontSizeMultiplier={1.5}>{ts('allowCustomTip')}</Text>
                         <Text style={[styles.toggleDescription, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-                          Let customers enter a custom tip amount
+                          {ts('allowCustomTipDescription')}
                         </Text>
                       </View>
-                      <Toggle value={allowCustomTip} onValueChange={setAllowCustomTip} accessibilityLabel="Allow custom tip" />
+                      <Toggle value={allowCustomTip} onValueChange={setAllowCustomTip} accessibilityLabel={ts('allowCustomTip')} />
                     </View>
                   </View>
                 </>
@@ -829,19 +735,19 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
               <View style={styles.inputSection}>
                 <View style={styles.toggleRow}>
                   <View style={styles.toggleInfo}>
-                    <Text style={[styles.inputLabel, { color: colors.text, marginBottom: 0 }]} maxFontSizeMultiplier={1.5}>Prompt for Email</Text>
+                    <Text style={[styles.inputLabel, { color: colors.text, marginBottom: 0 }]} maxFontSizeMultiplier={1.5}>{ts('promptForEmail')}</Text>
                     <Text style={[styles.toggleDescription, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-                      Ask for customer email for receipts
+                      {t('promptForEmailDesc')}
                     </Text>
                   </View>
-                  <Toggle value={promptForEmail} onValueChange={setPromptForEmail} accessibilityLabel="Prompt for email" />
+                  <Toggle value={promptForEmail} onValueChange={setPromptForEmail} accessibilityLabel={ts('promptForEmail')} />
                 </View>
               </View>
 
               <View style={[styles.infoBox, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}>
                 <Ionicons name="information-circle-outline" size={20} color={colors.primary} />
                 <Text style={[styles.infoBoxText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                  After creating your menu, tap the edit button to add products and categories.
+                  {t('infoAfterCreating')}
                 </Text>
               </View>
             </ScrollView>
@@ -852,17 +758,16 @@ function NoCatalogsWelcome({ colors, glassColors, isDark, isManager }: { colors:
   );
 }
 
-export function SetupRequired({ type }: SetupRequiredProps) {
+export function SetupRequired({ type, onQuickCharge }: SetupRequiredProps) {
   const { colors, isDark } = useTheme();
   const { user } = useAuth();
-  const glassColors = isDark ? glass.dark : glass.light;
   const isManager = user?.role === 'owner' || user?.role === 'admin';
 
   if (type === 'no-payment-account') {
     return <PaymentSetupRequired colors={colors} isManager={isManager} />;
   }
 
-  return <NoCatalogsWelcome colors={colors} glassColors={glassColors} isDark={isDark} isManager={isManager} />;
+  return <NoCatalogsWelcome colors={colors} isDark={isDark} isManager={isManager} onQuickCharge={onQuickCharge} />;
 }
 
 const createSimpleStyles = (colors: any) =>
@@ -871,31 +776,25 @@ const createSimpleStyles = (colors: any) =>
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingHorizontal: 40,
+      paddingHorizontal: 20,
       backgroundColor: colors.background,
     },
     iconContainer: {
-      width: 120,
-      height: 120,
-      borderRadius: 60,
-      backgroundColor: colors.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 24,
+      marginBottom: 20,
     },
     title: {
-      fontSize: 24,
+      fontSize: 20,
       fontFamily: fonts.bold,
       color: colors.text,
       textAlign: 'center',
-      marginBottom: 12,
+      marginBottom: 8,
     },
     message: {
-      fontSize: 16,
+      fontSize: 15,
       fontFamily: fonts.regular,
       color: colors.textSecondary,
       textAlign: 'center',
-      lineHeight: 24,
+      lineHeight: 22,
       marginBottom: 32,
     },
     button: {
@@ -913,173 +812,176 @@ const createSimpleStyles = (colors: any) =>
     },
   });
 
-const createWelcomeStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) => {
+const createWelcomeStyles = (colors: any, isDark: boolean) => {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: isDark ? '#1C1917' : colors.background,
+      backgroundColor: colors.background,
     },
     scrollContainer: {
       flex: 1,
     },
     scrollContent: {
-      flexGrow: 1,
-      paddingBottom: 50,
-    },
-    headerContainer: {
-      marginBottom: 0,
-    },
-    headerBackground: {
-      position: 'relative',
-      overflow: 'hidden',
-      flexGrow: 1,
       paddingBottom: 40,
     },
-    headerContent: {
-      paddingTop: 60,
-      paddingBottom: 48,
+    headerContainer: {
+    },
+    // Greeting
+    greetingSection: {
+      paddingTop: 24,
       paddingHorizontal: 24,
-      alignItems: 'center',
-      zIndex: 10,
+      paddingBottom: 28,
     },
-    headerIconContainer: {
-      width: 88,
-      height: 88,
-      borderRadius: 44,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 20,
-      borderWidth: 1,
-    },
-    headerTitle: {
-      fontSize: 28,
-      fontFamily: fonts.bold,
-      textAlign: 'center',
-      marginBottom: 8,
-      letterSpacing: -0.5,
-    },
-    headerSubtitle: {
+    greeting: {
       fontSize: 16,
-      fontFamily: fonts.regular,
-      textAlign: 'center',
+      fontFamily: fonts.medium,
+      marginBottom: 6,
     },
-    cardContainer: {
-      paddingHorizontal: 16,
-      marginBottom: 16,
-    },
-    primaryCard: {
-      borderRadius: 20,
-      borderWidth: 1,
-      padding: 24,
-      ...shadows.md,
-    },
-    cardHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 16,
-    },
-    primaryIconContainer: {
-      width: 56,
-      height: 56,
-      borderRadius: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    cardBadge: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 20,
-    },
-    cardBadgeText: {
-      fontSize: 11,
+    orgName: {
+      fontSize: 30,
       fontFamily: fonts.bold,
-      color: '#fff',
-      letterSpacing: 0.5,
-    },
-    primaryCardTitle: {
-      fontSize: 24,
-      fontFamily: fonts.bold,
-      marginBottom: 8,
-      letterSpacing: -0.3,
-    },
-    primaryCardDescription: {
-      fontSize: 15,
-      fontFamily: fonts.regular,
-      lineHeight: 22,
-      marginBottom: 20,
-    },
-    featureList: {
-      marginBottom: 24,
-    },
-    featureItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      letterSpacing: -0.5,
       marginBottom: 12,
     },
-    featureText: {
-      fontSize: 15,
-      fontFamily: fonts.regular,
-      marginLeft: 12,
-    },
-    primaryCardButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 16,
-      paddingHorizontal: 24,
-      borderRadius: 12,
-      gap: 10,
-    },
-    primaryCardButtonText: {
+    welcomeSub: {
       fontSize: 16,
-      fontFamily: fonts.semiBold,
+      fontFamily: fonts.regular,
+      lineHeight: 24,
     },
-    quickChargeContainer: {
-      paddingHorizontal: 16,
-      marginTop: 8,
+    // Primary CTA
+    ctaSection: {
+      paddingHorizontal: 20,
+      marginBottom: 28,
+    },
+    ctaCard: {
+      borderRadius: 24,
+      padding: 28,
+      alignItems: 'center',
+    },
+    ctaIconWrap: {
       marginBottom: 16,
     },
-    quickChargeCard: {
-      borderRadius: 16,
-      borderWidth: 1,
-      padding: 16,
+    ctaTitle: {
+      fontSize: 20,
+      fontFamily: fonts.bold,
+      color: '#fff',
+      textAlign: 'center',
+      marginBottom: 8,
     },
-    quickChargeContent: {
+    ctaDesc: {
+      fontSize: 15,
+      fontFamily: fonts.regular,
+      color: 'rgba(255,255,255,0.8)',
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    // Steps preview
+    stepsSection: {
+      paddingHorizontal: 20,
+      marginBottom: 24,
+    },
+    sectionLabel: {
+      fontSize: 12,
+      fontFamily: fonts.semiBold,
+      letterSpacing: 0.5,
+      marginBottom: 10,
+      marginLeft: 4,
+    },
+    stepsCard: {
+      borderRadius: 20,
+      borderWidth: 1,
+      overflow: 'hidden',
+    },
+    stepRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 14,
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      gap: 14,
     },
-    quickChargeIcon: {
-      width: 44,
-      height: 44,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 12,
+    stepDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
     },
-    quickChargeText: {
+    stepTextWrap: {
       flex: 1,
     },
-    quickChargeTitle: {
+    stepLabel: {
       fontSize: 15,
       fontFamily: fonts.semiBold,
       marginBottom: 2,
     },
-    quickChargeSubtitle: {
+    stepHint: {
       fontSize: 13,
       fontFamily: fonts.regular,
     },
-    quickChargeButton: {
+    stepDivider: {
+      height: 1,
+      marginLeft: 40,
+    },
+    // Link cards
+    linksSection: {
+      paddingHorizontal: 20,
+      gap: 12,
+      marginBottom: 24,
+    },
+    linkCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 16,
+      borderWidth: 1,
+      padding: 16,
+      gap: 14,
+    },
+    linkIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    linkTextWrap: {
+      flex: 1,
+    },
+    linkTitle: {
+      fontSize: 15,
+      fontFamily: fonts.semiBold,
+      marginBottom: 2,
+    },
+    linkHint: {
+      fontSize: 13,
+      fontFamily: fonts.regular,
+    },
+    // Keep old names for modal compatibility
+    primaryButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1.5,
+      paddingVertical: 14,
+      borderRadius: 12,
+      gap: 8,
+    },
+    primaryButtonText: {
+      fontSize: 16,
+      fontFamily: fonts.semiBold,
+      color: '#fff',
+    },
+    secondaryCard: {
+      borderRadius: 20,
+      borderWidth: 1,
+      padding: 20,
+    },
+    secondaryButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
       paddingVertical: 12,
-      borderRadius: 10,
+      borderRadius: 12,
       gap: 6,
     },
-    quickChargeButtonText: {
+    secondaryButtonText: {
       fontSize: 14,
       fontFamily: fonts.semiBold,
     },
@@ -1087,10 +989,10 @@ const createWelcomeStyles = (colors: any, glassColors: typeof glass.dark, isDark
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingTop: 24,
+      paddingTop: 16,
       paddingBottom: 16,
       gap: 8,
-      paddingHorizontal: 24,
+      paddingHorizontal: 20,
     },
     vendorHintText: {
       fontSize: 13,

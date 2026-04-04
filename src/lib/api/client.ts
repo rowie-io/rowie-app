@@ -178,9 +178,6 @@ class ApiClient {
     data?: any,
     options?: RequestInit
   ): Promise<T> {
-    // Small delay to ensure AsyncStorage write is complete
-    await new Promise(resolve => setTimeout(resolve, 100));
-
     // Get fresh token after refresh
     const token = await this.getAuthToken();
     logger.log('[ApiClient] Retry using token:', token ? token.substring(0, 50) + '...' : 'null');
@@ -205,13 +202,16 @@ class ApiClient {
       ...customHeaders as Record<string, string>,
     };
 
-    const token = await this.getAuthToken();
+    // Read token and session version in parallel to avoid sequential AsyncStorage delays
+    const [token, sessionVersion] = await Promise.all([
+      this.getAuthToken(),
+      this.getSessionVersion(),
+    ]);
+
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // Add session version header for single session enforcement
-    const sessionVersion = await this.getSessionVersion();
     if (sessionVersion) {
       headers['X-Session-Version'] = sessionVersion;
     }

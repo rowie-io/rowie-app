@@ -1,5 +1,5 @@
 import { TextStyle } from 'react-native';
-import { fonts } from '../../App';
+import { fonts } from './fonts';
 
 // Typography scale with font families
 export const typography = {

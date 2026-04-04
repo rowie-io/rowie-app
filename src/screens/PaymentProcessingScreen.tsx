@@ -17,10 +17,10 @@ import { useTerminal } from '../context/StripeTerminalContext';
 import { stripeTerminalApi } from '../lib/api';
 import { formatCents } from '../utils/currency';
 import { fonts } from '../lib/fonts';
-import { glass } from '../lib/colors';
 import { shadows } from '../lib/shadows';
 import { config } from '../lib/config';
 import logger from '../lib/logger';
+import { useTranslations } from '../lib/i18n';
 
 
 type RouteParams = {
@@ -40,12 +40,13 @@ type RouteParams = {
 const SERVER_DRIVEN_TIMEOUT_MS = 120_000;
 
 export function PaymentProcessingScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { currency } = useAuth();
+  const t = useTranslations('payment');
+  const tc = useTranslations('common');
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'PaymentProcessing'>>();
-  const glassColors = isDark ? glass.dark : glass.light;
   const {
     connectReader,
     processPayment: terminalProcessPayment,
@@ -59,7 +60,7 @@ export function PaymentProcessingScreen() {
 
   const { paymentIntentId, clientSecret, stripeAccountId, amount, orderId, orderNumber, customerEmail, preorderId } = route.params;
   const [isCancelling, setIsCancelling] = useState(false);
-  const [statusText, setStatusText] = useState('Preparing payment...');
+  const [statusText, setStatusText] = useState(t('preparingPayment'));
   const isCancelledRef = useRef(false);
   const isServerDriven = preferredReader?.readerType === 'internet';
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -70,17 +71,18 @@ export function PaymentProcessingScreen() {
   // goBack() when items.length === 0, which destroys the PaymentResult screen.
   // On FAILURE: keep Checkout so "Try Again" (goBack) returns there.
   const navigateToResult = useCallback((params: Record<string, any>) => {
+    const fullParams: Record<string, any> = { ...params, paymentMethod: 'tap_to_pay' };
     navigation.dispatch((state: any) => {
       let routes;
-      if (params.success) {
+      if (fullParams.success) {
         routes = [
           state.routes[0],
-          { name: 'PaymentResult', params },
+          { name: 'PaymentResult', params: fullParams },
         ];
       } else {
         routes = [
           ...state.routes.slice(0, -1),
-          { name: 'PaymentResult', params },
+          { name: 'PaymentResult', params: fullParams },
         ];
       }
       return CommonActions.reset({
@@ -129,7 +131,7 @@ export function PaymentProcessingScreen() {
         orderId,
         orderNumber,
         customerEmail,
-        errorMessage: terminalPaymentResult.error || 'Payment failed on reader',
+        errorMessage: terminalPaymentResult.error || t('paymentFailedOnReader'),
         preorderId,
       });
     }
@@ -153,16 +155,16 @@ export function PaymentProcessingScreen() {
   const processSDKFlow = async () => {
     try {
       if (Platform.OS === 'web') {
-        setStatusText('Tap to Pay unavailable on web');
+        setStatusText(t('tapToPayUnavailableOnWeb'));
         return;
       }
 
       // Wait for background warm (SDK init + reader pre-connect) to finish
-      setStatusText('Preparing...');
+      setStatusText(t('preparing'));
       await waitForWarm();
 
       // Ensure reader is connected (fast no-op if warm already connected it)
-      setStatusText('Connecting...');
+      setStatusText(t('connecting'));
       try {
         // If preferred reader is Bluetooth, connect via bluetoothScan; otherwise default tapToPay
         const discoveryMethod = preferredReader?.readerType === 'bluetooth' ? 'bluetoothScan' : 'tapToPay';
@@ -171,7 +173,7 @@ export function PaymentProcessingScreen() {
         if (connectErr.message?.includes('contact support')) {
           throw connectErr;
         }
-        throw new Error(`Connection failed: ${connectErr.message}`);
+        throw new Error(t('connectionFailed', { message: connectErr.message }));
       }
 
       // Initialize Stripe SDK with connected account for Terminal PI retrieval
@@ -181,7 +183,7 @@ export function PaymentProcessingScreen() {
         stripeAccountId,
       });
 
-      setStatusText('Starting payment...');
+      setStatusText(t('startingPayment'));
 
       const result = await terminalProcessPayment(clientSecret);
 
@@ -198,18 +200,18 @@ export function PaymentProcessingScreen() {
           preorderId,
         });
       } else {
-        throw new Error(`Payment status: ${result.status}`);
+        throw new Error(t('paymentStatus', { status: result.status }));
       }
     } catch (error: any) {
       if (isCancelledRef.current) return;
 
-      let errorMessage = error.message || 'Payment failed';
+      let errorMessage = error.message || t('paymentFailed');
 
       if (errorMessage.toLowerCase().includes('command was canceled') ||
           errorMessage.toLowerCase().includes('command was cancelled')) {
-        errorMessage = 'The transaction was canceled.';
+        errorMessage = t('transactionCanceled');
       } else if (errorMessage.toLowerCase().includes('no such payment_intent')) {
-        errorMessage = 'Stripe is still setting up your account. This can take a few minutes after onboarding. Please try again shortly, or contact support if the issue persists.';
+        errorMessage = t('stripeSettingUp');
       }
 
       navigateToResult({
@@ -229,10 +231,10 @@ export function PaymentProcessingScreen() {
   const processServerDrivenFlow = async () => {
     try {
       if (!preferredReader) {
-        throw new Error('No preferred reader configured');
+        throw new Error(t('noPreferredReader'));
       }
 
-      setStatusText(`Sending to ${preferredReader.label || 'reader'}...`);
+      setStatusText(t('sendingToReader', { readerLabel: preferredReader.label || 'reader' }));
       logger.log('[PaymentProcessing] Starting server-driven flow, reader:', preferredReader.id);
 
       // Clear any stale payment result
@@ -241,7 +243,7 @@ export function PaymentProcessingScreen() {
       // Send the existing PaymentIntent to the reader
       await processServerDrivenPayment(preferredReader.id, paymentIntentId);
 
-      setStatusText('Waiting for customer to tap card...');
+      setStatusText(t('waitingForCustomerTap'));
 
       // Set timeout — if no socket event within 2 minutes, fail
       timeoutRef.current = setTimeout(() => {
@@ -254,7 +256,7 @@ export function PaymentProcessingScreen() {
             orderId,
             orderNumber,
             customerEmail,
-            errorMessage: 'Payment timed out. The reader may be offline or the customer did not tap their card.',
+            errorMessage: t('paymentTimedOut'),
             preorderId,
           });
         }
@@ -265,10 +267,10 @@ export function PaymentProcessingScreen() {
     } catch (error: any) {
       if (isCancelledRef.current) return;
 
-      let errorMessage = error.message || 'Failed to send payment to reader';
+      let errorMessage = error.message || t('failedToSendToReader');
 
       if (errorMessage.includes('No such terminal.reader')) {
-        errorMessage = 'Reader not found. It may have been removed or is offline.';
+        errorMessage = t('readerNotFound');
       }
 
       navigateToResult({
@@ -307,18 +309,18 @@ export function PaymentProcessingScreen() {
     stripeTerminalApi.cancelPaymentIntent(paymentIntentId).catch(() => {});
   };
 
-  const styles = createStyles(colors, glassColors);
+  const styles = createStyles(colors);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={[styles.safeArea, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <View style={styles.content}>
           {/* Amount Display */}
-          <Text style={styles.amount} maxFontSizeMultiplier={1.2} accessibilityRole="summary" accessibilityLabel={`Amount ${formatCents(amount, currency)}`}>{formatCents(amount, currency)}</Text>
+          <Text style={styles.amount} maxFontSizeMultiplier={1.2} accessibilityRole="summary" accessibilityLabel={t('amountAccessibilityLabel', { amount: formatCents(amount, currency) })}>{formatCents(amount, currency)}</Text>
 
           {/* Loading indicator */}
           <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color={colors.primary} accessibilityLabel="Processing payment" />
+            <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('processingPaymentAccessibility')} />
           </View>
 
           {/* Status */}
@@ -341,11 +343,11 @@ export function PaymentProcessingScreen() {
             disabled={isCancelling}
             activeOpacity={0.7}
             accessibilityRole="button"
-            accessibilityLabel={isCancelling ? 'Cancelling payment' : 'Cancel payment'}
+            accessibilityLabel={isCancelling ? t('cancellingPaymentAccessibility') : t('cancelPaymentAccessibility')}
             accessibilityState={{ disabled: isCancelling }}
           >
             <Text style={styles.cancelButtonText} maxFontSizeMultiplier={1.3}>
-              {isCancelling ? 'Cancelling...' : 'Cancel'}
+              {isCancelling ? t('cancelling') : tc('cancel')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -354,7 +356,7 @@ export function PaymentProcessingScreen() {
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark) => {
+const createStyles = (colors: any) => {
   return StyleSheet.create({
     safeArea: {
       flex: 1,
@@ -396,9 +398,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
       justifyContent: 'center',
       paddingVertical: 16,
       borderRadius: 16,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       ...shadows.sm,
     },
     cancelButtonText: {

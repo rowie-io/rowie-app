@@ -10,19 +10,18 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { authService } from '../lib/api';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslations } from '../lib/i18n';
 
 export function ResetPasswordScreen() {
-  const { isDark } = useTheme();
-  const glassColors = isDark ? glass.dark : glass.light;
+  const { colors: themeColors } = useTheme();
+  const t = useTranslations('auth');
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const token = route.params?.token;
@@ -34,26 +33,26 @@ export function ResetPasswordScreen() {
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const styles = createStyles(glassColors);
+  const styles = createStyles(themeColors);
 
   const handleSubmit = async () => {
     if (!token) {
-      setError('Invalid or missing reset token');
+      setError(t('invalidResetToken'));
       return;
     }
 
     if (!password || !confirmPassword) {
-      setError('Please fill in both password fields');
+      setError(t('fillBothPasswordFields'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('passwordsDoNotMatch'));
       return;
     }
 
     if (password.length < 8) {
-      setError('Password must be at least 8 characters long');
+      setError(t('resetPasswordMinLength'));
       return;
     }
 
@@ -64,7 +63,7 @@ export function ResetPasswordScreen() {
       await authService.resetPassword(token, password);
       setIsSuccess(true);
     } catch (err: any) {
-      setError(err.error || err.message || 'Failed to reset password. Please try again.');
+      setError(err.error || err.message || t('failedToResetPassword'));
     } finally {
       setLoading(false);
     }
@@ -73,13 +72,7 @@ export function ResetPasswordScreen() {
   // Success state
   if (isSuccess) {
     return (
-      <LinearGradient
-        colors={[colors.gray950, colors.background, colors.gray950]}
-        locations={[0, 0.5, 1]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
-      >
+      <View style={styles.screenBackground}>
         <SafeAreaView style={styles.container}>
           <ScrollView
             contentContainerStyle={styles.scrollContent}
@@ -92,9 +85,9 @@ export function ResetPasswordScreen() {
                   <Text maxFontSizeMultiplier={1.2} style={styles.successIconText}>✓</Text>
                 </View>
 
-                <Text maxFontSizeMultiplier={1.2} style={styles.successTitle} accessibilityRole="header">Password Reset Successful!</Text>
+                <Text maxFontSizeMultiplier={1.2} style={styles.successTitle} accessibilityRole="header">{t('passwordResetSuccessTitle')}</Text>
                 <Text maxFontSizeMultiplier={1.5} style={styles.successSubtitle}>
-                  Your password has been successfully reset. You can now log in with your new password.
+                  {t('passwordResetSuccessMessage')}
                 </Text>
 
                 <TouchableOpacity
@@ -102,26 +95,20 @@ export function ResetPasswordScreen() {
                   onPress={() => navigation.navigate('Login')}
                   activeOpacity={0.8}
                   accessibilityRole="button"
-                  accessibilityLabel="Back to login"
+                  accessibilityLabel={t('backToLoginAccessibilityLabel')}
                 >
-                  <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>Back to login</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>{t('backToLoginLink')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </ScrollView>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
 
   return (
-    <LinearGradient
-      colors={[colors.gray950, colors.background, colors.gray950]}
-      locations={[0, 0.5, 1]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={styles.gradient}
-    >
+    <View style={styles.screenBackground}>
       <SafeAreaView style={styles.container}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -135,8 +122,8 @@ export function ResetPasswordScreen() {
             <View style={styles.contentWrapper}>
               {/* Header */}
               <View style={styles.header}>
-                <Text maxFontSizeMultiplier={1.2} style={styles.title}>Reset Your Password</Text>
-                <Text maxFontSizeMultiplier={1.5} style={styles.subtitle}>Enter your new password below</Text>
+                <Text maxFontSizeMultiplier={1.2} style={styles.title}>{t('resetYourPassword')}</Text>
+                <Text maxFontSizeMultiplier={1.5} style={styles.subtitle}>{t('resetYourPasswordSubtitle')}</Text>
               </View>
 
               {/* Card */}
@@ -149,46 +136,46 @@ export function ResetPasswordScreen() {
 
                 <View style={styles.form}>
                   <View style={styles.inputGroup}>
-                    <Text maxFontSizeMultiplier={1.5} style={styles.label}>New Password</Text>
+                    <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('newPasswordLabel')}</Text>
                     <View style={styles.inputContainer}>
                       <TextInput
                         style={[styles.input, styles.passwordInput]}
                         value={password}
                         onChangeText={setPassword}
-                        placeholder="Enter new password"
-                        placeholderTextColor={colors.gray500}
+                        placeholder={t('newPasswordPlaceholder')}
+                        placeholderTextColor={themeColors.textMuted}
                         secureTextEntry={!showPasswords}
                         autoComplete="new-password"
-                        accessibilityLabel="New password"
-                        accessibilityHint="Must be at least 8 characters"
+                        accessibilityLabel={t('newPasswordAccessibilityLabel')}
+                        accessibilityHint={t('newPasswordAccessibilityHint')}
                       />
                       <TouchableOpacity
                         onPress={() => setShowPasswords(!showPasswords)}
                         style={styles.showHideButton}
                         accessibilityRole="button"
-                        accessibilityLabel={showPasswords ? 'Hide passwords' : 'Show passwords'}
+                        accessibilityLabel={showPasswords ? t('hidePasswords') : t('showPasswords')}
                       >
                         <Ionicons
                           name={showPasswords ? 'eye-off-outline' : 'eye-outline'}
                           size={20}
-                          color={colors.gray400}
+                          color={themeColors.textSecondary}
                         />
                       </TouchableOpacity>
                     </View>
                   </View>
 
                   <View style={styles.inputGroup}>
-                    <Text maxFontSizeMultiplier={1.5} style={styles.label}>Confirm New Password</Text>
+                    <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('confirmNewPasswordLabel')}</Text>
                     <View style={styles.inputContainer}>
                       <TextInput
                         style={styles.input}
                         value={confirmPassword}
                         onChangeText={setConfirmPassword}
-                        placeholder="Confirm new password"
-                        placeholderTextColor={colors.gray500}
+                        placeholder={t('confirmNewPasswordPlaceholder')}
+                        placeholderTextColor={themeColors.textMuted}
                         secureTextEntry={!showPasswords}
                         autoComplete="new-password"
-                        accessibilityLabel="Confirm new password"
+                        accessibilityLabel={t('confirmNewPasswordAccessibilityLabel')}
                       />
                     </View>
                   </View>
@@ -199,16 +186,16 @@ export function ResetPasswordScreen() {
                     disabled={loading || !token}
                     activeOpacity={0.8}
                     accessibilityRole="button"
-                    accessibilityLabel={loading ? 'Resetting password' : 'Reset password'}
+                    accessibilityLabel={loading ? t('resettingPasswordAccessibilityLabel') : t('resetPasswordAccessibilityLabel')}
                     accessibilityState={{ disabled: loading || !token, busy: loading }}
                   >
                     {loading ? (
                       <View style={styles.buttonContent}>
-                        <ActivityIndicator color={colors.text} size="small" accessibilityLabel="Resetting password" />
-                        <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>Resetting...</Text>
+                        <ActivityIndicator color={themeColors.text} size="small" accessibilityLabel={t('resettingPasswordAccessibilityLabel')} />
+                        <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>{t('resettingButton')}</Text>
                       </View>
                     ) : (
-                      <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>Reset password</Text>
+                      <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>{t('resetPasswordButton')}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -216,22 +203,23 @@ export function ResetPasswordScreen() {
 
               {/* Footer */}
               <View style={styles.footer}>
-                <Text maxFontSizeMultiplier={1.5} style={styles.footerText}>Remember your password? </Text>
-                <TouchableOpacity onPress={() => navigation.navigate('Login')} accessibilityRole="link" accessibilityLabel="Back to login">
-                  <Text maxFontSizeMultiplier={1.3} style={styles.footerLink}>Back to login</Text>
+                <Text maxFontSizeMultiplier={1.5} style={styles.footerText}>{t('rememberPassword')}</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Login')} accessibilityRole="link" accessibilityLabel={t('backToLoginAccessibilityLabel')}>
+                  <Text maxFontSizeMultiplier={1.3} style={styles.footerLink}>{t('backToLoginLink')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
-const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
-  gradient: {
+const createStyles = (themeColors: { background: string; card: string; border: string; inputBackground: string; inputBorder: string; [key: string]: any }) => StyleSheet.create({
+  screenBackground: {
     flex: 1,
+    backgroundColor: themeColors.background,
   },
   container: {
     flex: 1,
@@ -257,23 +245,22 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
   title: {
     fontSize: 28,
     fontFamily: fonts.bold,
-    color: colors.text,
+    color: themeColors.text,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 15,
     fontFamily: fonts.regular,
-    color: colors.gray400,
+    color: themeColors.textSecondary,
     marginTop: 6,
     textAlign: 'center',
   },
   card: {
-    backgroundColor: glassColors.backgroundElevated,
-    borderRadius: 24,
+    backgroundColor: themeColors.card,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: glassColors.border,
+    borderColor: themeColors.border,
     padding: 24,
-    ...shadows.lg,
   },
   errorContainer: {
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -286,7 +273,7 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
   errorText: {
     fontSize: 14,
     fontFamily: fonts.medium,
-    color: colors.error,
+    color: themeColors.error,
   },
   form: {
     gap: 20,
@@ -297,15 +284,15 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
   label: {
     fontSize: 14,
     fontFamily: fonts.medium,
-    color: colors.gray300,
+    color: themeColors.textSecondary,
     marginLeft: 4,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: glassColors.background,
+    backgroundColor: themeColors.inputBackground,
     borderWidth: 1,
-    borderColor: glassColors.border,
+    borderColor: themeColors.inputBorder,
     borderRadius: 16,
   },
   input: {
@@ -314,7 +301,7 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
     paddingVertical: 14,
     fontSize: 16,
     fontFamily: fonts.regular,
-    color: colors.text,
+    color: themeColors.text,
   },
   passwordInput: {
     paddingRight: 48,
@@ -325,13 +312,13 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
     padding: 8,
   },
   button: {
-    backgroundColor: colors.primary,
+    backgroundColor: themeColors.primary,
     borderRadius: 20,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 8,
     ...shadows.md,
-    shadowColor: colors.primary,
+    shadowColor: themeColors.primary,
     shadowOpacity: 0.3,
   },
   buttonDisabled: {
@@ -355,12 +342,12 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
   footerText: {
     fontSize: 14,
     fontFamily: fonts.regular,
-    color: colors.gray500,
+    color: themeColors.textMuted,
   },
   footerLink: {
     fontSize: 14,
     fontFamily: fonts.semiBold,
-    color: colors.primary,
+    color: themeColors.primary,
   },
   // Success styles
   successIcon: {
@@ -375,19 +362,19 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
   },
   successIconText: {
     fontSize: 32,
-    color: colors.success,
+    color: themeColors.success,
   },
   successTitle: {
     fontSize: 24,
     fontFamily: fonts.bold,
-    color: colors.text,
+    color: themeColors.text,
     textAlign: 'center',
     marginBottom: 8,
   },
   successSubtitle: {
     fontSize: 15,
     fontFamily: fonts.regular,
-    color: colors.gray400,
+    color: themeColors.textSecondary,
     textAlign: 'center',
     marginBottom: 24,
   },

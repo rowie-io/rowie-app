@@ -16,7 +16,6 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Constants from 'expo-constants';
 
 // Conditionally import DraggableFlatList - uses reanimated which crashes in Expo Go
@@ -61,6 +60,7 @@ import {
   LibraryProduct,
 } from '../lib/api';
 import { formatCents } from '../utils/currency';
+import { useTranslations } from '../lib/i18n';
 import { openVendorDashboard } from '../lib/auth-handoff';
 import { SetupRequired } from '../components/SetupRequired';
 import { ProductModal } from '../components/ProductModal';
@@ -68,8 +68,10 @@ import { CategoryManagerModal } from '../components/CategoryManagerModal';
 import { CatalogSettingsModal } from '../components/CatalogSettingsModal';
 import { ItemNotesModal } from '../components/ItemNotesModal';
 import { QuickChargeBottomSheet } from '../components/QuickChargeBottomSheet';
-import { glass } from '../lib/colors';
 import { shadows } from '../lib/shadows';
+import { fonts } from '../lib/fonts';
+import { brandGradient, brandGradientLight } from '../lib/colors';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTapToPayGuard } from '../hooks';
 
 const isWeb = Platform.OS === 'web';
@@ -77,7 +79,6 @@ const isWeb = Platform.OS === 'web';
 // Empty state for menu screen
 function EmptyMenuState({
   colors,
-  isDark,
   searchQuery,
   isEditMode,
   canManage,
@@ -87,7 +88,6 @@ function EmptyMenuState({
   onOpenVendorPortal,
 }: {
   colors: any;
-  isDark: boolean;
   searchQuery: string;
   isEditMode: boolean;
   canManage: boolean;
@@ -96,6 +96,7 @@ function EmptyMenuState({
   onAddProduct: () => void;
   onOpenVendorPortal: () => void;
 }) {
+  const t = useTranslations('menu');
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -108,99 +109,70 @@ function EmptyMenuState({
 
   return (
     <Animated.View style={[emptyMenuStyles.container, { backgroundColor: colors.background, opacity: fadeAnim }]}>
-      {/* Background layer - subtle gradient overlay */}
-      <View style={[StyleSheet.absoluteFill, { zIndex: 0 }]} pointerEvents="none">
-        <LinearGradient
-          colors={isDark
-            ? ['transparent', 'rgba(245,158,11, 0.08)', 'rgba(245,158,11, 0.05)', 'transparent']
-            : ['transparent', 'rgba(245,158,11, 0.05)', 'rgba(245,158,11, 0.03)', 'transparent']
-          }
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={StyleSheet.absoluteFill}
-        />
-      </View>
-
-      {/* Content rendered on top */}
-      <View style={[emptyMenuStyles.content, { zIndex: 1 }]}>
+      <View style={emptyMenuStyles.content}>
         {searchQuery.trim() ? (
           // No search results
           <>
-            <View style={[emptyMenuStyles.iconContainer, {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.1)',
-              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.15)'
-            }]}>
-              <Ionicons name="search-outline" size={44} color={isDark ? 'rgba(255,255,255,0.95)' : colors.primary} />
-            </View>
-            <Text maxFontSizeMultiplier={1.2} style={[emptyMenuStyles.title, { color: isDark ? '#fff' : colors.text }]}>
-              No products found
+            <Ionicons name="search-outline" size={44} color={colors.textMuted} style={emptyMenuStyles.icon} />
+            <Text maxFontSizeMultiplier={1.2} style={[emptyMenuStyles.title, { color: colors.text, fontFamily: fonts.semiBold }]}>
+              {t('noProductsFound')}
             </Text>
-            <Text maxFontSizeMultiplier={1.5} style={[emptyMenuStyles.subtitle, { color: isDark ? 'rgba(255,255,255,0.55)' : colors.textSecondary }]}>
-              Try a different search term
+            <Text maxFontSizeMultiplier={1.5} style={[emptyMenuStyles.subtitle, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
+              {t('tryDifferentSearch')}
             </Text>
             <TouchableOpacity
-              style={[emptyMenuStyles.actionButton, { borderColor: colors.primary }]}
+              style={[emptyMenuStyles.primaryButton, { backgroundColor: colors.primary }]}
               onPress={onClearSearch}
               accessibilityRole="button"
-              accessibilityLabel="Clear search"
+              accessibilityLabel={t('clearSearchAccessibilityLabel')}
             >
-              <Text maxFontSizeMultiplier={1.3} style={[emptyMenuStyles.actionButtonText, { color: colors.primary }]}>
-                Clear Search
+              <Text maxFontSizeMultiplier={1.3} style={[emptyMenuStyles.primaryButtonText, { fontFamily: fonts.semiBold }]}>
+                {t('clearSearchButton')}
               </Text>
             </TouchableOpacity>
           </>
         ) : isEditMode ? (
           // Empty catalog in edit mode
           <>
-            <View style={[emptyMenuStyles.iconContainer, {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.1)',
-              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.15)'
-            }]}>
-              <Ionicons name="cube-outline" size={44} color={isDark ? 'rgba(255,255,255,0.95)' : colors.primary} />
-            </View>
-            <Text maxFontSizeMultiplier={1.2} style={[emptyMenuStyles.title, { color: isDark ? '#fff' : colors.text }]}>
-              No products yet
+            <Ionicons name="cube-outline" size={44} color={colors.textMuted} style={emptyMenuStyles.icon} />
+            <Text maxFontSizeMultiplier={1.2} style={[emptyMenuStyles.title, { color: colors.text, fontFamily: fonts.semiBold }]}>
+              {t('noProductsYet')}
             </Text>
-            <Text maxFontSizeMultiplier={1.5} style={[emptyMenuStyles.subtitle, { color: isDark ? 'rgba(255,255,255,0.55)' : colors.textSecondary }]}>
-              Add your first product to this catalog
+            <Text maxFontSizeMultiplier={1.5} style={[emptyMenuStyles.subtitle, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
+              {t('addFirstProduct')}
             </Text>
             <TouchableOpacity
               style={[emptyMenuStyles.primaryButton, { backgroundColor: colors.primary }]}
               onPress={onAddProduct}
               accessibilityRole="button"
-              accessibilityLabel="Add product"
+              accessibilityLabel={t('addProductAccessibilityLabel')}
             >
               <Ionicons name="add" size={20} color="#fff" />
-              <Text maxFontSizeMultiplier={1.3} style={emptyMenuStyles.primaryButtonText}>Add Product</Text>
+              <Text maxFontSizeMultiplier={1.3} style={[emptyMenuStyles.primaryButtonText, { fontFamily: fonts.semiBold }]}>{t('addProductButton')}</Text>
             </TouchableOpacity>
           </>
         ) : (
           // No products in catalog (view mode)
           <>
-            <View style={[emptyMenuStyles.iconContainer, {
-              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.1)',
-              borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.15)'
-            }]}>
-              <Ionicons name="cube-outline" size={44} color={isDark ? 'rgba(255,255,255,0.95)' : colors.primary} />
-            </View>
-            <Text maxFontSizeMultiplier={1.2} style={[emptyMenuStyles.title, { color: isDark ? '#fff' : colors.text }]}>
-              No products available
+            <Ionicons name="cube-outline" size={44} color={colors.textMuted} style={emptyMenuStyles.icon} />
+            <Text maxFontSizeMultiplier={1.2} style={[emptyMenuStyles.title, { color: colors.text, fontFamily: fonts.semiBold }]}>
+              {t('noProductsAvailable')}
             </Text>
-            <Text maxFontSizeMultiplier={1.5} style={[emptyMenuStyles.subtitle, { color: isDark ? 'rgba(255,255,255,0.55)' : colors.textSecondary }]}>
+            <Text maxFontSizeMultiplier={1.5} style={[emptyMenuStyles.subtitle, { color: colors.textSecondary, fontFamily: fonts.regular }]}>
               {canManage
-                ? 'Tap the edit button to add products to this menu'
-                : 'Ask your manager to add products to this menu'}
+                ? t('emptyManagerHint')
+                : t('emptyStaffHint')}
             </Text>
             {canManage && (
               <TouchableOpacity
                 style={[emptyMenuStyles.primaryButton, { backgroundColor: colors.primary }]}
                 onPress={onStartEditing}
                 accessibilityRole="button"
-                accessibilityLabel="Start editing"
-                accessibilityHint="Enter edit mode to add products to this menu"
+                accessibilityLabel={t('startEditingAccessibilityLabel')}
+                accessibilityHint={t('startEditingAccessibilityHint')}
               >
                 <Ionicons name="pencil" size={18} color="#fff" />
-                <Text maxFontSizeMultiplier={1.3} style={emptyMenuStyles.primaryButtonText}>Start Editing</Text>
+                <Text maxFontSizeMultiplier={1.3} style={[emptyMenuStyles.primaryButtonText, { fontFamily: fonts.semiBold }]}>{t('startEditingButton')}</Text>
               </TouchableOpacity>
             )}
           </>
@@ -213,48 +185,27 @@ function EmptyMenuState({
 const emptyMenuStyles = StyleSheet.create({
   container: {
     flex: 1,
-    position: 'relative',
-    overflow: 'hidden',
   },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
-    zIndex: 10,
+    paddingBottom: 100,
   },
-  iconContainer: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
+  icon: {
+    marginBottom: 16,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 18,
     textAlign: 'center',
     marginBottom: 8,
-    letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 16,
-    fontWeight: '400',
+    fontSize: 15,
     textAlign: 'center',
     lineHeight: 22,
     marginBottom: 24,
-  },
-  actionButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
   },
   primaryButton: {
     flexDirection: 'row',
@@ -266,7 +217,6 @@ const emptyMenuStyles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 16,
-    fontWeight: '600',
     color: '#fff',
   },
 });
@@ -275,15 +225,33 @@ const emptyMenuStyles = StyleSheet.create({
 const GRID_PADDING = 16; // Padding on left and right of the list
 const GRID_GAP = 12; // Gap between cards
 
+// Map legacy layout types from API to new types
+const normalizeLegacyLayout = (layoutType: string): CatalogLayoutType => {
+  switch (layoutType) {
+    case 'grid': return 'classic-grid';
+    case 'large-grid': return 'cards';
+    case 'magazine': return 'split-view';
+    default: return layoutType as CatalogLayoutType;
+  }
+};
+
 const getLayoutConfig = (layoutType: CatalogLayoutType, screenWidth: number) => {
   switch (layoutType) {
+    case 'split-view':
+      return { numColumns: 1, cardWidth: screenWidth - (GRID_PADDING * 2) }; // Split view: category sidebar + products
     case 'list':
-      return { numColumns: 1, cardWidth: screenWidth - (GRID_PADDING * 2) }; // Full width minus padding
-    case 'large-grid':
-      return { numColumns: 1, cardWidth: screenWidth - (GRID_PADDING * 2) }; // Single column large tiles
+      return { numColumns: 1, cardWidth: screenWidth - (GRID_PADDING * 2) }; // Full width horizontal cards
+    case 'cards':
+      return { numColumns: 1, cardWidth: screenWidth - (GRID_PADDING * 2) }; // Single column large cards
+    case 'mosaic': {
+      const numColumns = 2;
+      const totalGaps = (numColumns - 1) * GRID_GAP;
+      const cardWidth = (screenWidth - (GRID_PADDING * 2) - totalGaps) / numColumns;
+      return { numColumns, cardWidth };
+    }
     case 'compact':
       return { numColumns: 1, cardWidth: screenWidth - (GRID_PADDING * 2) }; // Minimal text-based list
-    case 'grid':
+    case 'classic-grid':
     default:
       // Responsive grid configuration
       if (isWeb && screenWidth >= 1024) {
@@ -297,7 +265,6 @@ const getLayoutConfig = (layoutType: CatalogLayoutType, screenWidth: number) => 
         return { numColumns, cardWidth };
       }
       // Mobile: 2 columns
-      // Available width = screenWidth - (padding left + padding right) - gap between cards
       const numColumns = 2;
       const totalGaps = (numColumns - 1) * GRID_GAP;
       const cardWidth = (screenWidth - (GRID_PADDING * 2) - totalGaps) / numColumns;
@@ -312,33 +279,16 @@ interface CategoryPillProps {
   isActive: boolean;
   onPress: () => void;
   colors: any;
-  glassColors: typeof glass.dark;
+  isDark?: boolean;
 }
 
-const CategoryPill = memo(function CategoryPill({ label, count, isActive, onPress, colors, glassColors }: CategoryPillProps) {
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.7}
-      accessibilityRole="button"
-      accessibilityLabel={`${label} category${count !== undefined && count > 0 ? `, ${count} products` : ''}`}
-      accessibilityState={{ selected: isActive }}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 12,
-        paddingHorizontal: 18,
-        borderRadius: 12,
-        backgroundColor: isActive ? colors.primary : glassColors.backgroundElevated,
-        borderWidth: 1,
-        borderColor: isActive ? colors.primary : glassColors.border,
-      }}
-    >
+const CategoryPill = memo(function CategoryPill({ label, count, isActive, onPress, colors, isDark = true }: CategoryPillProps) {
+  const t = useTranslations('menu');
+  const pillContent = (
+    <>
       <Text maxFontSizeMultiplier={1.3} style={{
         fontSize: 14,
-        fontWeight: isActive ? '600' : '500',
+        fontFamily: isActive ? fonts.semiBold : fonts.medium,
         color: isActive ? '#fff' : colors.textSecondary,
       }}>
         {label}
@@ -348,17 +298,52 @@ const CategoryPill = memo(function CategoryPill({ label, count, isActive, onPres
           paddingHorizontal: 7,
           paddingVertical: 2,
           borderRadius: 10,
-          backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : colors.primary + '20',
+          backgroundColor: isActive ? 'rgba(255,255,255,0.25)' : colors.chipBg,
           minWidth: 22,
           alignItems: 'center',
         }}>
           <Text maxFontSizeMultiplier={1.3} style={{
             fontSize: 12,
-            fontWeight: '600',
-            color: isActive ? '#fff' : colors.primary,
+            fontFamily: fonts.semiBold,
+            color: isActive ? '#fff' : colors.textMuted,
           }}>
             {count}
           </Text>
+        </View>
+      )}
+    </>
+  );
+
+  const pillStyle = {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={count !== undefined && count > 0 ? t('categoryAccessibilityLabelWithCount', { label, count }) : t('categoryAccessibilityLabel', { label })}
+      accessibilityState={{ selected: isActive }}
+    >
+      {isActive ? (
+        <LinearGradient
+          colors={isDark ? brandGradient : brandGradientLight}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={pillStyle}
+        >
+          {pillContent}
+        </LinearGradient>
+      ) : (
+        <View style={[pillStyle, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}>
+          {pillContent}
         </View>
       )}
     </TouchableOpacity>
@@ -424,12 +409,13 @@ const canManageCatalog = (role: string | undefined): boolean => {
 };
 
 export function MenuScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
+  const t = useTranslations('menu');
+  const tc = useTranslations('common');
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
-  const glassColors = isDark ? glass.dark : glass.light;
-  const { isLoading: authLoading, user, completeOnboarding, subscription, currency } = useAuth();
+  const { isLoading: authLoading, user, completeOnboarding, subscription, currency, isPaymentReady } = useAuth();
   const { selectedCatalog, catalogs, isLoading: catalogsLoading, refreshCatalogs, setSelectedCatalog } = useCatalog();
   const { addItem, getItemQuantity, decrementItem, itemCount, subtotal } = useCart();
   const { guardCheckout } = useTapToPayGuard();
@@ -800,12 +786,12 @@ export function MenuScreen() {
 
   const handleDeleteProduct = (product: Product) => {
     Alert.alert(
-      'Remove Product',
-      `Remove "${product.name}" from this menu? The product will remain in your library.`,
+      t('removeProductTitle'),
+      t('removeProductMessage', { name: product.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: tc('cancel'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('removeButton'),
           style: 'destructive',
           onPress: async () => {
             if (!selectedCatalog) return;
@@ -815,7 +801,7 @@ export function MenuScreen() {
                 catalogProductId: product.id,
               });
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to remove product');
+              Alert.alert(t('errorTitle'), error.message || t('failedToRemoveProduct'));
             }
           },
         },
@@ -850,7 +836,7 @@ export function MenuScreen() {
 
   const handleSaveCatalog = async (data: UpdateCatalogData) => {
     if (!selectedCatalog) {
-      throw new Error('No menu selected');
+      throw new Error(t('noMenuSelectedError'));
     }
     await updateCatalogMutation.mutateAsync({
       catalogId: selectedCatalog.id,
@@ -903,12 +889,12 @@ export function MenuScreen() {
     if (!selectedCatalog || selectedProducts.size === 0) return;
 
     Alert.alert(
-      'Delete Products',
-      `Are you sure you want to remove ${selectedProducts.size} product(s) from this menu?`,
+      t('deleteProductsTitle'),
+      t('deleteProductsMessage', { count: selectedProducts.size }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: tc('cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: tc('delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -925,7 +911,7 @@ export function MenuScreen() {
               setSelectedProducts(new Set());
               setIsSelectionMode(false);
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to delete products');
+              Alert.alert(t('errorTitle'), error.message || t('failedToDeleteProducts'));
             }
           },
         },
@@ -951,7 +937,7 @@ export function MenuScreen() {
       setSelectedProducts(new Set());
       setIsSelectionMode(false);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update products');
+      Alert.alert(t('errorTitle'), error.message || t('failedToUpdateProducts'));
     }
   };
 
@@ -977,7 +963,7 @@ export function MenuScreen() {
     } catch (error: any) {
       // Revert on error by refetching
       queryClient.invalidateQueries({ queryKey: ['products', selectedCatalog.id] });
-      Alert.alert('Error', error.message || 'Failed to reorder products');
+      Alert.alert(t('errorTitle'), error.message || t('failedToReorderProducts'));
     }
   }, [selectedCatalog, queryClient, reorderProductsMutation]);
 
@@ -1036,8 +1022,9 @@ export function MenuScreen() {
   }, [products, isEditMode]);
 
   // Get the layout type from the catalog (layout is per-catalog, not per-category)
+  // Map legacy values ('grid' -> 'classic-grid', 'large-grid' -> 'cards')
   const currentLayoutType: CatalogLayoutType = useMemo(() => {
-    return selectedCatalog?.layoutType || 'grid';
+    return normalizeLegacyLayout(selectedCatalog?.layoutType || 'classic-grid');
   }, [selectedCatalog]);
 
   // Get layout configuration for current layout type (responsive to screen width changes)
@@ -1075,10 +1062,151 @@ export function MenuScreen() {
     setNotesProduct(null);
   };
 
-  const styles = createStyles(colors, glassColors, cardWidth, currentLayoutType, isEditMode);
+  const styles = createStyles(colors, cardWidth, currentLayoutType, isEditMode, screenWidth);
 
-  // Check if current layout supports drag-and-drop (single column layouts)
-  const supportsDragAndDrop = numColumns === 1 && isEditMode && !isSelectionMode;
+  // Check if current layout supports drag-and-drop (single column layouts, not magazine which uses ScrollView)
+  const supportsDragAndDrop = numColumns === 1 && currentLayoutType !== 'split-view' && isEditMode && !isSelectionMode;
+
+  // Helper: build common accessibility label for a product
+  const getProductAccessibilityLabel = (item: Product, quantity: number, isInactive: boolean) => {
+    if (isInactive && isEditMode) return t('listAccessibilityLabelHidden', { name: item.name, price: formatCents(item.price, currency) });
+    if (quantity > 0) return t('listAccessibilityLabelWithQuantity', { name: item.name, price: formatCents(item.price, currency), quantity });
+    return t('listAccessibilityLabel', { name: item.name, price: formatCents(item.price, currency) });
+  };
+
+  // Helper: render standard quantity controls (increment/decrement/badge)
+  const renderQuantityControls = (
+    item: Product,
+    quantity: number,
+    decrementStyle: object,
+    incrementStyle: object,
+    badgeStyle: object,
+    textStyle: object,
+    decrementIconSize: number,
+    incrementIconSize: number,
+  ) => {
+    if (isEditMode || isSelectionMode) return null;
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+        {quantity > 0 ? (
+          <>
+            <TouchableOpacity
+              style={decrementStyle}
+              onPress={() => decrementItem(item.id)}
+              accessibilityRole="button"
+              accessibilityLabel={t('removeOneFromCart', { name: item.name })}
+            >
+              <Ionicons name="remove" size={decrementIconSize} color="#fff" />
+            </TouchableOpacity>
+            <View style={badgeStyle} accessibilityLabel={t('inCartAccessibilityLabel', { quantity })}>
+              <Text maxFontSizeMultiplier={1.5} style={textStyle}>{quantity}</Text>
+            </View>
+            <TouchableOpacity
+              style={incrementStyle}
+              onPress={() => handleAddToCart(item)}
+              accessibilityRole="button"
+              accessibilityLabel={t('addOneMoreToCart', { name: item.name })}
+            >
+              <Ionicons name="add" size={incrementIconSize} color="#fff" />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity
+            style={incrementStyle}
+            onPress={() => handleAddToCart(item)}
+            accessibilityRole="button"
+            accessibilityLabel={t('addToCart', { name: item.name })}
+          >
+            <Ionicons name="add" size={incrementIconSize} color="#fff" />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
+  // Helper: render edit overlay (edit + delete buttons)
+  const renderEditOverlay = (item: Product) => {
+    if (!isEditMode || isSelectionMode) return null;
+    return (
+      <View style={styles.editOverlay}>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => handleOpenProductModal(item)}
+          accessibilityRole="button"
+          accessibilityLabel={t('editAccessibilityLabel', { name: item.name })}
+        >
+          <Ionicons name="pencil" size={18} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDeleteProduct(item)}
+          accessibilityRole="button"
+          accessibilityLabel={t('deleteAccessibilityLabel', { name: item.name })}
+        >
+          <Ionicons name="trash-outline" size={18} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // Helper: render inactive badge
+  const renderInactiveBadge = (item: Product) => {
+    if (!(!item.isActive && isEditMode)) return null;
+    return (
+      <View style={styles.inactiveBadge}>
+        <Text maxFontSizeMultiplier={1.5} style={styles.inactiveBadgeText}>{t('hiddenBadge')}</Text>
+      </View>
+    );
+  };
+
+  // Helper: render selection checkbox
+  const renderSelectionCheckbox = (item: Product) => {
+    if (!isSelectionMode) return null;
+    const isSelected = selectedProducts.has(item.id);
+    return (
+      <TouchableOpacity
+        style={styles.selectionCheckbox}
+        onPress={() => toggleProductSelection(item.id)}
+        accessibilityRole="checkbox"
+        accessibilityLabel={t('selectAccessibilityLabel', { name: item.name })}
+        accessibilityState={{ checked: isSelected }}
+      >
+        <View style={[styles.checkboxCircle, isSelected && styles.checkboxCircleSelected]}>
+          {isSelected && <Ionicons name="checkmark" size={16} color="#fff" />}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Helper: render drag handle
+  const renderDragHandle = (item: Product, drag: () => void) => {
+    if (!supportsDragAndDrop) return null;
+    return (
+      <Pressable
+        style={styles.dragHandle}
+        onLongPress={() => { drag(); }}
+        delayLongPress={150}
+        accessibilityRole="button"
+        accessibilityLabel={t('reorderAccessibilityLabel', { name: item.name })}
+        accessibilityHint={t('reorderAccessibilityHint')}
+      >
+        <Ionicons name="reorder-three" size={22} color={colors.textMuted} />
+      </Pressable>
+    );
+  };
+
+  // Split View layout: group products by category for sidebar display
+  // On phones (<768px), this renders as classic-grid with always-visible category pills
+  // On tablets (>=768px), categories render as a left sidebar with products on the right
+  const splitViewCategories = useMemo(() => {
+    if (currentLayoutType !== 'split-view') return [];
+    const cats = categories || [];
+    // Add "All" as first option
+    return [{ id: null, name: t('allProducts') || 'All' }, ...cats.filter(c => c.isActive)];
+  }, [currentLayoutType, categories, t]);
+
+  // Split View: selected category in sidebar (null = all)
+  const [splitViewSelectedCat, setSplitViewSelectedCat] = useState<string | null>(null);
 
   // Render product card based on layout type
   const renderProduct = ({ item, drag, isActive: isDragging }: RenderItemParams<Product>) => {
@@ -1095,67 +1223,60 @@ export function MenuScreen() {
       }
     };
 
-    // Drag handle for single-column layouts in edit mode
-    const dragHandle = supportsDragAndDrop ? (
-      <Pressable
-        style={styles.dragHandle}
-        onLongPress={() => {
-          drag();
-        }}
-        delayLongPress={150}
-        accessibilityRole="button"
-        accessibilityLabel={`Reorder ${item.name}`}
-        accessibilityHint="Long press and drag to reorder"
-      >
-        <Ionicons name="reorder-three" size={22} color={colors.textMuted} />
-      </Pressable>
-    ) : null;
-
-    // Selection checkbox (only show when in selection mode)
-    const selectionCheckbox = isSelectionMode ? (
-      <TouchableOpacity
-        style={styles.selectionCheckbox}
-        onPress={() => toggleProductSelection(item.id)}
-        accessibilityRole="checkbox"
-        accessibilityLabel={`Select ${item.name}`}
-        accessibilityState={{ checked: isSelected }}
-      >
-        <View style={[styles.checkboxCircle, isSelected && styles.checkboxCircleSelected]}>
-          {isSelected && <Ionicons name="checkmark" size={16} color="#fff" />}
-        </View>
-      </TouchableOpacity>
-    ) : null;
-
-    // Edit mode overlay (only show when in edit mode but not selection mode)
-    const editOverlay = isEditMode && !isSelectionMode ? (
-      <View style={styles.editOverlay}>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => handleOpenProductModal(item)}
-          accessibilityRole="button"
-          accessibilityLabel={`Edit ${item.name}`}
+    // =========================================================================
+    // Classic Grid (was "grid") - square image, name, price, round add button
+    // =========================================================================
+    if (currentLayoutType === 'classic-grid') {
+      return (
+        <AnimatedPressable
+          style={[
+            styles.productCard,
+            isInactive && isEditMode && styles.cardInactive,
+            isSelected && styles.cardSelected,
+          ]}
+          onPress={handlePress}
+          onLongPress={() => undefined}
+          accessibilityLabel={getProductAccessibilityLabel(item, quantity, isInactive)}
+          accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
         >
-          <Ionicons name="pencil" size={18} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteProduct(item)}
-          accessibilityRole="button"
-          accessibilityLabel={`Delete ${item.name}`}
-        >
-          <Ionicons name="trash-outline" size={18} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    ) : null;
+          {renderSelectionCheckbox(item)}
+          <View style={styles.productImageContainer}>
+            {item.imageUrl ? (
+              <Image source={{ uri: item.imageUrl }} style={styles.productImage} />
+            ) : (
+              <View style={styles.productImagePlaceholder}>
+                <Ionicons name="image-outline" size={32} color={colors.textMuted} />
+              </View>
+            )}
+            {renderInactiveBadge(item)}
+            {renderEditOverlay(item)}
+          </View>
+          <View style={styles.productInfo}>
+            <Text maxFontSizeMultiplier={1.5} style={styles.productName} numberOfLines={2}>
+              {item.name}
+            </Text>
+            <View style={styles.productPriceRow}>
+              <Text maxFontSizeMultiplier={1.3} style={styles.productPrice}>
+                {formatCents(item.price, currency)}
+              </Text>
+              {renderQuantityControls(
+                item, quantity,
+                styles.quantityDecrementButton, styles.quantityIncrementButton,
+                styles.quantityBadge, styles.quantityText,
+                14, 14,
+              )}
+            </View>
+          </View>
+        </AnimatedPressable>
+      );
+    }
 
-    // Inactive badge
-    const inactiveBadge = isInactive && isEditMode ? (
-      <View style={styles.inactiveBadge}>
-        <Text maxFontSizeMultiplier={1.5} style={styles.inactiveBadgeText}>Hidden</Text>
-      </View>
-    ) : null;
+    // Split View uses the classic-grid card rendering via the FlatList above.
+    // No special branch needed — it falls through to the default grid card below.
 
-    // List layout - horizontal card with image on left
+    // =========================================================================
+    // List - horizontal card with image on left, name/desc/price on right
+    // =========================================================================
     if (currentLayoutType === 'list') {
       const listContent = (
         <AnimatedPressable
@@ -1166,12 +1287,12 @@ export function MenuScreen() {
             isDragging && styles.cardDragging,
           ]}
           onPress={handlePress}
-          onLongPress={supportsDragAndDrop ? undefined : () => undefined /* handleProductLongPress(item) - COMMENTED FOR DEBUGGING */}
-          accessibilityLabel={`${item.name}, ${formatCents(item.price, currency)}${quantity > 0 ? `, ${quantity} in cart` : ''}${isInactive && isEditMode ? ', hidden' : ''}`}
-          accessibilityHint={isEditMode ? 'Tap to edit product' : 'Tap to add to cart'}
+          onLongPress={supportsDragAndDrop ? undefined : () => undefined}
+          accessibilityLabel={getProductAccessibilityLabel(item, quantity, isInactive)}
+          accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
         >
-          {dragHandle}
-          {selectionCheckbox}
+          {renderDragHandle(item, drag)}
+          {renderSelectionCheckbox(item)}
           <View style={styles.listImageContainer}>
             {item.imageUrl ? (
               <Image source={{ uri: item.imageUrl }} style={styles.listImage} />
@@ -1180,48 +1301,18 @@ export function MenuScreen() {
                 <Ionicons name="image-outline" size={24} color={colors.textMuted} />
               </View>
             )}
-            {inactiveBadge}
+            {renderInactiveBadge(item)}
           </View>
           <View style={styles.listInfo}>
             <View style={styles.listTitleRow}>
               <Text maxFontSizeMultiplier={1.5} style={styles.listName} numberOfLines={2}>
                 {item.name}
               </Text>
-              {isSelectionMode ? null : isEditMode ? null : (
-                <View style={styles.listQuantityControls}>
-                  {quantity > 0 ? (
-                    <>
-                      <TouchableOpacity
-                        style={styles.listQuantityDecrementButton}
-                        onPress={() => decrementItem(item.id)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Remove one ${item.name} from cart`}
-                      >
-                        <Ionicons name="remove" size={14} color="#fff" />
-                      </TouchableOpacity>
-                      <View style={styles.listQuantityBadge} accessibilityLabel={`${quantity} in cart`}>
-                        <Text maxFontSizeMultiplier={1.5} style={styles.quantityText}>{quantity}</Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.listQuantityIncrementButton}
-                        onPress={() => handleAddToCart(item)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Add one more ${item.name} to cart`}
-                      >
-                        <Ionicons name="add" size={14} color="#fff" />
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.listQuantityIncrementButton}
-                      onPress={() => handleAddToCart(item)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Add ${item.name} to cart`}
-                    >
-                      <Ionicons name="add" size={14} color="#fff" />
-                    </TouchableOpacity>
-                  )}
-                </View>
+              {renderQuantityControls(
+                item, quantity,
+                styles.listQuantityDecrementButton, styles.listQuantityIncrementButton,
+                styles.listQuantityBadge, styles.quantityText,
+                14, 14,
               )}
             </View>
             {item.description ? (
@@ -1233,7 +1324,7 @@ export function MenuScreen() {
               {formatCents(item.price, currency)}
             </Text>
           </View>
-          {isSelectionMode ? null : isEditMode ? editOverlay : null}
+          {isSelectionMode ? null : isEditMode ? renderEditOverlay(item) : null}
         </AnimatedPressable>
       );
       return supportsDragAndDrop ? (
@@ -1241,95 +1332,137 @@ export function MenuScreen() {
       ) : listContent;
     }
 
-    // Large grid layout - single column large tiles
-    if (currentLayoutType === 'large-grid') {
-      const largeContent = (
+    // =========================================================================
+    // Cards (was "large-grid") - single column, large 3:2 image, generous info area
+    // =========================================================================
+    if (currentLayoutType === 'cards') {
+      const cardsContent = (
         <AnimatedPressable
           style={[
-            styles.largeCard,
+            styles.cardsCard,
             isInactive && isEditMode && styles.cardInactive,
             isSelected && styles.cardSelected,
             isDragging && styles.cardDragging,
           ]}
           onPress={handlePress}
-          onLongPress={supportsDragAndDrop ? undefined : () => undefined /* handleProductLongPress(item) - COMMENTED FOR DEBUGGING */}
-          accessibilityLabel={`${item.name}, ${formatCents(item.price, currency)}${quantity > 0 ? `, ${quantity} in cart` : ''}${isInactive && isEditMode ? ', hidden' : ''}`}
-          accessibilityHint={isEditMode ? 'Tap to edit product' : 'Tap to add to cart'}
+          onLongPress={supportsDragAndDrop ? undefined : () => undefined}
+          accessibilityLabel={getProductAccessibilityLabel(item, quantity, isInactive)}
+          accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
         >
-          {dragHandle}
-          {selectionCheckbox}
-          <View style={styles.largeImageContainer}>
+          {renderDragHandle(item, drag)}
+          {renderSelectionCheckbox(item)}
+          <View style={styles.cardsImageContainer}>
             {item.imageUrl ? (
-              <Image source={{ uri: item.imageUrl }} style={styles.largeImage} />
+              <Image source={{ uri: item.imageUrl }} style={styles.cardsImage} />
             ) : (
-              <View style={styles.largeImagePlaceholder}>
+              <View style={styles.cardsImagePlaceholder}>
                 <Ionicons name="image-outline" size={48} color={colors.textMuted} />
               </View>
             )}
-            {inactiveBadge}
-            {!isSelectionMode && editOverlay}
+            {renderInactiveBadge(item)}
+            {renderEditOverlay(item)}
           </View>
-          <View style={styles.largeInfo}>
-            <View style={styles.largeTextContainer}>
-              <Text maxFontSizeMultiplier={1.3} style={styles.largeName} numberOfLines={2}>
-                {item.name}
+          <View style={styles.cardsInfo}>
+            <Text maxFontSizeMultiplier={1.3} style={styles.cardsName} numberOfLines={2}>
+              {item.name}
+            </Text>
+            {item.description ? (
+              <Text maxFontSizeMultiplier={1.5} style={styles.cardsDescription} numberOfLines={2}>
+                {item.description}
               </Text>
-              {item.description ? (
-                <Text maxFontSizeMultiplier={1.5} style={styles.largeDescription} numberOfLines={2}>
-                  {item.description}
-                </Text>
-              ) : null}
-            </View>
-            <View style={styles.largePriceRow}>
-              <Text maxFontSizeMultiplier={1.2} style={styles.largePrice}>
-                {formatCents(item.price, currency)}
-              </Text>
-              {!isEditMode && !isSelectionMode && (
-                <View style={styles.largeQuantityControls}>
-                  {quantity > 0 ? (
-                    <>
-                      <TouchableOpacity
-                        style={styles.largeQuantityDecrementButton}
-                        onPress={() => decrementItem(item.id)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Remove one ${item.name} from cart`}
-                      >
-                        <Ionicons name="remove" size={18} color="#fff" />
-                      </TouchableOpacity>
-                      <View style={styles.largeQuantityBadge} accessibilityLabel={`${quantity} in cart`}>
-                        <Text maxFontSizeMultiplier={1.3} style={styles.largeQuantityText}>{quantity}</Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.largeQuantityIncrementButton}
-                        onPress={() => handleAddToCart(item)}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Add one more ${item.name} to cart`}
-                      >
-                        <Ionicons name="add" size={18} color="#fff" />
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.largeQuantityIncrementButton}
-                      onPress={() => handleAddToCart(item)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Add ${item.name} to cart`}
-                    >
-                      <Ionicons name="add" size={18} color="#fff" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
-            </View>
+            ) : null}
+            <Text maxFontSizeMultiplier={1.2} style={styles.cardsPrice}>
+              {formatCents(item.price, currency)}
+            </Text>
+            {!isEditMode && !isSelectionMode && (
+              <TouchableOpacity
+                style={styles.cardsAddButton}
+                onPress={() => handleAddToCart(item)}
+                accessibilityRole="button"
+                accessibilityLabel={quantity > 0 ? t('addOneMoreToCart', { name: item.name }) : t('addToCart', { name: item.name })}
+              >
+                {quantity > 0 ? (
+                  <View style={styles.cardsAddButtonInner}>
+                    <Ionicons name="add" size={18} color="#fff" />
+                    <Text maxFontSizeMultiplier={1.3} style={styles.cardsAddButtonText}>
+                      {t('addOneMoreShort', { quantity })}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.cardsAddButtonInner}>
+                    <Ionicons name="add" size={18} color="#fff" />
+                    <Text maxFontSizeMultiplier={1.3} style={styles.cardsAddButtonText}>
+                      {t('addToCartShort')}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </AnimatedPressable>
       );
       return supportsDragAndDrop ? (
-        <ScaleDecorator>{largeContent}</ScaleDecorator>
-      ) : largeContent;
+        <ScaleDecorator>{cardsContent}</ScaleDecorator>
+      ) : cardsContent;
     }
 
-    // Compact layout - minimal text-based list
+    // =========================================================================
+    // Mosaic - 2 columns, alternating heights for visual variety
+    // =========================================================================
+    if (currentLayoutType === 'mosaic') {
+      const itemIndex = filteredProducts.indexOf(item);
+      const isOdd = itemIndex % 2 === 0; // First item taller (4:3), second wider (3:2)
+      const imageAspect = isOdd ? 4 / 3 : 3 / 2;
+
+      return (
+        <AnimatedPressable
+          style={[
+            styles.mosaicCard,
+            isInactive && isEditMode && styles.cardInactive,
+            isSelected && styles.cardSelected,
+          ]}
+          onPress={handlePress}
+          onLongPress={() => undefined}
+          accessibilityLabel={getProductAccessibilityLabel(item, quantity, isInactive)}
+          accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
+        >
+          {renderSelectionCheckbox(item)}
+          <View style={[styles.mosaicImageContainer, { aspectRatio: imageAspect }]}>
+            {item.imageUrl ? (
+              <Image source={{ uri: item.imageUrl }} style={styles.mosaicImage} />
+            ) : (
+              <View style={styles.mosaicImagePlaceholder}>
+                <Ionicons name="image-outline" size={32} color={colors.textMuted} />
+              </View>
+            )}
+            {/* Gradient overlay at bottom for name + price */}
+            <LinearGradient
+              colors={['transparent', 'rgba(0,0,0,0.7)']}
+              style={styles.mosaicGradient}
+            >
+              <Text maxFontSizeMultiplier={1.5} style={styles.mosaicName} numberOfLines={2}>
+                {item.name}
+              </Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.mosaicPrice}>
+                {formatCents(item.price, currency)}
+              </Text>
+            </LinearGradient>
+            {renderInactiveBadge(item)}
+            {renderEditOverlay(item)}
+            {/* Quantity badge overlay in bottom-right */}
+            {!isEditMode && !isSelectionMode && quantity > 0 && (
+              <View style={styles.mosaicQuantityBadge}>
+                <Text maxFontSizeMultiplier={1.3} style={styles.mosaicQuantityText}>{quantity}</Text>
+              </View>
+            )}
+          </View>
+        </AnimatedPressable>
+      );
+    }
+
+    // =========================================================================
+    // Compact - no images, name left, price right, controls far right
+    // =========================================================================
     if (currentLayoutType === 'compact') {
       const compactContent = (
         <AnimatedPressable
@@ -1340,9 +1473,9 @@ export function MenuScreen() {
             isDragging && styles.cardDragging,
           ]}
           onPress={handlePress}
-          onLongPress={supportsDragAndDrop ? undefined : () => undefined /* handleProductLongPress(item) - COMMENTED FOR DEBUGGING */}
-          accessibilityLabel={`${item.name}, ${formatCents(item.price, currency)}${quantity > 0 ? `, ${quantity} in cart` : ''}${isInactive && isEditMode ? ', hidden' : ''}`}
-          accessibilityHint={isEditMode ? 'Tap to edit product' : 'Tap to add to cart'}
+          onLongPress={supportsDragAndDrop ? undefined : () => undefined}
+          accessibilityLabel={getProductAccessibilityLabel(item, quantity, isInactive)}
+          accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
         >
           {supportsDragAndDrop && (
             <Pressable
@@ -1351,8 +1484,8 @@ export function MenuScreen() {
               delayLongPress={150}
               onPressIn={(e) => e.stopPropagation()}
               accessibilityRole="button"
-              accessibilityLabel={`Reorder ${item.name}`}
-              accessibilityHint="Long press and drag to reorder"
+              accessibilityLabel={t('reorderAccessibilityLabel', { name: item.name })}
+              accessibilityHint={t('reorderAccessibilityHint')}
             >
               <Ionicons name="reorder-three" size={20} color={colors.textMuted} />
             </Pressable>
@@ -1368,7 +1501,7 @@ export function MenuScreen() {
             </Text>
             {isInactive && isEditMode && !isSelectionMode && (
               <View style={styles.compactHiddenBadge}>
-                <Text maxFontSizeMultiplier={1.5} style={styles.compactHiddenText}>Hidden</Text>
+                <Text maxFontSizeMultiplier={1.5} style={styles.compactHiddenText}>{t('hiddenBadge')}</Text>
               </View>
             )}
           </View>
@@ -1381,7 +1514,7 @@ export function MenuScreen() {
                 style={styles.compactEditButton}
                 onPress={() => handleOpenProductModal(item)}
                 accessibilityRole="button"
-                accessibilityLabel={`Edit ${item.name}`}
+                accessibilityLabel={t('editAccessibilityLabel', { name: item.name })}
               >
                 <Ionicons name="pencil" size={16} color={colors.primary} />
               </TouchableOpacity>
@@ -1389,7 +1522,7 @@ export function MenuScreen() {
                 style={styles.compactDeleteButton}
                 onPress={() => handleDeleteProduct(item)}
                 accessibilityRole="button"
-                accessibilityLabel={`Delete ${item.name}`}
+                accessibilityLabel={t('deleteAccessibilityLabel', { name: item.name })}
               >
                 <Ionicons name="trash-outline" size={16} color={colors.error} />
               </TouchableOpacity>
@@ -1402,18 +1535,18 @@ export function MenuScreen() {
                     style={styles.compactQuantityDecrementButton}
                     onPress={() => decrementItem(item.id)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Remove one ${item.name} from cart`}
+                    accessibilityLabel={t('removeOneFromCart', { name: item.name })}
                   >
                     <Ionicons name="remove" size={12} color="#fff" />
                   </TouchableOpacity>
-                  <View style={styles.compactQuantityBadge} accessibilityLabel={`${quantity} in cart`}>
+                  <View style={styles.compactQuantityBadge} accessibilityLabel={t('inCartAccessibilityLabel', { quantity })}>
                     <Text maxFontSizeMultiplier={1.5} style={styles.compactQuantityText}>{quantity}</Text>
                   </View>
                   <TouchableOpacity
                     style={styles.compactQuantityIncrementButton}
                     onPress={() => handleAddToCart(item)}
                     accessibilityRole="button"
-                    accessibilityLabel={`Add one more ${item.name} to cart`}
+                    accessibilityLabel={t('addOneMoreToCart', { name: item.name })}
                   >
                     <Ionicons name="add" size={12} color="#fff" />
                   </TouchableOpacity>
@@ -1423,7 +1556,7 @@ export function MenuScreen() {
                   style={styles.compactQuantityIncrementButton}
                   onPress={() => handleAddToCart(item)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Add ${item.name} to cart`}
+                  accessibilityLabel={t('addToCart', { name: item.name })}
                 >
                   <Ionicons name="add" size={14} color="#fff" />
                 </TouchableOpacity>
@@ -1437,79 +1570,8 @@ export function MenuScreen() {
       ) : compactContent;
     }
 
-    // Default grid layout
-    return (
-      <AnimatedPressable
-        style={[
-          styles.productCard,
-          isInactive && isEditMode && styles.cardInactive,
-          isSelected && styles.cardSelected,
-        ]}
-        onPress={handlePress}
-        onLongPress={() => undefined /* handleProductLongPress(item) - COMMENTED FOR DEBUGGING */}
-        accessibilityLabel={`${item.name}, ${formatCents(item.price, currency)}${quantity > 0 ? `, ${quantity} in cart` : ''}${isInactive && isEditMode ? ', hidden' : ''}`}
-        accessibilityHint={isEditMode ? 'Tap to edit product' : 'Tap to add to cart'}
-      >
-        {selectionCheckbox}
-        <View style={styles.productImageContainer}>
-          {item.imageUrl ? (
-            <Image source={{ uri: item.imageUrl }} style={styles.productImage} />
-          ) : (
-            <View style={styles.productImagePlaceholder}>
-              <Ionicons name="image-outline" size={32} color={colors.textMuted} />
-            </View>
-          )}
-          {inactiveBadge}
-          {!isSelectionMode && editOverlay}
-        </View>
-        <View style={styles.productInfo}>
-          <Text maxFontSizeMultiplier={1.5} style={styles.productName} numberOfLines={2}>
-            {item.name}
-          </Text>
-          <View style={styles.productPriceRow}>
-            <Text maxFontSizeMultiplier={1.3} style={styles.productPrice}>
-              {formatCents(item.price, currency)}
-            </Text>
-            {!isEditMode && !isSelectionMode && (
-              <View style={styles.quantityControls}>
-                {quantity > 0 ? (
-                  <>
-                    <TouchableOpacity
-                      style={styles.quantityDecrementButton}
-                      onPress={() => decrementItem(item.id)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Remove one ${item.name} from cart`}
-                    >
-                      <Ionicons name="remove" size={14} color="#fff" />
-                    </TouchableOpacity>
-                    <View style={styles.quantityBadge} accessibilityLabel={`${quantity} in cart`}>
-                      <Text maxFontSizeMultiplier={1.5} style={styles.quantityText}>{quantity}</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.quantityIncrementButton}
-                      onPress={() => handleAddToCart(item)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Add one more ${item.name} to cart`}
-                    >
-                      <Ionicons name="add" size={14} color="#fff" />
-                    </TouchableOpacity>
-                  </>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.quantityIncrementButton}
-                    onPress={() => handleAddToCart(item)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Add ${item.name} to cart`}
-                  >
-                    <Ionicons name="add" size={14} color="#fff" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-      </AnimatedPressable>
-    );
+    // Fallback: classic-grid (should not reach here due to explicit check above)
+    return null;
   };
 
   // Show skeleton loading while auth or catalogs are being fetched
@@ -1548,26 +1610,30 @@ export function MenuScreen() {
   if (catalogs.length === 0) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <SetupRequired type="no-catalogs" />
+        <SetupRequired type="no-catalogs" onQuickCharge={() => setQuickChargeVisible(true)} />
 
-        {/* Quick Charge FAB - always available even without menus */}
-        <View style={[styles.bottomActions, styles.bottomActionsEmpty]}>
+        {/* Quick Charge FAB - disabled without connected account */}
+        <View style={[styles.bottomActions, styles.bottomActionsEmpty, { bottom: insets.bottom }]}>
           <TouchableOpacity
-            style={[styles.quickChargeFab, { backgroundColor: isDark ? '#fff' : '#1C1917' }]}
-            onPress={() => setQuickChargeVisible(true)}
+            style={[styles.quickChargeFab, { backgroundColor: colors.text, opacity: isPaymentReady ? 1 : 0.35 }]}
+            onPress={() => isPaymentReady && setQuickChargeVisible(true)}
+            disabled={!isPaymentReady}
             activeOpacity={0.9}
             accessibilityRole="button"
-            accessibilityLabel="Quick charge"
-            accessibilityHint="Open quick charge to enter a custom amount"
+            accessibilityLabel={t('quickChargeAccessibilityLabel')}
+            accessibilityHint={t('quickChargeAccessibilityHint')}
+            accessibilityState={{ disabled: !isPaymentReady }}
           >
-            <Ionicons name="flash" size={24} color={isDark ? '#1C1917' : '#fff'} />
+            <Ionicons name="flash" size={22} color={colors.background} />
           </TouchableOpacity>
         </View>
 
-        <QuickChargeBottomSheet
-          visible={quickChargeVisible}
-          onClose={() => setQuickChargeVisible(false)}
-        />
+        {isPaymentReady && (
+          <QuickChargeBottomSheet
+            visible={quickChargeVisible}
+            onClose={() => setQuickChargeVisible(false)}
+          />
+        )}
       </View>
     );
   }
@@ -1576,7 +1642,7 @@ export function MenuScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.centered}>
-          <Text maxFontSizeMultiplier={1.5} style={styles.errorText}>No menu selected</Text>
+          <Text maxFontSizeMultiplier={1.5} style={styles.errorText}>{t('noMenuSelected')}</Text>
         </View>
       </View>
     );
@@ -1627,20 +1693,18 @@ export function MenuScreen() {
           </View>
         </View>
         <View style={styles.centered}>
-          <View style={{ backgroundColor: colors.error + '15', borderRadius: 40, padding: 16, marginBottom: 16 }}>
-            <Ionicons name="alert-circle-outline" size={32} color={colors.error} />
-          </View>
-          <Text maxFontSizeMultiplier={1.3} style={[styles.emptyTitle, { color: colors.text }]}>Unable to Load Menu</Text>
-          <Text maxFontSizeMultiplier={1.5} style={[styles.errorText, { marginTop: 8, textAlign: 'center', paddingHorizontal: 32 }]}>
-            Please check your connection and try again
+          <Ionicons name="alert-circle-outline" size={44} color={colors.textMuted} style={{ marginBottom: 16 }} />
+          <Text maxFontSizeMultiplier={1.3} style={[styles.emptyTitle, { color: colors.text, fontFamily: fonts.semiBold }]}>{t('unableToLoadMenu')}</Text>
+          <Text maxFontSizeMultiplier={1.5} style={[styles.errorText, { marginTop: 8, textAlign: 'center', paddingHorizontal: 32, fontFamily: fonts.regular }]}>
+            {t('checkConnectionRetry')}
           </Text>
           <TouchableOpacity
             onPress={() => refetch()}
             style={{ marginTop: 20, paddingHorizontal: 24, paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 12 }}
             accessibilityRole="button"
-            accessibilityLabel="Retry loading menu"
+            accessibilityLabel={t('retryAccessibilityLabel')}
           >
-            <Text maxFontSizeMultiplier={1.3} style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Retry</Text>
+            <Text maxFontSizeMultiplier={1.3} style={{ color: '#fff', fontFamily: fonts.semiBold, fontSize: 15 }}>{t('retryButton')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1650,7 +1714,7 @@ export function MenuScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        {/* Header with glass effect */}
+        {/* Header */}
         <View style={styles.header}>
         {isSearching ? (
           // Search mode - show search input
@@ -1659,21 +1723,21 @@ export function MenuScreen() {
             <TextInput
               ref={searchInputRef}
               style={styles.searchInput}
-              placeholder="Search products..."
+              placeholder={t('searchPlaceholder')}
               placeholderTextColor={colors.textMuted}
               value={searchQuery}
               onChangeText={setSearchQuery}
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="search"
-              accessibilityLabel="Search products"
+              accessibilityLabel={t('searchAccessibilityLabel')}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity
                 onPress={() => setSearchQuery('')}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 accessibilityRole="button"
-                accessibilityLabel="Clear search text"
+                accessibilityLabel={t('clearSearchTextAccessibilityLabel')}
               >
                 <Ionicons name="close-circle" size={20} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -1685,9 +1749,9 @@ export function MenuScreen() {
                 setSearchQuery('');
               }}
               accessibilityRole="button"
-              accessibilityLabel="Cancel search"
+              accessibilityLabel={t('cancelSearchAccessibilityLabel')}
             >
-              <Text maxFontSizeMultiplier={1.3} style={styles.cancelSearchText}>Cancel</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.cancelSearchText}>{t('cancelSearchButton')}</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -1703,7 +1767,7 @@ export function MenuScreen() {
                     activeOpacity={0.8}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                     accessibilityRole="button"
-                    accessibilityLabel={isEditMode ? 'Exit edit mode' : 'Enter edit mode'}
+                    accessibilityLabel={isEditMode ? t('exitEditModeAccessibilityLabel') : t('enterEditModeAccessibilityLabel')}
                     accessibilityState={{ selected: isEditMode }}
                   >
                     <Ionicons
@@ -1728,7 +1792,7 @@ export function MenuScreen() {
                   }}
                   activeOpacity={0.8}
                   accessibilityRole="button"
-                  accessibilityLabel="Search products"
+                  accessibilityLabel={t('searchAccessibilityLabel')}
                 >
                   <Ionicons name="search" size={20} color={colors.text} />
                 </TouchableOpacity>
@@ -1740,7 +1804,7 @@ export function MenuScreen() {
                     onPress={() => setCatalogSettingsVisible(true)}
                     activeOpacity={0.8}
                     accessibilityRole="button"
-                    accessibilityLabel="Menu settings"
+                    accessibilityLabel={t('menuSettingsAccessibilityLabel')}
                   >
                     <Ionicons name="settings-outline" size={22} color={colors.text} />
                   </TouchableOpacity>
@@ -1749,7 +1813,7 @@ export function MenuScreen() {
                     onPress={() => setCategoryManagerVisible(true)}
                     activeOpacity={0.8}
                     accessibilityRole="button"
-                    accessibilityLabel="Manage categories"
+                    accessibilityLabel={t('manageCategoriesAccessibilityLabel')}
                   >
                     <Ionicons name="folder-outline" size={22} color={colors.text} />
                   </TouchableOpacity>
@@ -1770,12 +1834,11 @@ export function MenuScreen() {
             contentContainerStyle={styles.categoryContainer}
           >
             <CategoryPill
-              label="All"
+              label={t('allCategoryLabel')}
               count={productCountByCategory.get(null)}
               isActive={!selectedCategory}
               onPress={() => setSelectedCategory(null)}
               colors={colors}
-              glassColors={glassColors}
             />
             {activeCategories.map((category) => (
               <CategoryPill
@@ -1785,7 +1848,6 @@ export function MenuScreen() {
                 isActive={selectedCategory === category.id}
                 onPress={() => setSelectedCategory(category.id)}
                 colors={colors}
-                glassColors={glassColors}
               />
             ))}
           </ScrollView>
@@ -1796,12 +1858,14 @@ export function MenuScreen() {
       {searchQuery.trim() ? (
         <View style={styles.searchResultsBar}>
           <Text maxFontSizeMultiplier={1.5} style={styles.searchResultsText}>
-            {filteredProducts.length === 0
-              ? 'No results'
-              : `${filteredProducts.length} result${filteredProducts.length === 1 ? '' : 's'}`}
-            {' for "'}
-            <Text maxFontSizeMultiplier={1.5} style={styles.searchQueryText}>{searchQuery}</Text>
-            {'"'}
+            {t('searchResultsFor', {
+              results: filteredProducts.length === 0
+                ? t('noResults')
+                : filteredProducts.length === 1
+                  ? t('searchResultsSingular', { count: filteredProducts.length })
+                  : t('searchResultsPlural', { count: filteredProducts.length }),
+              query: searchQuery,
+            })}
           </Text>
         </View>
       ) : null}
@@ -1811,7 +1875,7 @@ export function MenuScreen() {
         <View style={styles.bulkActionsBar}>
           <View style={styles.bulkActionsLeft}>
             <Text maxFontSizeMultiplier={1.5} style={styles.selectedCountText}>
-              {selectedProducts.size} selected
+              {t('selectedCount', { count: selectedProducts.size })}
             </Text>
           </View>
           <View style={styles.bulkActionsRight}>
@@ -1821,7 +1885,7 @@ export function MenuScreen() {
                   style={styles.bulkActionButton}
                   onPress={() => handleBulkToggleVisibility(true)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Show ${selectedProducts.size} selected products`}
+                  accessibilityLabel={t('showSelectedProducts', { count: selectedProducts.size })}
                 >
                   <Ionicons name="eye-outline" size={20} color={colors.success} />
                 </TouchableOpacity>
@@ -1829,7 +1893,7 @@ export function MenuScreen() {
                   style={styles.bulkActionButton}
                   onPress={() => handleBulkToggleVisibility(false)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Hide ${selectedProducts.size} selected products`}
+                  accessibilityLabel={t('hideSelectedProducts', { count: selectedProducts.size })}
                 >
                   <Ionicons name="eye-off-outline" size={20} color={colors.warning} />
                 </TouchableOpacity>
@@ -1837,7 +1901,7 @@ export function MenuScreen() {
                   style={styles.bulkActionButton}
                   onPress={handleBulkDelete}
                   accessibilityRole="button"
-                  accessibilityLabel={`Delete ${selectedProducts.size} selected products`}
+                  accessibilityLabel={t('deleteSelectedProducts', { count: selectedProducts.size })}
                 >
                   <Ionicons name="trash-outline" size={20} color={colors.error} />
                 </TouchableOpacity>
@@ -1851,7 +1915,6 @@ export function MenuScreen() {
       {filteredProducts.length === 0 ? (
         <EmptyMenuState
           colors={colors}
-          isDark={isDark}
           searchQuery={searchQuery}
           isEditMode={isEditMode}
           canManage={canManage}
@@ -1860,6 +1923,67 @@ export function MenuScreen() {
           onAddProduct={() => handleOpenProductModal()}
           onOpenVendorPortal={() => openVendorDashboard()}
         />
+      ) : currentLayoutType === 'split-view' ? (
+        /* Split View: category sidebar (tablet) or horizontal pills (phone) + 2-col grid */
+        <View style={styles.splitViewContainer}>
+          {/* Category sidebar — visible on wider screens, horizontal on phone */}
+          <ScrollView
+            horizontal={screenWidth < 768}
+            showsHorizontalScrollIndicator={false}
+            showsVerticalScrollIndicator={false}
+            style={screenWidth >= 768 ? styles.splitViewSidebar : styles.splitViewHorizontalBar}
+            contentContainerStyle={screenWidth >= 768 ? styles.splitViewSidebarContent : styles.splitViewHorizontalBarContent}
+          >
+            {splitViewCategories.map((cat) => {
+              const isActive = splitViewSelectedCat === cat.id;
+              return (
+                <TouchableOpacity
+                  key={cat.id || 'all'}
+                  onPress={() => setSplitViewSelectedCat(cat.id)}
+                  style={[
+                    screenWidth >= 768 ? styles.splitViewSidebarItem : styles.splitViewPill,
+                    isActive && (screenWidth >= 768 ? styles.splitViewSidebarItemActive : styles.splitViewPillActive),
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={cat.name}
+                  accessibilityState={{ selected: isActive }}
+                >
+                  <Text
+                    maxFontSizeMultiplier={1.3}
+                    style={[
+                      screenWidth >= 768 ? styles.splitViewSidebarText : styles.splitViewPillText,
+                      isActive && styles.splitViewTextActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {cat.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* Products — filtered by selected category */}
+          <FlatList
+            data={splitViewSelectedCat
+              ? filteredProducts.filter(p => p.categoryId === splitViewSelectedCat)
+              : filteredProducts
+            }
+            renderItem={({ item }) => renderProduct({ item, drag: () => {}, isActive: false, getIndex: () => undefined })}
+            keyExtractor={(item: Product) => item.id}
+            numColumns={2}
+            columnWrapperStyle={{ gap: GRID_GAP }}
+            contentContainerStyle={[styles.productList, screenWidth >= 768 && { flex: 1 }]}
+            refreshControl={
+              <RefreshControl
+                refreshing={isManualRefreshing}
+                onRefresh={handleManualRefresh}
+                tintColor={colors.primary}
+              />
+            }
+            style={screenWidth >= 768 ? styles.splitViewProductArea : { flex: 1 }}
+          />
+        </View>
       ) : supportsDragAndDrop ? (
         <DraggableFlatList
           data={filteredProducts}
@@ -1902,7 +2026,7 @@ export function MenuScreen() {
           onPress={() => handleOpenProductModal()}
           activeOpacity={0.9}
           accessibilityRole="button"
-          accessibilityLabel="Add new product"
+          accessibilityLabel={t('addNewProductAccessibilityLabel')}
         >
           <Ionicons name="add" size={28} color="#fff" />
         </TouchableOpacity>
@@ -1910,17 +2034,17 @@ export function MenuScreen() {
 
       {/* Bottom Action Buttons (only when not in edit mode) */}
       {!isEditMode && (
-        <View style={[styles.bottomActions, itemCount === 0 && styles.bottomActionsEmpty]}>
+        <View style={[styles.bottomActions, { bottom: insets.bottom }, itemCount === 0 && styles.bottomActionsEmpty]}>
           {/* Quick Charge FAB */}
           <TouchableOpacity
-            style={[styles.quickChargeFab, { backgroundColor: isDark ? '#fff' : '#1C1917' }]}
+            style={[styles.quickChargeFab, { backgroundColor: colors.text }]}
             onPress={() => setQuickChargeVisible(true)}
             activeOpacity={0.9}
             accessibilityRole="button"
-            accessibilityLabel="Quick charge"
-            accessibilityHint="Open quick charge to enter a custom amount"
+            accessibilityLabel={t('quickChargeAccessibilityLabel')}
+            accessibilityHint={t('quickChargeAccessibilityHint')}
           >
-            <Ionicons name="flash" size={24} color={isDark ? '#1C1917' : '#fff'} />
+            <Ionicons name="flash" size={22} color={colors.background} />
           </TouchableOpacity>
 
           {/* Go to Cart Button */}
@@ -1930,12 +2054,12 @@ export function MenuScreen() {
               onPress={() => { if (guardCheckout()) navigation.navigate('Checkout', { total: subtotal }); }}
               activeOpacity={0.9}
               accessibilityRole="button"
-              accessibilityLabel={`Go to cart, ${itemCount} ${itemCount === 1 ? 'item' : 'items'}`}
+              accessibilityLabel={itemCount === 1 ? t('goToCartAccessibilityLabelSingular', { count: itemCount }) : t('goToCartAccessibilityLabelPlural', { count: itemCount })}
             >
               <View style={styles.goToCartBadge}>
                 <Text maxFontSizeMultiplier={1.3} style={styles.goToCartBadgeText}>{itemCount}</Text>
               </View>
-              <Text maxFontSizeMultiplier={1.3} style={styles.goToCartText}>Go to Cart</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.goToCartText}>{t('goToCartButton')}</Text>
               <Ionicons name="chevron-forward" size={18} color="#fff" />
             </TouchableOpacity>
           )}
@@ -1995,7 +2119,7 @@ export function MenuScreen() {
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: number, layoutType: CatalogLayoutType, isEditMode: boolean) => {
+const createStyles = (colors: any, cardWidth: number, layoutType: CatalogLayoutType, isEditMode: boolean, screenWidth: number) => {
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -2007,9 +2131,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       justifyContent: 'space-between',
       paddingHorizontal: 20,
       paddingVertical: 12,
-      backgroundColor: glassColors.backgroundSubtle,
+      backgroundColor: colors.surface,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.borderSubtle,
+      borderBottomColor: colors.borderSubtle,
     },
     headerLeft: {
       flex: 1,
@@ -2040,9 +2164,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       width: 44,
       height: 44,
       borderRadius: 14,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       ...shadows.sm,
@@ -2051,9 +2175,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       width: 44,
       height: 44,
       borderRadius: 14,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       ...shadows.sm,
@@ -2062,9 +2186,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       width: 44,
       height: 44,
       borderRadius: 14,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       ...shadows.sm,
@@ -2077,9 +2201,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       width: 28,
       height: 28,
       borderRadius: 8,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       marginLeft: 8,
@@ -2092,10 +2216,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       paddingHorizontal: 12,
       height: 44,
       gap: 8,
@@ -2134,10 +2258,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       justifyContent: 'flex-start',
       gap: GRID_GAP,
     },
-    // Grid layout styles with glass effect
+    // Grid layout styles with card styling
     productCard: {
       width: cardWidth,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 20,
       marginBottom: GRID_GAP,
       overflow: 'hidden',
@@ -2149,7 +2273,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
     productImageContainer: {
       width: '100%',
       aspectRatio: 1,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
     },
     productImage: {
       width: '100%',
@@ -2161,7 +2285,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       height: '100%',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: glassColors.backgroundSubtle,
+      backgroundColor: colors.surface,
     },
     quantityBadge: {
       minWidth: 24,
@@ -2266,11 +2390,11 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       fontWeight: '600',
       color: '#fff',
     },
-    // List layout styles with glass effect
+    // List layout styles with card styling
     listCard: {
       width: cardWidth,
       flexDirection: 'row',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 20,
       marginBottom: 12,
       overflow: 'hidden',
@@ -2281,7 +2405,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
     listImageContainer: {
       width: 80,
       height: 80,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 14,
       overflow: 'hidden',
     },
@@ -2358,10 +2482,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       alignItems: 'center',
       justifyContent: 'center',
     },
-    // Large grid layout styles with glass effect
+    // Large grid layout styles with card styling
     largeCard: {
       width: cardWidth,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 24,
       marginBottom: 16,
       overflow: 'hidden',
@@ -2370,7 +2494,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
     largeImageContainer: {
       width: '100%',
       aspectRatio: 16 / 9,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
     },
     largeImage: {
       width: '100%',
@@ -2449,12 +2573,202 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       alignItems: 'center',
       justifyContent: 'center',
     },
-    // Compact layout styles with glass effect
+    // Cards layout styles (was "large-grid") - single column, 3:2 image, generous info
+    cardsCard: {
+      width: cardWidth,
+      backgroundColor: colors.card,
+      borderRadius: 24,
+      marginBottom: 16,
+      overflow: 'hidden',
+      ...shadows.lg,
+    },
+    cardsImageContainer: {
+      width: '100%',
+      aspectRatio: 3 / 2,
+      backgroundColor: colors.card,
+    },
+    cardsImage: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+    cardsImagePlaceholder: {
+      width: '100%',
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+    },
+    cardsInfo: {
+      padding: 16,
+    },
+    cardsName: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.text,
+      marginBottom: 4,
+    },
+    cardsDescription: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      lineHeight: 20,
+      marginBottom: 8,
+    },
+    cardsPrice: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: colors.primary,
+      marginBottom: 12,
+    },
+    cardsAddButton: {
+      width: '100%',
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cardsAddButtonInner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    cardsAddButtonText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: '#fff',
+    },
+    // Magazine layout styles - hero/pair pattern
+    // Split View layout styles
+    splitViewContainer: {
+      flex: 1,
+      flexDirection: screenWidth >= 768 ? 'row' : 'column',
+    },
+    splitViewSidebar: {
+      width: 160,
+      backgroundColor: colors.card,
+      borderRightWidth: 1,
+      borderRightColor: colors.border,
+    },
+    splitViewSidebarContent: {
+      paddingVertical: 8,
+    },
+    splitViewSidebarItem: {
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderLeftWidth: 3,
+      borderLeftColor: 'transparent',
+    },
+    splitViewSidebarItemActive: {
+      backgroundColor: `${colors.primary}15`,
+      borderLeftColor: colors.primary,
+    },
+    splitViewSidebarText: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: colors.textSecondary,
+    },
+    splitViewHorizontalBar: {
+      maxHeight: 44,
+      flexGrow: 0,
+    },
+    splitViewHorizontalBarContent: {
+      paddingHorizontal: GRID_PADDING,
+      gap: 8,
+      alignItems: 'center',
+      paddingBottom: 8,
+    },
+    splitViewPill: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    splitViewPillActive: {
+      backgroundColor: `${colors.primary}20`,
+      borderColor: colors.primary,
+    },
+    splitViewPillText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    splitViewTextActive: {
+      color: colors.primary,
+    },
+    splitViewProductArea: {
+      flex: 1,
+    },
+    // Mosaic layout styles - 2 columns, variable height, overlay text
+    mosaicCard: {
+      width: cardWidth,
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      marginBottom: GRID_GAP,
+      overflow: 'hidden',
+      ...shadows.md,
+    },
+    mosaicImageContainer: {
+      width: '100%',
+      backgroundColor: colors.card,
+    },
+    mosaicImage: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+    mosaicImagePlaceholder: {
+      width: '100%',
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+    },
+    mosaicGradient: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      paddingTop: 24,
+    },
+    mosaicName: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#fff',
+      marginBottom: 2,
+    },
+    mosaicPrice: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: '#F59E0B',
+    },
+    mosaicQuantityBadge: {
+      position: 'absolute',
+      bottom: 8,
+      right: 8,
+      minWidth: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 6,
+    },
+    mosaicQuantityText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#fff',
+    },
+    // Compact layout styles with card styling
     compactCard: {
       width: cardWidth,
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 14,
       paddingVertical: 12,
       paddingHorizontal: 16,
@@ -2639,7 +2953,6 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
     },
     bottomActions: {
       position: 'absolute',
-      bottom: 20,
       left: 20,
       right: 20,
       flexDirection: 'row',
@@ -2657,16 +2970,16 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       justifyContent: 'center',
       gap: 8,
       backgroundColor: colors.primary,
-      paddingVertical: 14,
+      paddingVertical: 13,
       paddingHorizontal: 16,
-      borderRadius: 28,
+      borderRadius: 26,
       ...shadows.lg,
     },
     goToCartBadge: {
       backgroundColor: 'rgba(255, 255, 255, 0.25)',
-      width: 24,
-      height: 24,
-      borderRadius: 12,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -2677,20 +2990,20 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
     },
     goToCartText: {
       color: '#fff',
-      fontSize: 15,
+      fontSize: 14,
       fontWeight: '600',
     },
     quickChargeFab: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 52,
+      height: 52,
+      borderRadius: 26,
       alignItems: 'center',
       justifyContent: 'center',
       ...shadows.lg,
     },
     // Skeleton loading styles
     skeletonBox: {
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       opacity: 0.6,
     },
     // Header icon button active state
@@ -2737,9 +3050,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -2756,7 +3069,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       borderRadius: 12,
       borderWidth: 2,
       borderColor: colors.textMuted,
-      backgroundColor: glassColors.background,
+      backgroundColor: colors.background,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -2788,9 +3101,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, cardWidth: nu
       width: 32,
       height: 32,
       borderRadius: 8,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       zIndex: 10,

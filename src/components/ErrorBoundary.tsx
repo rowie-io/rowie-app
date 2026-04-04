@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslations } from '../lib/i18n';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -12,49 +13,91 @@ interface ErrorBoundaryState {
   error: Error | null;
 }
 
-export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
+// Inner class component to catch errors (React requires class for getDerivedStateFromError)
+class ErrorCatcher extends React.Component<
+  { children: React.ReactNode; onError: (error: Error) => void; hasError: boolean },
+  { hasError: boolean }
+> {
+  constructor(props: any) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
+  static getDerivedStateFromError(): { hasError: boolean } {
+    return { hasError: true };
   }
 
-  handleReset = () => {
-    this.setState({ hasError: false, error: null });
-  };
+  componentDidCatch(error: Error) {
+    this.props.onError(error);
+  }
+
+  componentDidUpdate(prevProps: any) {
+    if (prevProps.hasError && !this.props.hasError) {
+      this.setState({ hasError: false });
+    }
+  }
 
   render() {
     if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
-
-      return (
-        <View style={styles.container} accessibilityRole="alert">
-          <View style={styles.content}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="warning-outline" size={48} color="#ef4444" />
-            </View>
-            <Text style={styles.title} maxFontSizeMultiplier={1.3} accessibilityRole="header">
-              Something went wrong
-            </Text>
-            <Text style={styles.message} maxFontSizeMultiplier={1.5}>
-              The app ran into an unexpected error. Try restarting or tap below to recover.
-            </Text>
-            <TouchableOpacity style={styles.button} onPress={this.handleReset} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Try again" accessibilityHint="Attempts to recover from the error">
-              <Ionicons name="refresh-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.buttonText} maxFontSizeMultiplier={1.3}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      );
+      return null;
     }
-
     return this.props.children;
   }
+}
+
+// Functional fallback UI with i18n support
+function ErrorFallback({ onReset }: { onReset: () => void }) {
+  const t = useTranslations('components.errorBoundary');
+
+  return (
+    <View style={styles.container} accessibilityRole="alert">
+      <View style={styles.content}>
+        <View style={styles.iconContainer}>
+          <Ionicons name="warning-outline" size={48} color="#ef4444" />
+        </View>
+        <Text style={styles.title} maxFontSizeMultiplier={1.3} accessibilityRole="header">
+          {t('title')}
+        </Text>
+        <Text style={styles.message} maxFontSizeMultiplier={1.5}>
+          {t('message')}
+        </Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={onReset}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={t('tryAgainLabel')}
+          accessibilityHint={t('tryAgainHint')}
+        >
+          <Ionicons name="refresh-outline" size={20} color="#FFFFFF" />
+          <Text style={styles.buttonText} maxFontSizeMultiplier={1.3}>{t('tryAgainButton')}</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+// Public ErrorBoundary — functional wrapper around the class error catcher
+export function ErrorBoundary({ children, fallback }: ErrorBoundaryProps) {
+  const [hasError, setHasError] = useState(false);
+
+  const handleError = useCallback((error: Error) => {
+    setHasError(true);
+  }, []);
+
+  const handleReset = useCallback(() => {
+    setHasError(false);
+  }, []);
+
+  if (hasError) {
+    return fallback || <ErrorFallback onReset={handleReset} />;
+  }
+
+  return (
+    <ErrorCatcher onError={handleError} hasError={hasError}>
+      {children}
+    </ErrorCatcher>
+  );
 }
 
 const styles = StyleSheet.create({

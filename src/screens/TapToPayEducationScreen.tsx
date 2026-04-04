@@ -21,32 +21,30 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-
 import { useAuth } from '../context/AuthContext';
 import { useDevice } from '../context/DeviceContext';
 import { authService } from '../lib/api';
+import { useTranslations } from '../lib/i18n';
 
 import { useTheme } from '../context/ThemeContext';
 import { useTerminal, ConfigurationStage } from '../context/StripeTerminalContext';
-import { glass } from '../lib/colors';
-import { shadows, glow } from '../lib/shadows';
+import { shadows } from '../lib/shadows';
 import { spacing, radius } from '../lib/spacing';
 import logger from '../lib/logger';
 
 // Apple TTPOi 5.4: Region-correct copy
 const TAP_TO_PAY_NAME = Platform.OS === 'ios' ? 'Tap to Pay on iPhone' : 'Tap to Pay';
 
-// Configuration stage messages for progress indicator (Apple TTPOi 3.9.1)
-const STAGE_MESSAGES: Record<ConfigurationStage, string> = {
-  idle: 'Preparing...',
-  checking_compatibility: 'Checking device compatibility...',
-  initializing: 'Initializing payment terminal...',
-  fetching_location: 'Fetching location...',
-  discovering_reader: 'Discovering reader...',
-  connecting_reader: 'Connecting to reader...',
-  ready: 'Ready to accept payments!',
-  error: 'Setup failed',
+// Configuration stage messages mapped to i18n keys (Apple TTPOi 3.9.1)
+const STAGE_MESSAGE_KEYS: Record<ConfigurationStage, string> = {
+  idle: 'educationStageIdle',
+  checking_compatibility: 'educationStageCheckingCompatibility',
+  initializing: 'educationStageInitializing',
+  fetching_location: 'educationStageFetchingLocation',
+  discovering_reader: 'educationStageDiscoveringReader',
+  connecting_reader: 'educationStageConnectingReader',
+  ready: 'educationStageReady',
+  error: 'educationStageError',
 };
 
 
@@ -54,10 +52,9 @@ const STAGE_MESSAGES: Record<ConfigurationStage, string> = {
 
 export function TapToPayEducationScreen() {
   const { colors, isDark } = useTheme();
+  const t = useTranslations('tapToPay');
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const glassColors = isDark ? glass.dark : glass.light;
-
   // Auth context for user ID and device context for device ID
   const { user, refreshAuth } = useAuth();
   const { deviceId } = useDevice();
@@ -149,7 +146,7 @@ export function TapToPayEducationScreen() {
   const [isConnectSetupError, setIsConnectSetupError] = useState(false);
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
 
-  const styles = createStyles(colors, glassColors, isDark);
+  const styles = createStyles(colors, isDark);
 
   const navigateBack = () => {
     // Refresh auth so user state picks up newly registered device IDs
@@ -226,11 +223,11 @@ export function TapToPayEducationScreen() {
         await registerDevice();
         navigateBack();
       } else {
-        setEnableError('Failed to enable Tap to Pay. Please try again.');
+        setEnableError(t('educationErrorFailedGeneric'));
       }
     } catch (err: any) {
       logger.error('[TapToPayEducation] Android enable failed:', err);
-      setEnableError(err.message || 'Failed to enable Tap to Pay');
+      setEnableError(err.message || t('educationErrorFailedGeneric'));
     } finally {
       setIsEnabling(false);
     }
@@ -267,8 +264,8 @@ export function TapToPayEducationScreen() {
       setEnableError(
         deviceCompatibility.errorMessage ||
         (Platform.OS === 'ios'
-          ? `${TAP_TO_PAY_NAME} requires iPhone XS or later with iOS 16.4+.`
-          : `${TAP_TO_PAY_NAME} requires an Android device with NFC capability.`)
+          ? t('educationErrorDeviceIos', { tapToPayName: TAP_TO_PAY_NAME })
+          : t('educationErrorDeviceAndroid', { tapToPayName: TAP_TO_PAY_NAME }))
       );
       return;
     }
@@ -294,7 +291,7 @@ export function TapToPayEducationScreen() {
         await showAppleNativeEducation();
         return;
       } else {
-        setEnableError('Failed to connect. Please try again.');
+        setEnableError(t('educationErrorFailedConnect'));
       }
     } catch (err: any) {
       logger.error('[TapToPayEducation] Enable failed:', err);
@@ -308,7 +305,7 @@ export function TapToPayEducationScreen() {
         errorMsg.includes('tos acceptance')
       ) {
         // User cancelled ToS - this is not a setup error, just needs retry
-        setEnableError('You must accept the Terms of Service to use Tap to Pay. Please try again.');
+        setEnableError(t('educationErrorTosRequired'));
       }
       // Check if this is a Stripe Connect setup error
       else if (
@@ -320,9 +317,9 @@ export function TapToPayEducationScreen() {
         errorMsg.includes('no connected account')
       ) {
         setIsConnectSetupError(true);
-        setEnableError('You need to link your banking first.');
+        setEnableError(t('educationErrorConnectSetup'));
       } else {
-        setEnableError(err.message || 'Failed to enable Tap to Pay');
+        setEnableError(err.message || t('educationErrorFailedGeneric'));
       }
     } finally {
       setIsEnabling(false);
@@ -340,11 +337,11 @@ export function TapToPayEducationScreen() {
 
   // Determine button text based on current state
   const getButtonText = () => {
-    if (isEnabling) return 'Enabling...';
+    if (isEnabling) return t('educationButtonEnabling');
     // If there's an error, show retry regardless of connection state
-    if (enableError) return 'Try Again';
-    if (isConnected && deviceAlreadyRegistered) return 'Continue';
-    return `Enable ${TAP_TO_PAY_NAME}`;
+    if (enableError) return t('educationButtonTryAgain');
+    if (isConnected && deviceAlreadyRegistered) return t('educationButtonContinue');
+    return t('educationButtonEnable', { tapToPayName: TAP_TO_PAY_NAME });
   };
 
   const handleButtonPress = () => {
@@ -365,10 +362,10 @@ export function TapToPayEducationScreen() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.closeButton} onPress={handleClose} accessibilityRole="button" accessibilityLabel="Close">
+          <TouchableOpacity style={styles.closeButton} onPress={handleClose} accessibilityRole="button" accessibilityLabel={t('educationCloseAccessibilityLabel')}>
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>Setting Up Tap to Pay</Text>
+          <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>{t('educationHeaderTitleSettingUp')}</Text>
           <View style={styles.skipButton} />
         </View>
         <View style={styles.androidCenterContent}>
@@ -376,12 +373,12 @@ export function TapToPayEducationScreen() {
             <>
               <View style={styles.progressIconContainer}>
                 <View style={styles.progressRing}>
-                  <ActivityIndicator size="large" color={colors.primary} accessibilityLabel="Enabling Tap to Pay" />
+                  <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('educationAndroidEnablingTitle')} />
                 </View>
               </View>
-              <Text style={styles.slideTitle} maxFontSizeMultiplier={1.3}>Enabling Tap to Pay</Text>
+              <Text style={styles.slideTitle} maxFontSizeMultiplier={1.3}>{t('educationAndroidEnablingTitle')}</Text>
               <Text style={styles.slideDescription} maxFontSizeMultiplier={1.5}>
-                Please wait while we set up contactless payments...
+                {t('educationAndroidEnablingDescription')}
               </Text>
             </>
           ) : enableError ? (
@@ -392,14 +389,14 @@ export function TapToPayEducationScreen() {
                   <View style={[styles.errorIconCircle, { backgroundColor: colors.warning + '15' }]}>
                     <Ionicons name="code-slash-outline" size={40} color={colors.warning} />
                   </View>
-                  <Text style={styles.slideTitle} maxFontSizeMultiplier={1.3}>Development Build Required</Text>
+                  <Text style={styles.slideTitle} maxFontSizeMultiplier={1.3}>{t('educationAndroidDevBuildTitle')}</Text>
                   <Text style={[styles.slideDescription, { marginBottom: 24 }]} maxFontSizeMultiplier={1.5}>
-                    Tap to Pay requires native device features that aren't available in Expo Go.
+                    {t('educationAndroidDevBuildDescription')}
                   </Text>
                   <View style={[styles.infoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <Text style={[styles.infoCardTitle, { color: colors.text }]} maxFontSizeMultiplier={1.5}>To test payments:</Text>
+                    <Text style={[styles.infoCardTitle, { color: colors.text }]} maxFontSizeMultiplier={1.5}>{t('educationAndroidDevBuildHowTo')}</Text>
                     <Text style={[styles.infoCardText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                      Run{' '}<Text style={{ fontFamily: 'monospace', color: colors.primary }} maxFontSizeMultiplier={1.5}>eas build --profile development</Text>{' '}to create a development build with full native support.
+                      {t('educationAndroidDevBuildCommand', { command: 'eas build --profile development' })}
                     </Text>
                   </View>
                   <TouchableOpacity
@@ -407,16 +404,11 @@ export function TapToPayEducationScreen() {
                     activeOpacity={0.9}
                     style={{ marginTop: 32, width: '100%' }}
                     accessibilityRole="button"
-                    accessibilityLabel="Got It"
+                    accessibilityLabel={t('educationAndroidGotIt')}
                   >
-                    <LinearGradient
-                      colors={[colors.primary, colors.primary700]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.nextButton}
-                    >
-                      <Text style={styles.nextButtonText} maxFontSizeMultiplier={1.3}>Got It</Text>
-                    </LinearGradient>
+                    <View style={[styles.nextButton, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.nextButtonText} maxFontSizeMultiplier={1.3}>{t('educationAndroidGotIt')}</Text>
+                    </View>
                   </TouchableOpacity>
                 </>
               ) : (
@@ -424,23 +416,18 @@ export function TapToPayEducationScreen() {
                   <View style={[styles.errorIconCircle, { backgroundColor: colors.error + '15' }]}>
                     <Ionicons name="alert-circle-outline" size={40} color={colors.error} />
                   </View>
-                  <Text style={styles.slideTitle} maxFontSizeMultiplier={1.3}>Setup Failed</Text>
+                  <Text style={styles.slideTitle} maxFontSizeMultiplier={1.3}>{t('educationAndroidSetupFailed')}</Text>
                   <Text style={[styles.slideDescription, { marginBottom: 8 }]} maxFontSizeMultiplier={1.5}>{enableError}</Text>
                   <TouchableOpacity
                     onPress={handleAndroidAutoEnable}
                     activeOpacity={0.9}
                     style={{ marginTop: 32, width: '100%' }}
                     accessibilityRole="button"
-                    accessibilityLabel="Try Again"
+                    accessibilityLabel={t('educationButtonTryAgain')}
                   >
-                    <LinearGradient
-                      colors={[colors.primary, colors.primary700]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.nextButton}
-                    >
-                      <Text style={styles.nextButtonText} maxFontSizeMultiplier={1.3}>Try Again</Text>
-                    </LinearGradient>
+                    <View style={[styles.nextButton, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.nextButtonText} maxFontSizeMultiplier={1.3}>{t('educationButtonTryAgain')}</Text>
+                    </View>
                   </TouchableOpacity>
                 </>
               )}
@@ -450,9 +437,9 @@ export function TapToPayEducationScreen() {
               <View style={styles.successIconContainer}>
                 <Ionicons name="checkmark-circle" size={80} color={colors.success} />
               </View>
-              <Text style={styles.slideTitle} maxFontSizeMultiplier={1.3}>Ready to Go!</Text>
+              <Text style={styles.slideTitle} maxFontSizeMultiplier={1.3}>{t('educationAndroidReadyTitle')}</Text>
               <Text style={styles.slideDescription} maxFontSizeMultiplier={1.5}>
-                Tap to Pay is now enabled on your device.
+                {t('educationAndroidReadyDescription')}
               </Text>
             </>
           )}
@@ -497,10 +484,10 @@ export function TapToPayEducationScreen() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.closeButton} onPress={handleClose} accessibilityRole="button" accessibilityLabel="Close">
+        <TouchableOpacity style={styles.closeButton} onPress={handleClose} accessibilityRole="button" accessibilityLabel={t('educationCloseAccessibilityLabel')}>
           <Ionicons name="close" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>Set Up Tap to Pay</Text>
+        <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>{t('educationHeaderTitleSetup')}</Text>
         <View style={styles.skipButton} />
       </View>
 
@@ -515,27 +502,20 @@ export function TapToPayEducationScreen() {
           <>
             <View style={styles.progressIconContainer}>
               <View style={styles.progressRing}>
-                <ActivityIndicator size="large" color={colors.primary} accessibilityLabel="Setting up Tap to Pay" />
+                <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('educationHeaderTitleSettingUp')} />
               </View>
             </View>
-            <Text style={styles.progressPercent} maxFontSizeMultiplier={1.2} accessibilityRole="text" accessibilityLabel={`${Math.round(configurationProgress)} percent complete`}>{Math.round(configurationProgress)}%</Text>
+            <Text style={styles.progressPercent} maxFontSizeMultiplier={1.2} accessibilityRole="text" accessibilityLabel={t('educationProgressAccessibilityLabel', { percent: Math.round(configurationProgress) })}>{Math.round(configurationProgress)}%</Text>
             <View style={styles.progressBarContainer}>
-              <View style={[styles.progressBarFill, { width: `${configurationProgress}%` }]}>
-                <LinearGradient
-                  colors={[colors.primary, colors.primary500]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              </View>
+              <View style={[styles.progressBarFill, { width: `${configurationProgress}%`, backgroundColor: colors.primary }]} />
             </View>
-            <Text style={styles.slideTitle} maxFontSizeMultiplier={1.3}>Setting Up</Text>
+            <Text style={styles.slideTitle} maxFontSizeMultiplier={1.3}>{t('educationSettingUp')}</Text>
             <Text style={styles.stageText} maxFontSizeMultiplier={1.5}>
-              {STAGE_MESSAGES[configurationStage] || 'Please wait...'}
+              {t(STAGE_MESSAGE_KEYS[configurationStage] || 'educationPleaseWait')}
             </Text>
             {configurationStage === 'connecting_reader' && (
               <Text style={styles.hintText} maxFontSizeMultiplier={1.5}>
-                You may be prompted to accept Terms & Conditions
+                {t('educationTermsHint')}
               </Text>
             )}
           </>
@@ -543,24 +523,21 @@ export function TapToPayEducationScreen() {
           /* Initial Enable State */
           <>
             <View style={styles.iconContainer}>
-              <LinearGradient
-                colors={[colors.primary, colors.primary700]}
-                style={styles.iconGradient}
-              >
+              <View style={[styles.iconGradient, { backgroundColor: colors.primary }]}>
                 <Ionicons name="wifi" size={64} color="#fff" style={styles.nfcIcon} />
-              </LinearGradient>
+              </View>
             </View>
-            <Text style={styles.slideTitle} maxFontSizeMultiplier={1.3}>Enable {TAP_TO_PAY_NAME}</Text>
+            <Text style={styles.slideTitle} maxFontSizeMultiplier={1.3}>{t('educationEnableTitle', { tapToPayName: TAP_TO_PAY_NAME })}</Text>
             <Text style={styles.slideDescription} maxFontSizeMultiplier={1.5}>
-              Turn your device into a payment terminal. Accept contactless cards and digital wallets instantly.
+              {t('educationEnableDescription')}
             </Text>
 
             {/* Features list */}
             <View style={styles.tipsContainer}>
               {[
-                { icon: 'shield-checkmark', text: 'Secure & encrypted payments' },
-                { icon: 'card', text: 'All major cards & wallets' },
-                { icon: 'flash', text: 'No extra hardware needed' },
+                { icon: 'shield-checkmark', text: t('educationFeatureSecure') },
+                { icon: 'card', text: t('educationFeatureCards') },
+                { icon: 'flash', text: t('educationFeatureNoHardware') },
               ].map((feature, index) => (
                 <View key={index} style={styles.tipRow}>
                   <View style={styles.featureIconBg}>
@@ -583,11 +560,11 @@ export function TapToPayEducationScreen() {
                     style={styles.setupPaymentsButton}
                     onPress={handleGoToPaymentSetup}
                     accessibilityRole="button"
-                    accessibilityLabel="Set Up Payments"
-                    accessibilityHint="Navigate to payment setup"
+                    accessibilityLabel={t('educationSetUpPayments')}
+                    accessibilityHint={t('educationSetUpPaymentsAccessibilityHint')}
                   >
                     <Ionicons name="card-outline" size={18} color="#fff" />
-                    <Text style={styles.setupPaymentsButtonText} maxFontSizeMultiplier={1.3}>Set Up Payments</Text>
+                    <Text style={styles.setupPaymentsButtonText} maxFontSizeMultiplier={1.3}>{t('educationSetUpPayments')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -606,14 +583,9 @@ export function TapToPayEducationScreen() {
           accessibilityLabel={getButtonText()}
           accessibilityState={{ disabled: isButtonDisabled }}
         >
-          <LinearGradient
-            colors={isButtonDisabled ? [colors.gray600, colors.gray700] : [colors.primary, colors.primary700]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[styles.nextButton, isButtonDisabled && { opacity: 0.6 }]}
-          >
+          <View style={[styles.nextButton, { backgroundColor: isButtonDisabled ? colors.gray600 : colors.primary }, isButtonDisabled && { opacity: 0.6 }]}>
             {isEnabling ? (
-              <ActivityIndicator size="small" color="#fff" accessibilityLabel="Enabling" />
+              <ActivityIndicator size="small" color="#fff" accessibilityLabel={t('educationButtonEnabling')} />
             ) : (
               <>
                 <Text style={styles.nextButtonText} maxFontSizeMultiplier={1.3}>{getButtonText()}</Text>
@@ -622,7 +594,7 @@ export function TapToPayEducationScreen() {
                 )}
               </>
             )}
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -630,7 +602,7 @@ export function TapToPayEducationScreen() {
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) =>
+const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -642,19 +614,19 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 12,
-      backgroundColor: glassColors.backgroundSubtle,
+      backgroundColor: colors.surface,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.borderSubtle,
+      borderBottomColor: colors.borderSubtle,
     },
     closeButton: {
       width: 44,
       height: 44,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     headerTitle: {
       fontSize: 18,
@@ -724,11 +696,11 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     },
     tipsContainer: {
       width: '100%',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 20,
       padding: 20,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       ...shadows.sm,
     },
     tipRow: {
@@ -810,7 +782,6 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     // Enable slide - Success state styles
     successIconContainer: {
       marginBottom: spacing.lg,
-      ...glow(colors.success, 'subtle'),
     },
     // Enable slide - Initial state styles
     featureIconBg: {

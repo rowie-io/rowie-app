@@ -22,8 +22,8 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useTranslations } from '../lib/i18n';
 import { getCurrencySymbol, isZeroDecimal, fromSmallestUnit, toSmallestUnit } from '../utils/currency';
-import { glass } from '../lib/colors';
 import type { Product, Category } from '../lib/api';
 import { Toggle } from './Toggle';
 
@@ -60,8 +60,8 @@ export function ProductModal({
 }: ProductModalProps) {
   const { colors, isDark } = useTheme();
   const { currency } = useAuth();
-  const glassColors = isDark ? glass.dark : glass.light;
-
+  const t = useTranslations('components.productModal');
+  const tc = useTranslations('common');
   const isEditing = !!product;
 
   // Form state
@@ -120,7 +120,7 @@ export function ProductModal({
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
       if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'Please allow access to your photo library to add product images.');
+        Alert.alert(t('permissionRequiredTitle'), t('permissionRequiredMessage'));
         return;
       }
 
@@ -138,7 +138,7 @@ export function ProductModal({
         setRemoveImage(false);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick image');
+      Alert.alert(tc('error'), t('errorFailedToPickImage'));
     }
   };
 
@@ -152,13 +152,13 @@ export function ProductModal({
   const handleSave = async () => {
     // Validate
     if (!name.trim()) {
-      Alert.alert('Error', 'Product name is required');
+      Alert.alert(tc('error'), t('errorProductNameRequired'));
       return;
     }
 
     const priceNumber = parseFloat(priceString);
     if (isNaN(priceNumber) || priceNumber < 0) {
-      Alert.alert('Error', 'Please enter a valid price');
+      Alert.alert(tc('error'), t('errorInvalidPrice'));
       return;
     }
 
@@ -181,7 +181,7 @@ export function ProductModal({
       });
       onClose();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to save product');
+      Alert.alert(tc('error'), error.message || t('errorFailedToSave'));
     } finally {
       setIsSaving(false);
     }
@@ -191,7 +191,7 @@ export function ProductModal({
   const activeCategories = categories.filter(c => c.isActive);
   const displayImage = imageUri || (!removeImage ? existingImageUrl : null);
 
-  const styles = createStyles(colors, glassColors, isDark);
+  const styles = createStyles(colors, isDark);
 
   return (
     <Modal
@@ -200,32 +200,33 @@ export function ProductModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.container}>
-        <Pressable style={styles.overlay} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <Pressable style={styles.overlay} onPress={onClose} accessibilityLabel={tc('close')} accessibilityRole="button" />
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.content}
-        >
+        <View style={styles.content}>
           {/* Header */}
           <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton} accessibilityRole="button" accessibilityLabel="Close">
+            <TouchableOpacity onPress={onClose} style={styles.closeButton} accessibilityRole="button" accessibilityLabel={tc('close')}>
               <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
             <Text style={styles.title} maxFontSizeMultiplier={1.3}>
-              {isEditing ? 'Edit Product' : 'Add Product'}
+              {isEditing ? t('editProductTitle') : t('addProductTitle')}
             </Text>
             <TouchableOpacity
               onPress={handleSave}
               disabled={isSaving}
               style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
               accessibilityRole="button"
-              accessibilityLabel={isSaving ? 'Saving product' : 'Save product'}
+              accessibilityLabel={isSaving ? tc('saving') : tc('save')}
             >
               {isSaving ? (
-                <ActivityIndicator size="small" color="#fff" accessibilityLabel="Saving" />
+                <ActivityIndicator size="small" color="#fff" accessibilityLabel={tc('saving')} />
               ) : (
-                <Text style={styles.saveButtonText} maxFontSizeMultiplier={1.3}>Save</Text>
+                <Text style={styles.saveButtonText} maxFontSizeMultiplier={1.3}>{tc('save')}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -237,14 +238,14 @@ export function ProductModal({
           >
             {/* Image Picker */}
             <View style={styles.section}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>Product Image</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('productImage')}</Text>
               <TouchableOpacity
                 style={styles.imagePicker}
                 onPress={handlePickImage}
                 activeOpacity={0.8}
                 accessibilityRole="button"
-                accessibilityLabel={displayImage ? 'Change product image' : 'Add product image'}
-                accessibilityHint="Opens the photo library to select an image"
+                accessibilityLabel={displayImage ? t('changeProductImage') : t('addProductImage')}
+                accessibilityHint={t('opensPhotoLibraryHint')}
               >
                 {displayImage ? (
                   <View style={styles.imageContainer}>
@@ -257,7 +258,7 @@ export function ProductModal({
                       style={styles.removeImageButton}
                       onPress={handleRemoveImage}
                       accessibilityRole="button"
-                      accessibilityLabel="Remove product image"
+                      accessibilityLabel={t('removeProductImage')}
                     >
                       <Ionicons name="close-circle" size={28} color={colors.error} />
                     </TouchableOpacity>
@@ -265,7 +266,7 @@ export function ProductModal({
                 ) : (
                   <View style={styles.imagePlaceholder}>
                     <Ionicons name="camera-outline" size={40} color={colors.textMuted} />
-                    <Text style={styles.imagePlaceholderText} maxFontSizeMultiplier={1.5}>Tap to add image</Text>
+                    <Text style={styles.imagePlaceholderText} maxFontSizeMultiplier={1.5}>{t('tapToAddImage')}</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -273,37 +274,37 @@ export function ProductModal({
 
             {/* Name */}
             <View style={styles.section}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>Name *</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('nameLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
-                placeholder="Product name"
+                placeholder={t('namePlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 maxLength={100}
-                accessibilityLabel="Product name"
+                accessibilityLabel={t('namePlaceholder')}
               />
             </View>
 
             {/* Description */}
             <View style={styles.section}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>Description</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('descriptionLabel')}</Text>
               <TextInput
                 style={[styles.input, styles.textArea]}
                 value={description}
                 onChangeText={setDescription}
-                placeholder="Optional description"
+                placeholder={t('descriptionPlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 multiline
                 numberOfLines={3}
                 maxLength={500}
-                accessibilityLabel="Product description"
+                accessibilityLabel={t('descriptionLabel')}
               />
             </View>
 
             {/* Price */}
             <View style={styles.section}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>Price *</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('priceLabel')}</Text>
               <View style={styles.priceInputContainer}>
                 <Text style={styles.currencySymbol} maxFontSizeMultiplier={1.3}>{getCurrencySymbol(currency)}</Text>
                 <TextInput
@@ -313,7 +314,7 @@ export function ProductModal({
                   placeholder={isZeroDecimal(currency) ? '0' : '0.00'}
                   placeholderTextColor={colors.textMuted}
                   keyboardType="decimal-pad"
-                  accessibilityLabel={`Product price in ${currency.toUpperCase()}`}
+                  accessibilityLabel={t('priceLabelWithCurrency', { currency: currency.toUpperCase() })}
                 />
               </View>
             </View>
@@ -321,10 +322,10 @@ export function ProductModal({
             {/* Category */}
             <View style={styles.section}>
               <View style={styles.labelRow}>
-                <Text style={styles.label} maxFontSizeMultiplier={1.5}>Category</Text>
+                <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('categoryLabel')}</Text>
                 {onOpenCategoryManager && (
-                  <TouchableOpacity onPress={onOpenCategoryManager} accessibilityRole="button" accessibilityLabel="Manage categories">
-                    <Text style={styles.manageLink} maxFontSizeMultiplier={1.5}>Manage</Text>
+                  <TouchableOpacity onPress={onOpenCategoryManager} accessibilityRole="button" accessibilityLabel={t('manageCategories')}>
+                    <Text style={styles.manageLink} maxFontSizeMultiplier={1.5}>{t('manageCategories')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -333,14 +334,14 @@ export function ProductModal({
                   style={styles.categorySelector}
                   onPress={() => setShowCategoryPicker(!showCategoryPicker)}
                   accessibilityRole="button"
-                  accessibilityLabel={`Category: ${selectedCategory?.name || 'No category'}`}
-                  accessibilityHint="Opens category picker"
+                  accessibilityLabel={`${t('categoryLabel')}: ${selectedCategory?.name || tc('noCategory')}`}
+                  accessibilityHint={t('opensCategoryPicker')}
                 >
                   <Text style={[
                     styles.categorySelectorText,
                     !selectedCategory && styles.categorySelectorPlaceholder
                   ]} maxFontSizeMultiplier={1.5}>
-                    {selectedCategory?.name || 'No category'}
+                    {selectedCategory?.name || tc('noCategory')}
                   </Text>
                   <Ionicons
                     name={showCategoryPicker ? "chevron-up" : "chevron-down"}
@@ -353,7 +354,7 @@ export function ProductModal({
                     style={styles.addCategoryButton}
                     onPress={onOpenCategoryManager}
                     accessibilityRole="button"
-                    accessibilityLabel="Add new category"
+                    accessibilityLabel={t('addNewCategory')}
                   >
                     <Ionicons name="add" size={22} color={colors.primary} />
                   </TouchableOpacity>
@@ -372,14 +373,14 @@ export function ProductModal({
                       setShowCategoryPicker(false);
                     }}
                     accessibilityRole="button"
-                    accessibilityLabel="No category"
+                    accessibilityLabel={tc('noCategory')}
                     accessibilityState={{ selected: categoryId === null }}
                   >
                     <Text style={[
                       styles.categoryOptionText,
                       categoryId === null && styles.categoryOptionTextSelected
                     ]} maxFontSizeMultiplier={1.5}>
-                      No category
+                      {tc('noCategory')}
                     </Text>
                     {categoryId === null && (
                       <Ionicons name="checkmark" size={20} color={colors.primary} />
@@ -419,47 +420,41 @@ export function ProductModal({
             <View style={styles.section}>
               <View style={styles.toggleRow}>
                 <View>
-                  <Text style={styles.label} maxFontSizeMultiplier={1.5}>Available</Text>
+                  <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('availableLabel')}</Text>
                   <Text style={styles.toggleDescription} maxFontSizeMultiplier={1.5}>
-                    Show this product on the menu
+                    {t('availableDescription')}
                   </Text>
                 </View>
                 <Toggle
                   value={isActive}
                   onValueChange={setIsActive}
-                  accessibilityLabel="Product available"
+                  accessibilityLabel={t('availableLabel')}
                 />
               </View>
             </View>
           </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
-const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
+const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
     container: {
       flex: 1,
+      justifyContent: 'flex-end',
     },
     overlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
+      ...StyleSheet.absoluteFillObject,
       backgroundColor: 'rgba(0, 0, 0, 0.6)',
     },
     content: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
       backgroundColor: colors.card,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
-      height: SCREEN_HEIGHT * 0.85,
+      maxHeight: SCREEN_HEIGHT * 0.85,
+      overflow: 'hidden',
     },
     header: {
       flexDirection: 'row',
@@ -468,13 +463,13 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       paddingHorizontal: 16,
       paddingVertical: 16,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.border,
+      borderBottomColor: colors.border,
     },
     closeButton: {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -525,9 +520,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       fontWeight: '500',
     },
     input: {
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderRadius: 12,
       paddingHorizontal: 16,
       paddingVertical: 14,
@@ -541,9 +536,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
     priceInputContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderRadius: 12,
       paddingHorizontal: 16,
     },
@@ -563,9 +558,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
     imagePicker: {
       borderRadius: 16,
       overflow: 'hidden',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderStyle: 'dashed',
     },
     imageContainer: {
@@ -602,9 +597,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderRadius: 12,
       paddingHorizontal: 16,
       paddingVertical: 14,
@@ -613,9 +608,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       width: 48,
       height: 48,
       borderRadius: 12,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -628,9 +623,9 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
     },
     categoryList: {
       marginTop: 8,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       borderRadius: 12,
       overflow: 'hidden',
     },
@@ -641,7 +636,7 @@ const createStyles = (colors: any, glassColors: any, isDark: boolean) =>
       paddingHorizontal: 16,
       paddingVertical: 14,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.borderSubtle,
+      borderBottomColor: colors.borderSubtle,
     },
     categoryOptionSelected: {
       backgroundColor: colors.primary + '15',

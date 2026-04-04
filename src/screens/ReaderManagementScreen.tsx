@@ -16,15 +16,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { useTheme } from '../context/ThemeContext';
+import { useTranslations } from '../lib/i18n';
 import { useTerminal, classifyReaderType } from '../context/StripeTerminalContext';
 import type { PreferredReader } from '../context/StripeTerminalContext';
 import { stripeTerminalApi, TerminalReader } from '../lib/api/stripe-terminal';
 import { fonts } from '../lib/fonts';
-import { glass } from '../lib/colors';
 
 export function ReaderManagementScreen() {
   const { colors, isDark } = useTheme();
-  const glassColors = isDark ? glass.dark : glass.light;
+  const t = useTranslations('tapToPay');
+  const tc = useTranslations('common');
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -67,10 +68,10 @@ export function ReaderManagementScreen() {
       setShowRegister(false);
       setRegistrationCode('');
       setReaderLabel('');
-      Alert.alert('Reader Registered', 'The terminal reader has been registered successfully.');
+      Alert.alert(t('readerRegisteredTitle'), t('readerRegisteredMessage'));
     },
     onError: (error: any) => {
-      Alert.alert('Registration Failed', error.message || 'Failed to register reader. Check the registration code and try again.');
+      Alert.alert(t('readerRegistrationFailedTitle'), error.message || t('readerRegistrationFailedMessage'));
     },
   });
 
@@ -85,13 +86,13 @@ export function ReaderManagementScreen() {
       }
     },
     onError: (error: any) => {
-      Alert.alert('Delete Failed', error.message || 'Failed to delete reader.');
+      Alert.alert(t('readerDeleteFailedTitle'), error.message || t('readerDeleteFailedMessage'));
     },
   });
 
   const handleRegister = useCallback(() => {
     if (!registrationCode.trim()) {
-      Alert.alert('Missing Code', 'Please enter the registration code from the reader.');
+      Alert.alert(t('readerMissingCodeTitle'), t('readerMissingCodeMessage'));
       return;
     }
     registerMutation.mutate({
@@ -106,10 +107,10 @@ export function ReaderManagementScreen() {
 
     Alert.alert(
       reader.label || reader.deviceType,
-      isDefault ? 'This is your default reader.' : `${reader.status || 'Unknown status'}`,
+      isDefault ? t('readerIsDefaultMessage') : `${reader.status || t('readerUnknownStatus')}`,
       [
         {
-          text: isDefault ? 'Clear Default' : 'Set as Default',
+          text: isDefault ? t('readerActionClearDefault') : t('readerActionSetDefault'),
           onPress: () => {
             if (isDefault) {
               clearPreferredReader();
@@ -124,11 +125,11 @@ export function ReaderManagementScreen() {
           },
         },
         {
-          text: 'Delete',
+          text: t('readerActionDelete'),
           style: 'destructive',
           onPress: () => deleteMutation.mutate(reader.id),
         },
-        { text: 'Cancel', style: 'cancel' },
+        { text: tc('cancel'), style: 'cancel' },
       ]
     );
   }, [preferredReader, setPreferredReader, clearPreferredReader, deleteMutation]);
@@ -138,13 +139,13 @@ export function ReaderManagementScreen() {
       const found = await scanForBluetoothReaders();
       if (found.length === 0) {
         Alert.alert(
-          'No Readers Found',
-          'Make sure your Bluetooth reader is powered on, in pairing mode, and within a few feet of your phone. Then try again.',
+          t('readerNoReadersFoundTitle'),
+          t('readerNoReadersFoundMessage'),
         );
       }
     } catch (err: any) {
-      const message = err.message || 'Failed to scan for Bluetooth readers.';
-      Alert.alert('Scan Failed', message);
+      const message = err.message || t('readerScanFailedMessage');
+      Alert.alert(t('readerScanFailedTitle'), message);
     }
   }, [scanForBluetoothReaders]);
 
@@ -155,12 +156,12 @@ export function ReaderManagementScreen() {
       await connectReader('bluetoothScan', reader);
       await setPreferredReader({
         id: serial,
-        label: reader.label || reader.serialNumber || 'Bluetooth Reader',
+        label: reader.label || reader.serialNumber || t('readerBluetoothReader'),
         deviceType: reader.deviceType || 'bluetooth',
         readerType: 'bluetooth',
       });
     } catch (err: any) {
-      Alert.alert('Connection Failed', err.message || 'Could not connect to the Bluetooth reader. Make sure it is powered on and nearby.');
+      Alert.alert(t('readerConnectionFailedTitle'), err.message || t('readerConnectionFailedMessage'));
     } finally {
       setConnectingSerial(null);
     }
@@ -172,12 +173,12 @@ export function ReaderManagementScreen() {
 
   const handleClearDefault = useCallback(() => {
     Alert.alert(
-      'Clear Default Reader',
-      'This will revert to using Tap to Pay for all payments.',
+      t('readerClearDefaultAlertTitle'),
+      t('readerClearDefaultAlertMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: tc('cancel'), style: 'cancel' },
         {
-          text: 'Clear',
+          text: t('readerClearDefault'),
           style: 'destructive',
           onPress: () => clearPreferredReader(),
         },
@@ -185,7 +186,7 @@ export function ReaderManagementScreen() {
     );
   }, [clearPreferredReader]);
 
-  const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
+  const cardBorder = colors.border;
 
   const styles = StyleSheet.create({
     container: {
@@ -235,7 +236,7 @@ export function ReaderManagementScreen() {
       paddingHorizontal: 4,
     },
     card: {
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 14,
       borderWidth: 1,
       borderColor: cardBorder,
@@ -390,16 +391,16 @@ export function ReaderManagementScreen() {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('readerGoBackAccessibilityLabel')}
         >
           <Ionicons name="chevron-back" size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>Terminal Readers</Text>
+        <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>{t('readerHeaderTitle')}</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity
             onPress={() => setShowRegister(!showRegister)}
             accessibilityRole="button"
-            accessibilityLabel="Register new reader"
+            accessibilityLabel={t('readerRegisterAccessibilityLabel')}
           >
             <Ionicons name={showRegister ? 'close' : 'add-circle-outline'} size={26} color={colors.primary} />
           </TouchableOpacity>
@@ -414,23 +415,23 @@ export function ReaderManagementScreen() {
       >
         {/* Default Reader Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>Default Reader</Text>
+          <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>{t('readerSectionDefaultReader')}</Text>
           <View style={styles.card}>
             <View style={styles.defaultInfoRow}>
               <Ionicons name={preferredReader ? 'hardware-chip' : 'phone-portrait-outline'} size={18} color={preferredReader ? colors.primary : colors.textMuted} />
               <Text style={styles.defaultInfoValue} maxFontSizeMultiplier={1.3} numberOfLines={1}>
                 {preferredReader
-                  ? `${preferredReader.label || preferredReader.deviceType} (${preferredReader.readerType === 'internet' ? 'Internet' : 'Bluetooth'})`
-                  : 'None — using Tap to Pay'}
+                  ? t('readerDefaultValueWithReader', { label: preferredReader.label || preferredReader.deviceType, connectionType: preferredReader.readerType === 'internet' ? t('readerConnectionTypeInternet') : t('readerConnectionTypeBluetooth') })
+                  : t('readerDefaultValueNone')}
               </Text>
               {preferredReader && (
                 <TouchableOpacity
                   style={styles.clearButton}
                   onPress={handleClearDefault}
                   accessibilityRole="button"
-                  accessibilityLabel="Clear default reader"
+                  accessibilityLabel={t('readerClearDefaultAccessibilityLabel')}
                 >
-                  <Text style={styles.clearButtonText} maxFontSizeMultiplier={1.3}>Clear</Text>
+                  <Text style={styles.clearButtonText} maxFontSizeMultiplier={1.3}>{t('readerClearDefault')}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -440,27 +441,27 @@ export function ReaderManagementScreen() {
         {/* Connected Reader */}
         {isConnected && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>Connected</Text>
+            <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>{t('readerSectionConnected')}</Text>
             <View style={styles.card}>
               <View style={styles.row}>
                 <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
                 <View style={styles.rowLeft}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={styles.readerName} maxFontSizeMultiplier={1.3}>
-                      {connectedReaderLabel || (connectedReaderType === 'tapToPay' ? 'Tap to Pay' : 'Bluetooth Reader')}
+                      {connectedReaderLabel || (connectedReaderType === 'tapToPay' ? t('readerTapToPay') : t('readerBluetoothReader'))}
                     </Text>
                   </View>
                   <Text style={styles.readerDetail} maxFontSizeMultiplier={1.5}>
-                    {connectedReaderType === 'tapToPay' ? 'Built-in NFC' : 'Bluetooth'}
+                    {connectedReaderType === 'tapToPay' ? t('readerBuiltInNfc') : t('readerBluetooth')}
                   </Text>
                 </View>
                 <TouchableOpacity
                   onPress={handleDisconnect}
                   accessibilityRole="button"
-                  accessibilityLabel="Disconnect reader"
+                  accessibilityLabel={t('readerDisconnectAccessibilityLabel')}
                 >
                   <Text style={{ color: colors.error, fontFamily: fonts.medium, fontSize: 14 }} maxFontSizeMultiplier={1.3}>
-                    Disconnect
+                    {t('readerDisconnect')}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -471,47 +472,47 @@ export function ReaderManagementScreen() {
         {/* Register New Reader */}
         {showRegister && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>Register New Reader</Text>
+            <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>{t('readerSectionRegisterNew')}</Text>
             <View style={styles.card}>
               <View style={styles.registerForm}>
                 <TextInput
                   style={styles.input}
                   value={registrationCode}
                   onChangeText={setRegistrationCode}
-                  placeholder="Registration code (from reader screen)"
+                  placeholder={t('readerRegistrationCodePlaceholder')}
                   placeholderTextColor={colors.textMuted}
                   autoCapitalize="none"
                   autoCorrect={false}
-                  accessibilityLabel="Registration code"
+                  accessibilityLabel={t('readerRegistrationCodeAccessibilityLabel')}
                 />
                 <TextInput
                   style={styles.input}
                   value={readerLabel}
                   onChangeText={setReaderLabel}
-                  placeholder="Label (optional, e.g. 'Bar Reader 1')"
+                  placeholder={t('readerLabelPlaceholder')}
                   placeholderTextColor={colors.textMuted}
-                  accessibilityLabel="Reader label"
+                  accessibilityLabel={t('readerLabelAccessibilityLabel')}
                 />
                 <View style={styles.buttonRow}>
                   <TouchableOpacity
                     style={styles.secondaryButton}
                     onPress={() => { setShowRegister(false); setRegistrationCode(''); setReaderLabel(''); }}
                     accessibilityRole="button"
-                    accessibilityLabel="Cancel registration"
+                    accessibilityLabel={t('readerCancelRegistrationAccessibilityLabel')}
                   >
-                    <Text style={styles.secondaryButtonText} maxFontSizeMultiplier={1.3}>Cancel</Text>
+                    <Text style={styles.secondaryButtonText} maxFontSizeMultiplier={1.3}>{tc('cancel')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.primaryButton, registerMutation.isPending && { opacity: 0.6 }]}
                     onPress={handleRegister}
                     disabled={registerMutation.isPending}
                     accessibilityRole="button"
-                    accessibilityLabel="Register reader"
+                    accessibilityLabel={t('readerRegisterAccessibilityLabel')}
                   >
                     {registerMutation.isPending ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" accessibilityLabel="Registering" />
+                      <ActivityIndicator size="small" color="#FFFFFF" accessibilityLabel={t('readerRegistering')} />
                     ) : (
-                      <Text style={styles.primaryButtonText} maxFontSizeMultiplier={1.3}>Register</Text>
+                      <Text style={styles.primaryButtonText} maxFontSizeMultiplier={1.3}>{t('readerRegister')}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -522,17 +523,20 @@ export function ReaderManagementScreen() {
 
         {/* Registered Readers */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>Registered Readers</Text>
+          <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>{t('readerSectionRegisteredReaders')}</Text>
           <View style={styles.card}>
             {isLoading ? (
               <View style={styles.emptyState}>
-                <ActivityIndicator size="large" color={colors.primary} accessibilityLabel="Loading readers" />
+                <ActivityIndicator size="small" color={colors.primary} accessibilityLabel={t('readerLoadingReaders')} />
+                <Text style={[styles.emptyText, { marginTop: 12 }]} maxFontSizeMultiplier={1.5}>
+                  {t('readerLoadingReaders')}
+                </Text>
               </View>
             ) : readers.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="hardware-chip-outline" size={40} color={colors.textMuted} />
                 <Text style={styles.emptyText} maxFontSizeMultiplier={1.5}>
-                  No physical readers registered.{'\n'}Tap + to register a reader using the code on its screen.
+                  {t('readerEmptyState')}
                 </Text>
               </View>
             ) : (
@@ -545,7 +549,7 @@ export function ReaderManagementScreen() {
                       style={styles.row}
                       onPress={() => handleReaderAction(reader)}
                       accessibilityRole="button"
-                      accessibilityLabel={`${reader.label || reader.deviceType}, ${reader.status || 'unknown status'}${isDefault ? ', default reader' : ''}. Tap for options`}
+                      accessibilityLabel={t('readerRowAccessibilityLabel', { name: reader.label || reader.deviceType, status: reader.status || t('readerUnknownStatus'), defaultSuffix: isDefault ? t('readerRowDefaultSuffix') : '' })}
                     >
                       <View style={[styles.statusDot, {
                         backgroundColor: reader.status === 'online' ? colors.success : colors.textMuted,
@@ -557,7 +561,7 @@ export function ReaderManagementScreen() {
                           </Text>
                           {isDefault && (
                             <View style={styles.defaultBadge}>
-                              <Text style={styles.defaultBadgeText} maxFontSizeMultiplier={1.3}>Default</Text>
+                              <Text style={styles.defaultBadgeText} maxFontSizeMultiplier={1.3}>{t('readerDefaultBadge')}</Text>
                             </View>
                           )}
                         </View>
@@ -576,22 +580,22 @@ export function ReaderManagementScreen() {
 
         {/* Bluetooth Scan */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>Bluetooth Readers</Text>
+          <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>{t('readerSectionBluetooth')}</Text>
           <View style={styles.card}>
             <TouchableOpacity
               style={styles.actionButton}
               onPress={handleBluetoothScan}
               disabled={isScanning}
               accessibilityRole="button"
-              accessibilityLabel={isScanning ? 'Scanning for Bluetooth readers' : 'Scan for Bluetooth readers'}
+              accessibilityLabel={isScanning ? t('readerScanningAccessibilityLabel') : t('readerScanBluetoothAccessibilityLabel')}
             >
               {isScanning ? (
-                <ActivityIndicator size="small" color={colors.primary} accessibilityLabel="Scanning" />
+                <ActivityIndicator size="small" color={colors.primary} accessibilityLabel={t('readerScanning')} />
               ) : (
                 <Ionicons name="bluetooth" size={20} color={colors.primary} />
               )}
               <Text style={styles.actionButtonText} maxFontSizeMultiplier={1.3}>
-                {isScanning ? 'Scanning...' : 'Scan for Bluetooth Readers'}
+                {isScanning ? t('readerScanning') : t('readerScanBluetooth')}
               </Text>
             </TouchableOpacity>
 
@@ -609,7 +613,7 @@ export function ReaderManagementScreen() {
                         onPress={() => handleConnectBluetooth(reader)}
                         disabled={!!connectingSerial}
                         accessibilityRole="button"
-                        accessibilityLabel={isThisConnecting ? 'Connecting to reader' : `Connect to ${reader.label || reader.serialNumber || 'reader'}`}
+                        accessibilityLabel={isThisConnecting ? t('readerConnectingAccessibilityLabel') : t('readerConnectToAccessibilityLabel', { name: reader.label || reader.serialNumber || t('readerUnknownReader') })}
                       >
                         {isThisConnecting ? (
                           <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
@@ -618,10 +622,10 @@ export function ReaderManagementScreen() {
                         )}
                         <View style={styles.rowLeft}>
                           <Text style={styles.readerName} maxFontSizeMultiplier={1.3}>
-                            {reader.label || reader.serialNumber || 'Unknown Reader'}
+                            {reader.label || reader.serialNumber || t('readerUnknownReader')}
                           </Text>
                           <Text style={styles.readerDetail} maxFontSizeMultiplier={1.5}>
-                            {isThisConnecting ? 'Connecting...' : `${reader.deviceType || 'Bluetooth'} · Tap to connect`}
+                            {isThisConnecting ? t('readerConnecting') : `${reader.deviceType || t('readerBluetooth')} · ${t('readerTapToConnect')}`}
                           </Text>
                         </View>
                         {!isThisConnecting && (

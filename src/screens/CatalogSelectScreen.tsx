@@ -17,9 +17,9 @@ import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../context/CatalogContext';
 import { Catalog } from '../lib/api';
 import { openVendorDashboard } from '../lib/auth-handoff';
-import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
+import { useTranslations } from '../lib/i18n';
 
 
 // Loading state
@@ -33,6 +33,7 @@ function LoadingCatalogs({ colors, isDark }: { colors: any; isDark: boolean }) {
 
 // Empty state
 function EmptyCatalogs({ colors, isDark, isManager }: { colors: any; isDark: boolean; isManager: boolean }) {
+  const t = useTranslations('catalogs');
   return (
     <View style={[emptyStyles.container, { backgroundColor: isDark ? '#1C1917' : colors.background }]}>
       <View style={emptyStyles.content}>
@@ -43,12 +44,12 @@ function EmptyCatalogs({ colors, isDark, isManager }: { colors: any; isDark: boo
           <Ionicons name="grid-outline" size={44} color={isDark ? 'rgba(255,255,255,0.95)' : colors.primary} />
         </View>
         <Text style={[emptyStyles.title, { color: isDark ? '#fff' : colors.text }]} maxFontSizeMultiplier={1.2}>
-          No Menus Available
+          {t('noMenusAvailable')}
         </Text>
         <Text style={[emptyStyles.subtitle, { color: isDark ? 'rgba(255,255,255,0.55)' : colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
           {isManager
-            ? 'Create your product menu in the Vendor Portal to start selling with preset items and prices.'
-            : 'Ask your manager to create a menu for you to get started.'}
+            ? t('emptyManagerSubtitle')
+            : t('emptyStaffSubtitle')}
         </Text>
         {isManager && (
           <TouchableOpacity
@@ -56,11 +57,11 @@ function EmptyCatalogs({ colors, isDark, isManager }: { colors: any; isDark: boo
             onPress={() => openVendorDashboard('/products')}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel="Open Vendor Portal"
-            accessibilityHint="Opens the vendor dashboard to create menus"
+            accessibilityLabel={t('openVendorPortalAccessibilityLabel')}
+            accessibilityHint={t('openVendorPortalAccessibilityHint')}
           >
             <Text style={[emptyStyles.buttonText, { color: isDark ? '#1C1917' : '#fff' }]} maxFontSizeMultiplier={1.3}>
-              Open Vendor Portal
+              {t('openVendorPortalButton')}
             </Text>
             <Ionicons name="arrow-forward" size={18} color={isDark ? '#1C1917' : '#fff'} />
           </TouchableOpacity>
@@ -123,9 +124,10 @@ export function CatalogSelectScreen() {
   const { user } = useAuth();
   const navigation = useNavigation<any>();
   const route = useRoute();
-  const glassColors = isDark ? glass.dark : glass.light;
   const { catalogs, selectedCatalog, setSelectedCatalog, refreshCatalogs, isLoading } = useCatalog();
   const isManager = user?.role === 'owner' || user?.role === 'admin';
+  const t = useTranslations('catalogs');
+  const tc = useTranslations('common');
 
   const [isRefreshing, setIsRefreshing] = React.useState(false);
 
@@ -149,7 +151,7 @@ export function CatalogSelectScreen() {
     navigation.goBack();
   };
 
-  const styles = createStyles(colors, glassColors);
+  const styles = createStyles(colors);
 
   const renderCatalog = ({ item }: { item: Catalog }) => {
     const isSelected = selectedCatalog?.id === item.id;
@@ -160,8 +162,8 @@ export function CatalogSelectScreen() {
         onPress={() => handleSelectCatalog(item)}
         activeOpacity={0.7}
         accessibilityRole="button"
-        accessibilityLabel={`${item.name}, ${item.productCount} ${item.productCount === 1 ? 'product' : 'products'}${isSelected ? ', selected' : ''}`}
-        accessibilityHint="Double tap to select this menu"
+        accessibilityLabel={`${item.productCount === 1 ? t('catalogAccessibilityLabelSingular', { name: item.name, count: item.productCount }) : t('catalogAccessibilityLabelPlural', { name: item.name, count: item.productCount })}${isSelected ? t('catalogAccessibilityLabelSelectedSuffix') : ''}`}
+        accessibilityHint={t('catalogAccessibilityHint')}
       >
         <View style={[styles.catalogIcon, isSelected && styles.catalogIconSelected]}>
           <Ionicons
@@ -187,7 +189,7 @@ export function CatalogSelectScreen() {
             </View>
           )}
           <Text style={styles.productCount} maxFontSizeMultiplier={1.5}>
-            {item.productCount} {item.productCount === 1 ? 'product' : 'products'}
+            {t('productCount', { count: item.productCount, unit: item.productCount === 1 ? tc('product') : tc('products') })}
           </Text>
         </View>
         {isSelected ? (
@@ -215,15 +217,15 @@ export function CatalogSelectScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <Text style={styles.title} maxFontSizeMultiplier={1.2}>{isModal ? 'Switch Menu' : 'Select a Menu'}</Text>
+          <Text style={styles.title} maxFontSizeMultiplier={1.2}>{isModal ? t('switchMenuTitle') : t('selectMenuTitle')}</Text>
           <Text style={styles.subtitle} maxFontSizeMultiplier={1.5}>
             {isModal
-              ? 'Choose a different menu for this device'
-              : 'Choose which menu to use for this session'}
+              ? t('switchMenuSubtitle')
+              : t('selectMenuSubtitle')}
           </Text>
         </View>
         {isModal && (
-          <TouchableOpacity style={styles.closeButton} onPress={handleClose} accessibilityRole="button" accessibilityLabel="Close">
+          <TouchableOpacity style={styles.closeButton} onPress={handleClose} accessibilityRole="button" accessibilityLabel={t('closeAccessibilityLabel')}>
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
         )}
@@ -250,7 +252,7 @@ export function CatalogSelectScreen() {
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark) => {
+const createStyles = (colors: any) => {
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -262,9 +264,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
       paddingHorizontal: 20,
       paddingTop: 20,
       paddingBottom: 16,
-      backgroundColor: glassColors.backgroundSubtle,
+      backgroundColor: colors.background,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.borderSubtle,
+      borderBottomColor: colors.borderSubtle,
     },
     headerContent: {
       flex: 1,
@@ -276,10 +278,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
       justifyContent: 'center',
       marginTop: -8,
       marginRight: -8,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 14,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     title: {
       fontSize: 24,
@@ -300,10 +302,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
     catalogCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       padding: 16,
       marginBottom: 12,
       ...shadows.sm,

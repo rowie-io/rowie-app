@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet, Platform, Animated, Text, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 
 // Stripe React Native only works on native platforms with dev builds (not Expo Go)
@@ -32,17 +31,19 @@ import {
 import { QueryProvider } from './src/providers/QueryProvider';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { LanguageProvider } from './src/context/LanguageContext';
 import { CatalogProvider, useCatalog } from './src/context/CatalogContext';
 import { CartProvider } from './src/context/CartContext';
 import { DeviceProvider, useDevice } from './src/context/DeviceContext';
 import { SocketProvider } from './src/context/SocketContext';
-import { PreordersProvider, usePreorders } from './src/context/PreordersContext';
+import { PreordersProvider } from './src/context/PreordersContext';
 import { SocketEventHandlers } from './src/components/SocketEventHandlers';
 import { StripeTerminalContextProvider, useTerminal } from './src/context/StripeTerminalContext';
 import { NetworkStatus } from './src/components/NetworkStatus';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { DataPrefetcher } from './src/components/DataPrefetcher';
 import { config } from './src/lib/config';
+import { FloatingTabBar, FLOATING_TAB_BAR_HEIGHT } from './src/components/ui/FloatingTabBar';
 
 // Auth screens
 import { LoginScreen } from './src/screens/LoginScreen';
@@ -142,85 +143,7 @@ function HistoryStackNavigator() {
   );
 }
 
-// Custom Tab Bar Icon - Clean iOS style with dot indicator and optional badge
-function TabIcon({
-  route,
-  focused,
-  color,
-  badge,
-}: {
-  route: string;
-  focused: boolean;
-  color: string;
-  badge?: number;
-}) {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
-  const dotOpacity = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.spring(scaleAnim, {
-        toValue: focused ? 1.05 : 1,
-        tension: 300,
-        friction: 20,
-        useNativeDriver: true,
-      }),
-      Animated.timing(dotOpacity, {
-        toValue: focused ? 1 : 0,
-        duration: 150,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [focused, scaleAnim, dotOpacity]);
-
-  let iconName: keyof typeof Ionicons.glyphMap;
-
-  switch (route) {
-    case 'Menu':
-      iconName = focused ? 'grid' : 'grid-outline';
-      break;
-    case 'History':
-      iconName = focused ? 'receipt' : 'receipt-outline';
-      break;
-    case 'Events':
-      iconName = focused ? 'scan' : 'scan-outline';
-      break;
-    case 'Preorders':
-      iconName = focused ? 'clipboard' : 'clipboard-outline';
-      break;
-    case 'Settings':
-      iconName = focused ? 'settings' : 'settings-outline';
-      break;
-    default:
-      iconName = 'ellipse';
-  }
-
-  return (
-    <Animated.View
-      style={[
-        styles.tabIconWrapper,
-        { transform: [{ scale: scaleAnim }] },
-      ]}
-    >
-      <View>
-        <Ionicons name={iconName} size={26} color={color} />
-        {typeof badge === 'number' && badge > 0 ? (
-          <View style={styles.tabBadge}>
-            <Text style={styles.tabBadgeText}>
-              {badge > 99 ? '99+' : String(badge)}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-      <Animated.View
-        style={[
-          styles.tabDot,
-          { opacity: dotOpacity, backgroundColor: color },
-        ]}
-      />
-    </Animated.View>
-  );
-}
+// TabIcon removed — now using FloatingTabBar component
 
 // Main tab navigator wrapper - includes onboarding modal
 function TabNavigatorWithOnboarding() {
@@ -236,12 +159,10 @@ function TabNavigatorWithOnboarding() {
   );
 }
 
-// Main tab navigator - Clean iOS style
+// Main tab navigator - Floating pill bar
 function TabNavigator() {
-  const { colors, isDark } = useTheme();
-  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
   const { subscription } = useAuth();
-  const { counts: preorderCounts } = usePreorders();
   const { selectedCatalog } = useCatalog();
 
   // Only show Events tab for Pro/Enterprise users
@@ -252,28 +173,11 @@ function TabNavigator() {
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      tabBar={(props) => <FloatingTabBar {...props} />}
+      screenOptions={{
         headerShown: false,
-        tabBarShowLabel: false,
-        tabBarStyle: {
-          backgroundColor: isDark ? '#292524' : '#ffffff',
-          borderTopWidth: StyleSheet.hairlineWidth,
-          borderTopColor: isDark ? '#44403C' : 'rgba(0, 0, 0, 0.08)',
-          height: 60 + insets.bottom,
-          paddingTop: 8,
-          paddingBottom: insets.bottom,
-        },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.tabInactive,
-        tabBarIcon: ({ focused, color }) => (
-          <TabIcon
-            route={route.name}
-            focused={focused}
-            color={color}
-            badge={route.name === 'Preorders' && preorderCounts?.total ? preorderCounts.total : undefined}
-          />
-        ),
-      })}
+        sceneStyle: { paddingBottom: FLOATING_TAB_BAR_HEIGHT },
+      }}
     >
       <Tab.Screen
         name="Menu"
@@ -353,15 +257,8 @@ function TapToPayOnboardingWrapper() {
   // Handle Setup Payments modal - user clicked "Continue"
   const handleSetupPayments = useCallback(() => {
     // Mark as complete for this session only (to hide the modal)
-    // Don't mark education as seen yet - that happens when user finishes TapToPayEducation
     setHasCompletedOnboarding(true);
-
-    // Navigate to Stripe Connect onboarding after a brief delay
-    // This ensures the modal dismisses cleanly before navigation
-    // returnTo: 'education' will take them to Tap to Pay education after
-    requestAnimationFrame(() => {
-      navigation.navigate('StripeOnboarding', { returnTo: 'education' });
-    });
+    navigation.navigate('StripeOnboarding', { returnTo: 'education' });
   }, [navigation]);
 
   // Navigate to education screen when Connect is already set up
@@ -511,6 +408,15 @@ function AuthenticatedNavigator() {
 }
 
 // App navigator with auth check
+function LanguageBridge({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  return (
+    <LanguageProvider userLanguage={user?.language} orgLanguage={user?.orgLanguage}>
+      {children}
+    </LanguageProvider>
+  );
+}
+
 function AppNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
   const { colors, isDark } = useTheme();
@@ -618,19 +524,21 @@ export default function App() {
             <SafeAreaProvider>
               <ThemeProvider>
                 <AuthProvider>
-                  <SocketProvider>
-                    <SocketEventHandlers />
-                    <DeviceProvider>
-                      <CatalogProvider>
-                        <PreordersProvider>
-                          <CartProvider>
-                            <NetworkStatus />
-                            <AppNavigator />
-                          </CartProvider>
-                        </PreordersProvider>
-                      </CatalogProvider>
-                    </DeviceProvider>
-                  </SocketProvider>
+                  <LanguageBridge>
+                    <SocketProvider>
+                      <SocketEventHandlers />
+                      <DeviceProvider>
+                        <CatalogProvider>
+                          <PreordersProvider>
+                            <CartProvider>
+                              <NetworkStatus />
+                              <AppNavigator />
+                            </CartProvider>
+                          </PreordersProvider>
+                        </CatalogProvider>
+                      </DeviceProvider>
+                    </SocketProvider>
+                  </LanguageBridge>
                 </AuthProvider>
               </ThemeProvider>
             </SafeAreaProvider>
@@ -644,33 +552,5 @@ export default function App() {
 const styles = StyleSheet.create({
   gestureRoot: {
     flex: 1,
-  },
-  tabIconWrapper: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 4,
-  },
-  tabDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    marginTop: 4,
-  },
-  tabBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -10,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#ef4444',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  tabBadgeText: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
   },
 });

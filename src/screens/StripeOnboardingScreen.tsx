@@ -14,6 +14,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { stripeConnectApi } from '../lib/api';
 import logger from '../lib/logger';
+import { useTranslations } from '../lib/i18n';
 
 type StripeOnboardingParams = {
   returnTo?: 'education' | 'settings' | 'home';
@@ -27,12 +28,15 @@ export function StripeOnboardingScreen() {
   const { refreshConnectStatus } = useAuth();
   const insets = useSafeAreaInsets();
   const webViewRef = useRef<WebView>(null);
+  const t = useTranslations('onboarding');
+  const tc = useTranslations('common');
 
   const [onboardingUrl, setOnboardingUrl] = useState<string | null>(null);
   const [isFetchingUrl, setIsFetchingUrl] = useState(true);
   const [isWebViewLoading, setIsWebViewLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasShownCompletion, setHasShownCompletion] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
 
   const styles = createStyles(colors);
 
@@ -50,8 +54,22 @@ export function StripeOnboardingScreen() {
       logger.log('[StripeOnboarding] Got onboarding URL:', response.onboardingUrl);
       setOnboardingUrl(response.onboardingUrl);
     } catch (err: any) {
+      // If no connected account exists yet (404), create one automatically
+      if (err.statusCode === 404) {
+        logger.log('[StripeOnboarding] No account found, creating one...');
+        try {
+          const createResponse = await stripeConnectApi.createAccount();
+          logger.log('[StripeOnboarding] Account created, got URL:', createResponse.onboardingUrl);
+          setOnboardingUrl(createResponse.onboardingUrl);
+          return;
+        } catch (createErr: any) {
+          logger.error('[StripeOnboarding] Failed to create account:', createErr);
+          setError(createErr.message || t('errorCreateAccountDefault'));
+          return;
+        }
+      }
       logger.error('[StripeOnboarding] Failed to get onboarding URL:', err);
-      setError(err.message || 'Failed to load onboarding. Please try again.');
+      setError(err.message || t('errorLoadOnboardingDefault'));
     } finally {
       setIsFetchingUrl(false);
     }
@@ -117,13 +135,29 @@ export function StripeOnboardingScreen() {
   // Show loading overlay while API is fetching or WebView is loading the Stripe page
   const showLoading = isFetchingUrl || (onboardingUrl && isWebViewLoading);
 
+  // Cycle through loading messages to show progress
+  const LOADING_STEPS = [
+    t('loadingStep1'),
+    t('loadingStep2'),
+    t('loadingStep3'),
+    t('loadingStep4'),
+  ];
+
+  useEffect(() => {
+    if (!showLoading || error) return;
+    const interval = setInterval(() => {
+      setLoadingStep(prev => (prev + 1) % LOADING_STEPS.length);
+    }, 2200);
+    return () => clearInterval(interval);
+  }, [showLoading, error]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleClose} style={styles.closeButton} accessibilityRole="button" accessibilityLabel="Close">
+        <TouchableOpacity onPress={handleClose} style={styles.closeButton} accessibilityRole="button" accessibilityLabel={t('closeAccessibilityLabel')}>
           <Ionicons name="close" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.title} maxFontSizeMultiplier={1.3}>Banking</Text>
+        <Text style={styles.title} maxFontSizeMultiplier={1.3}>{t('headerTitle')}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -149,10 +183,24 @@ export function StripeOnboardingScreen() {
           />
         )}
 
-        {/* Loading overlay on top of WebView */}
+        {/* Loading overlay with progress steps */}
         {showLoading && !error && (
-          <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }]}>
-            <ActivityIndicator size="large" color={colors.primary} />
+          <View style={[StyleSheet.absoluteFill, styles.loadingContainer]}>
+            <View style={styles.loadingIconWrap}>
+              <Ionicons name="shield-checkmark-outline" size={48} color={colors.primary} />
+            </View>
+            <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
+            <Text style={styles.loadingTitle} maxFontSizeMultiplier={1.3}>
+              {t('loadingTitle')}
+            </Text>
+            <Text style={styles.loadingStep} maxFontSizeMultiplier={1.5}>
+              {LOADING_STEPS[loadingStep]}
+            </Text>
+            <View style={styles.progressBarTrack}>
+              <View style={[styles.progressBarFill, {
+                width: isFetchingUrl ? '40%' : '75%',
+              }]} />
+            </View>
           </View>
         )}
 
@@ -161,8 +209,8 @@ export function StripeOnboardingScreen() {
           <View style={[StyleSheet.absoluteFill, styles.errorContainer]}>
             <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
             <Text style={styles.errorText} maxFontSizeMultiplier={1.5} accessibilityRole="alert">{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={fetchOnboardingUrl} accessibilityRole="button" accessibilityLabel="Try Again">
-              <Text style={styles.retryButtonText} maxFontSizeMultiplier={1.3}>Try Again</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={fetchOnboardingUrl} accessibilityRole="button" accessibilityLabel={t('tryAgainButtonText')}>
+              <Text style={styles.retryButtonText} maxFontSizeMultiplier={1.3}>{t('tryAgainButtonText')}</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -196,6 +244,49 @@ const createStyles = (colors: any) =>
     },
     placeholder: {
       width: 40,
+    },
+    loadingContainer: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      padding: 32,
+    },
+    loadingIconWrap: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      backgroundColor: `${colors.primary}15`,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: `${colors.primary}30`,
+    },
+    loadingTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.text,
+      marginTop: 20,
+      textAlign: 'center',
+    },
+    loadingStep: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginTop: 8,
+      textAlign: 'center',
+      minHeight: 20,
+    },
+    progressBarTrack: {
+      width: 200,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: `${colors.text}15`,
+      marginTop: 24,
+      overflow: 'hidden',
+    },
+    progressBarFill: {
+      height: '100%',
+      borderRadius: 2,
+      backgroundColor: colors.primary,
     },
     errorContainer: {
       flex: 1,

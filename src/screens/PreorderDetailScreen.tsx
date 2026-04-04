@@ -19,9 +19,9 @@ import { preordersApi, Preorder, PreorderStatus } from '../lib/api/preorders';
 import { stripeTerminalApi } from '../lib/api/stripe-terminal';
 import { usePreorders } from '../context/PreordersContext';
 import { formatCurrency, toSmallestUnit } from '../utils/currency';
-import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
+import { useTranslations } from '../lib/i18n';
 
 interface RouteParams {
   preorderId: string;
@@ -46,31 +46,31 @@ function getStatusColor(status: PreorderStatus, colors: any): string {
   }
 }
 
-function getStatusLabel(status: PreorderStatus): string {
+function getStatusLabel(status: PreorderStatus, t: (key: string) => string): string {
   switch (status) {
     case 'pending':
-      return 'Pending';
+      return t('statusPending');
     case 'preparing':
-      return 'Preparing';
+      return t('statusPreparing');
     case 'ready':
-      return 'Ready for Pickup';
+      return t('statusReadyForPickup');
     case 'picked_up':
-      return 'Picked Up';
+      return t('statusPickedUp');
     case 'cancelled':
-      return 'Cancelled';
+      return t('statusCancelled');
     default:
       return status;
   }
 }
 
-function getNextAction(status: PreorderStatus): { label: string; nextStatus: PreorderStatus } | null {
+function getNextAction(status: PreorderStatus, t: (key: string, params?: Record<string, string>) => string): { label: string; nextStatus: PreorderStatus } | null {
   switch (status) {
     case 'pending':
-      return { label: 'Start Preparing', nextStatus: 'preparing' };
+      return { label: t('actionStartPreparing'), nextStatus: 'preparing' };
     case 'preparing':
-      return { label: 'Mark as Ready', nextStatus: 'ready' };
+      return { label: t('actionMarkAsReady'), nextStatus: 'ready' };
     case 'ready':
-      return { label: 'Complete Pickup', nextStatus: 'picked_up' };
+      return { label: t('actionCompletePickup'), nextStatus: 'picked_up' };
     default:
       return null;
   }
@@ -96,8 +96,9 @@ export function PreorderDetailScreen() {
   const { preorderId } = route.params as RouteParams;
   const { isConnected } = useSocket();
   const { refreshCounts } = usePreorders();
-  const glassColors = isDark ? glass.dark : glass.light;
   const insets = useSafeAreaInsets();
+  const t = useTranslations('preorders');
+  const tc = useTranslations('common');
 
   const [preorder, setPreorder] = useState<Preorder | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -106,14 +107,14 @@ export function PreorderDetailScreen() {
   const wasConnectedRef = useRef(isConnected);
   const hasEverConnectedRef = useRef(false);
 
-  const styles = createStyles(colors, glassColors, isDark);
+  const styles = createStyles(colors, isDark);
 
   const fetchPreorder = useCallback(async () => {
     try {
       const data = await preordersApi.get(preorderId);
       setPreorder(data);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load order details');
+      Alert.alert(t('errorAlertTitle'), t('errorLoadOrderDetails'));
     } finally {
       setIsLoading(false);
     }
@@ -152,7 +153,7 @@ export function PreorderDetailScreen() {
       setPreorder(updated);
       refreshCounts();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to update order status');
+      Alert.alert(t('errorAlertTitle'), error.message || t('errorUpdateStatusDefault'));
     } finally {
       setIsUpdating(false);
     }
@@ -164,12 +165,12 @@ export function PreorderDetailScreen() {
     // For pay_at_pickup orders, we need to process payment first
     if (preorder.paymentType === 'pay_at_pickup') {
       Alert.alert(
-        'Process Payment',
-        `The customer needs to pay ${formatCurrency(preorder.totalAmount || 0, currency)}. Proceed with Tap to Pay?`,
+        t('processPaymentTitle'),
+        t('processPaymentMessage', { amount: formatCurrency(preorder.totalAmount || 0, currency) }),
         [
-          { text: 'Cancel', style: 'cancel' },
+          { text: tc('cancel'), style: 'cancel' },
           {
-            text: 'Process Payment',
+            text: t('processPaymentConfirm'),
             onPress: async () => {
               try {
                 setIsUpdating(true);
@@ -202,7 +203,7 @@ export function PreorderDetailScreen() {
                 setIsUpdating(false);
               } catch (error: any) {
                 setIsUpdating(false);
-                Alert.alert('Error', error.message || 'Failed to create payment');
+                Alert.alert(t('errorAlertTitle'), error.message || t('errorCreatePaymentDefault'));
               }
             },
           },
@@ -215,9 +216,9 @@ export function PreorderDetailScreen() {
         const updated = await preordersApi.complete(preorder.id);
         setPreorder(updated);
         refreshCounts();
-        Alert.alert('Success', 'Order marked as picked up!');
+        Alert.alert(t('successAlertTitle'), t('orderMarkedPickedUp'));
       } catch (error: any) {
-        Alert.alert('Error', error.message || 'Failed to complete order');
+        Alert.alert(t('errorAlertTitle'), error.message || t('errorCompleteOrderDefault'));
       } finally {
         setIsUpdating(false);
       }
@@ -230,14 +231,14 @@ export function PreorderDetailScreen() {
     const isPaid = preorder.paymentType === 'pay_now' && preorder.stripePaymentIntentId;
     const formattedTotal = formatCurrency(preorder.totalAmount || 0, currency);
     Alert.alert(
-      isPaid ? 'Cancel & Refund Order' : 'Cancel Order',
+      isPaid ? t('cancelAndRefundTitle') : t('cancelOrderTitle'),
       isPaid
-        ? `A refund of ${formattedTotal} will be issued to the customer's original payment method. This cannot be undone.`
-        : 'Are you sure you want to cancel this order? No payment was collected.',
+        ? t('cancelAndRefundMessage', { amount: formattedTotal })
+        : t('cancelOrderMessage'),
       [
-        { text: 'Keep Order', style: 'cancel' },
+        { text: t('keepOrderButton'), style: 'cancel' },
         {
-          text: isPaid ? 'Cancel & Refund' : 'Cancel Order',
+          text: isPaid ? t('cancelAndRefundButton') : t('cancelOrderButton'),
           style: 'destructive',
           onPress: async () => {
             setIsCancelling(true);
@@ -245,14 +246,14 @@ export function PreorderDetailScreen() {
               await preordersApi.cancel(preorder.id);
               refreshCounts();
               Alert.alert(
-                isPaid ? 'Cancelled & Refunded' : 'Cancelled',
+                isPaid ? t('cancelledAndRefundedTitle') : t('cancelledTitle'),
                 isPaid
-                  ? `Order cancelled. ${formattedTotal} refund issued to the customer.`
-                  : 'Order has been cancelled.'
+                  ? t('cancelledAndRefundedMessage', { amount: formattedTotal })
+                  : t('cancelledMessage')
               );
               navigation.goBack();
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to cancel order');
+              Alert.alert(t('errorAlertTitle'), error.message || t('errorCancelOrderDefault'));
             } finally {
               setIsCancelling(false);
             }
@@ -278,30 +279,30 @@ export function PreorderDetailScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel={t('goBackAccessibilityLabel')}>
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>Order Details</Text>
+          <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>{t('detailHeaderTitleLoading')}</Text>
           <View style={{ width: 40 }} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel="Loading order details" />
+          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={tc('loading')} />
         </View>
       </SafeAreaView>
     );
   }
 
-  const nextAction = getNextAction(preorder.status);
+  const nextAction = getNextAction(preorder.status, t);
   const statusColor = getStatusColor(preorder.status, colors);
   const isComplete = preorder.status === 'picked_up' || preorder.status === 'cancelled';
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Go back">
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton} accessibilityRole="button" accessibilityLabel={t('goBackAccessibilityLabel')}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>Order #{preorder.dailyNumber || '—'}</Text>
+        <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>{t('detailHeaderTitle', { dailyNumber: String(preorder.dailyNumber || '—') })}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -312,19 +313,19 @@ export function PreorderDetailScreen() {
             <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
               <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
               <Text style={[styles.statusText, { color: statusColor }]} maxFontSizeMultiplier={1.5}>
-                {getStatusLabel(preorder.status)}
+                {getStatusLabel(preorder.status, t)}
               </Text>
             </View>
             {preorder.paymentType === 'pay_now' && (
               <View style={styles.paidBadge}>
                 <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                <Text style={styles.paidText} maxFontSizeMultiplier={1.5}>Paid Online</Text>
+                <Text style={styles.paidText} maxFontSizeMultiplier={1.5}>{t('paidOnlineText')}</Text>
               </View>
             )}
             {preorder.paymentType === 'pay_at_pickup' && preorder.status !== 'picked_up' && (
               <View style={styles.unpaidBadge}>
                 <Ionicons name="card-outline" size={16} color={colors.warning} />
-                <Text style={styles.unpaidText} maxFontSizeMultiplier={1.5}>Pay at Pickup</Text>
+                <Text style={styles.unpaidText} maxFontSizeMultiplier={1.5}>{t('payAtPickupBadgeText')}</Text>
               </View>
             )}
           </View>
@@ -346,48 +347,56 @@ export function PreorderDetailScreen() {
                     <View style={[styles.timelineLine, isCompleted && { backgroundColor: colors.primary }]} />
                   )}
                   <Text style={[styles.timelineLabel, (isCompleted || isCurrent) && { color: colors.text }]} maxFontSizeMultiplier={1.5}>
-                    {getStatusLabel(status)}
+                    {getStatusLabel(status, t)}
                   </Text>
                 </View>
               );
             })}
           </View>
 
-          <Text style={styles.orderDate} maxFontSizeMultiplier={1.5}>Ordered {preorder.createdAt ? formatDate(preorder.createdAt) : '—'}</Text>
+          <Text style={styles.orderDate} maxFontSizeMultiplier={1.5}>{t('orderedPrefix', { date: preorder.createdAt ? formatDate(preorder.createdAt) : '—' })}</Text>
         </View>
 
         {/* Customer Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.5}>Customer</Text>
+          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.5}>{t('customerCardTitle')}</Text>
           <View style={styles.customerInfo}>
-            <Text style={styles.customerName} maxFontSizeMultiplier={1.3}>{preorder.customerName || 'Unknown Customer'}</Text>
-            <Text style={styles.customerEmail} maxFontSizeMultiplier={1.5}>{preorder.customerEmail || 'No email'}</Text>
+            <View style={styles.customerNameRow}>
+              <Text style={styles.customerName} maxFontSizeMultiplier={1.3}>{preorder.customerName || t('unknownCustomerName')}</Text>
+              {preorder.tableIdentifier && (
+                <View style={styles.tableBadge}>
+                  <Ionicons name="restaurant-outline" size={13} color={colors.textSecondary} />
+                  <Text style={styles.tableBadgeText} maxFontSizeMultiplier={1.5}>{preorder.tableIdentifier}</Text>
+                </View>
+              )}
+            </View>
+            <Text style={styles.customerEmail} maxFontSizeMultiplier={1.5}>{preorder.customerEmail || t('noEmailText')}</Text>
             {preorder.customerPhone && (
               <Text style={styles.customerPhone} maxFontSizeMultiplier={1.5}>{preorder.customerPhone}</Text>
             )}
           </View>
           <View style={styles.customerActions}>
             {preorder.customerPhone && (
-              <TouchableOpacity style={styles.customerAction} onPress={handleCallCustomer} accessibilityRole="button" accessibilityLabel={`Call ${preorder.customerName || 'customer'}`}>
+              <TouchableOpacity style={styles.customerAction} onPress={handleCallCustomer} accessibilityRole="button" accessibilityLabel={`${t('callButtonText')} ${preorder.customerName || t('customerFallbackName')}`}>
                 <Ionicons name="call-outline" size={20} color={colors.primary} />
-                <Text style={styles.customerActionText} maxFontSizeMultiplier={1.3}>Call</Text>
+                <Text style={styles.customerActionText} maxFontSizeMultiplier={1.3}>{t('callButtonText')}</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.customerAction} onPress={handleEmailCustomer} accessibilityRole="button" accessibilityLabel={`Email ${preorder.customerName || 'customer'}`}>
+            <TouchableOpacity style={styles.customerAction} onPress={handleEmailCustomer} accessibilityRole="button" accessibilityLabel={`${t('emailButtonText')} ${preorder.customerName || t('customerFallbackName')}`}>
               <Ionicons name="mail-outline" size={20} color={colors.primary} />
-              <Text style={styles.customerActionText} maxFontSizeMultiplier={1.3}>Email</Text>
+              <Text style={styles.customerActionText} maxFontSizeMultiplier={1.3}>{t('emailButtonText')}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Items Card */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.5}>Items</Text>
+          <Text style={styles.cardTitle} maxFontSizeMultiplier={1.5}>{t('itemsCardTitle')}</Text>
           {(preorder.items || []).map((item, index) => (
             <View key={item.id} style={[styles.itemRow, index > 0 && styles.itemRowBorder]}>
               <View style={styles.itemInfo}>
                 <View style={styles.itemHeader}>
-                  <Text style={styles.itemQuantity} maxFontSizeMultiplier={1.5}>{item.quantity}x</Text>
+                  <Text style={styles.itemQuantity} maxFontSizeMultiplier={1.5}>{t('quantityPrefix', { quantity: String(item.quantity) })}</Text>
                   <Text style={styles.itemName} maxFontSizeMultiplier={1.5}>{item.name}</Text>
                 </View>
                 {item.notes && (
@@ -412,23 +421,23 @@ export function PreorderDetailScreen() {
         {/* Totals Card */}
         <View style={styles.card}>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel} maxFontSizeMultiplier={1.5}>Subtotal</Text>
+            <Text style={styles.totalLabel} maxFontSizeMultiplier={1.5}>{t('subtotalLabel')}</Text>
             <Text style={styles.totalValue} maxFontSizeMultiplier={1.5}>{formatCurrency(preorder.subtotal || 0, currency)}</Text>
           </View>
           {(preorder.taxAmount || 0) > 0 && (
             <View style={styles.totalRow}>
-              <Text style={styles.totalLabel} maxFontSizeMultiplier={1.5}>Tax</Text>
+              <Text style={styles.totalLabel} maxFontSizeMultiplier={1.5}>{t('taxLabel')}</Text>
               <Text style={styles.totalValue} maxFontSizeMultiplier={1.5}>{formatCurrency(preorder.taxAmount || 0, currency)}</Text>
             </View>
           )}
           {(preorder.tipAmount || 0) > 0 && (
             <View style={styles.totalRow}>
-              <Text style={styles.totalLabel} maxFontSizeMultiplier={1.5}>Tip</Text>
+              <Text style={styles.totalLabel} maxFontSizeMultiplier={1.5}>{t('tipLabel')}</Text>
               <Text style={styles.totalValue} maxFontSizeMultiplier={1.5}>{formatCurrency(preorder.tipAmount || 0, currency)}</Text>
             </View>
           )}
           <View style={[styles.totalRow, styles.totalRowFinal]}>
-            <Text style={styles.totalLabelFinal} maxFontSizeMultiplier={1.3}>Total</Text>
+            <Text style={styles.totalLabelFinal} maxFontSizeMultiplier={1.3}>{t('totalLabel')}</Text>
             <Text style={styles.totalValueFinal} maxFontSizeMultiplier={1.3}>{formatCurrency(preorder.totalAmount || 0, currency)}</Text>
           </View>
         </View>
@@ -440,15 +449,15 @@ export function PreorderDetailScreen() {
             onPress={handleCancel}
             disabled={isCancelling}
             accessibilityRole="button"
-            accessibilityLabel="Cancel Order"
+            accessibilityLabel={t('cancelOrderButtonText')}
             accessibilityState={{ disabled: isCancelling }}
           >
             {isCancelling ? (
-              <ActivityIndicator size="small" color={colors.error} accessibilityLabel="Cancelling order" />
+              <ActivityIndicator size="small" color={colors.error} accessibilityLabel={tc('loading')} />
             ) : (
               <>
                 <Ionicons name="close-circle-outline" size={20} color={colors.error} />
-                <Text style={styles.cancelButtonText} maxFontSizeMultiplier={1.3}>Cancel Order</Text>
+                <Text style={styles.cancelButtonText} maxFontSizeMultiplier={1.3}>{t('cancelOrderButtonText')}</Text>
               </>
             )}
           </TouchableOpacity>
@@ -473,13 +482,13 @@ export function PreorderDetailScreen() {
             accessibilityState={{ disabled: isUpdating }}
           >
             {isUpdating ? (
-              <ActivityIndicator size="small" color="#fff" accessibilityLabel="Updating order status" />
+              <ActivityIndicator size="small" color="#fff" accessibilityLabel={tc('loading')} />
             ) : (
               <>
                 <Text style={styles.actionButtonText} maxFontSizeMultiplier={1.3}>{nextAction.label}</Text>
                 {preorder.status === 'ready' && preorder.paymentType === 'pay_at_pickup' && (
                   <Text style={styles.actionButtonSubtext} maxFontSizeMultiplier={1.3}>
-                    Collect {formatCurrency(preorder.totalAmount || 0, currency)} via Tap to Pay
+                    {t('actionCollectViaTapToPay', { amount: formatCurrency(preorder.totalAmount || 0, currency) })}
                   </Text>
                 )}
               </>
@@ -491,7 +500,7 @@ export function PreorderDetailScreen() {
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) =>
+const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -504,13 +513,13 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       paddingHorizontal: 16,
       paddingVertical: 12,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.border,
+      borderBottomColor: colors.border,
     },
     backButton: {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -531,11 +540,11 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       padding: 16,
     },
     card: {
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 16,
       padding: 16,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       marginBottom: 16,
       ...shadows.sm,
     },
@@ -632,11 +641,30 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     customerInfo: {
       marginBottom: 12,
     },
+    customerNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 4,
+    },
     customerName: {
       fontSize: 17,
       fontFamily: fonts.semiBold,
       color: colors.text,
-      marginBottom: 4,
+    },
+    tableBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: colors.border,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 8,
+    },
+    tableBadgeText: {
+      fontSize: 12,
+      fontFamily: fonts.medium,
+      color: colors.textSecondary,
     },
     customerEmail: {
       fontSize: 15,
@@ -675,7 +703,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
     },
     itemRowBorder: {
       borderTopWidth: 1,
-      borderTopColor: glassColors.borderSubtle,
+      borderTopColor: colors.borderSubtle,
     },
     itemInfo: {
       flex: 1,
@@ -715,7 +743,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       paddingTop: 12,
       marginTop: 12,
       borderTopWidth: 1,
-      borderTopColor: glassColors.borderSubtle,
+      borderTopColor: colors.borderSubtle,
       gap: 8,
     },
     orderNotesText: {
@@ -735,7 +763,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       paddingTop: 12,
       marginTop: 8,
       borderTopWidth: 1,
-      borderTopColor: glassColors.border,
+      borderTopColor: colors.border,
     },
     totalLabel: {
       fontSize: 15,
@@ -781,7 +809,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       padding: 16,
       backgroundColor: colors.background,
       borderTopWidth: 1,
-      borderTopColor: glassColors.border,
+      borderTopColor: colors.border,
     },
     actionButton: {
       backgroundColor: colors.primary,

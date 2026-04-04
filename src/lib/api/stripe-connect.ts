@@ -15,7 +15,14 @@ export interface OnboardingLink {
   onboardingUrl: string;
 }
 
+export interface CreateAccountResponse {
+  accountId: string;
+  onboardingUrl: string;
+}
+
 export const stripeConnectApi = {
   getStatus: () => apiClient.get<ConnectStatus>('/stripe/connect/status'),
   getOnboardingLink: () => apiClient.post<OnboardingLink>('/stripe/connect/onboarding-link', {}),
+  createAccount: (country = 'US') =>
+    apiClient.post<CreateAccountResponse>('/stripe/connect/create-account', { country }),
 };

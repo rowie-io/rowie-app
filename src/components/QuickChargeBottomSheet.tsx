@@ -20,9 +20,9 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { formatCents, getCurrencySymbol, isZeroDecimal, fromSmallestUnit } from '../utils/currency';
 import { fonts } from '../lib/fonts';
-import { glass } from '../lib/colors';
 import { shadows } from '../lib/shadows';
 import { useTapToPayGuard } from '../hooks';
+import { useTranslations } from '../lib/i18n';
 
 const KEYPAD_ROWS = [
   ['1', '2', '3'],
@@ -36,10 +36,9 @@ interface KeypadButtonProps {
   onPress: (key: string) => void;
   colors: any;
   buttonSize: number;
-  glassColors: typeof glass.dark;
 }
 
-const KeypadButton = memo(function KeypadButton({ keyValue, onPress, colors, buttonSize, glassColors }: KeypadButtonProps) {
+const KeypadButton = memo(function KeypadButton({ keyValue, onPress, colors, buttonSize }: KeypadButtonProps) {
   const scale = React.useRef(new Animated.Value(1)).current;
 
   const numberFontSize = Math.round(buttonSize * 0.36);
@@ -90,10 +89,10 @@ const KeypadButton = memo(function KeypadButton({ keyValue, onPress, colors, but
             justifyContent: 'center',
             alignItems: 'center',
             backgroundColor: pressed
-              ? glassColors.backgroundElevated
-              : glassColors.background,
+              ? colors.card
+              : colors.background,
             borderWidth: 1,
-            borderColor: pressed ? glassColors.borderLight : glassColors.border,
+            borderColor: pressed ? colors.borderLight : colors.border,
             ...shadows.sm,
           },
         ]}
@@ -129,10 +128,10 @@ interface QuickChargeBottomSheetProps {
 export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSheetProps) {
   const { colors, isDark } = useTheme();
   const { currency } = useAuth();
+  const t = useTranslations('components.quickCharge');
   const navigation = useNavigation<any>();
   const { guardCheckout } = useTapToPayGuard();
   const insets = useSafeAreaInsets();
-  const glassColors = isDark ? glass.dark : glass.light;
   const { width: screenWidth } = useWindowDimensions();
 
   const [amount, setAmount] = useState('');
@@ -170,7 +169,7 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
 
   const handleCharge = useCallback(() => {
     if (cents < 50) {
-      Alert.alert('Invalid Amount', `Minimum charge is ${formatCents(50, currency)}`);
+      Alert.alert(t('invalidAmountTitle'), t('minimumCharge', { amount: formatCents(50, currency) }));
       return;
     }
 
@@ -186,7 +185,7 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
     navigation.navigate('Checkout', {
       total: cents,
       isQuickCharge: true,
-      quickChargeDescription: `Quick Charge - ${formattedAmount}`,
+      quickChargeDescription: t('quickChargeDescription', { amount: formattedAmount }),
     });
 
     // Reset form
@@ -233,7 +232,7 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
 
             {/* Header */}
             <View style={styles.header}>
-              <Text style={[styles.title, { color: colors.text }]} maxFontSizeMultiplier={1.3}>Quick Charge</Text>
+              <Text style={[styles.title, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{t('title')}</Text>
               <Pressable onPress={handleClose} hitSlop={12}>
                 <Ionicons name="close" size={24} color={colors.textSecondary} />
               </Pressable>
@@ -256,7 +255,6 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
                       onPress={handleKeypadPress}
                       colors={colors}
                       buttonSize={buttonSize}
-                      glassColors={glassColors}
                     />
                   ))}
                 </View>
@@ -277,7 +275,7 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
                   styles.chargeButton,
                   {
                     backgroundColor: chargeDisabled
-                      ? glassColors.backgroundElevated
+                      ? colors.card
                       : isDark ? '#fff' : '#1C1917',
                   },
                   pressed && !chargeDisabled && styles.chargeButtonPressed,
@@ -295,12 +293,12 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
                   ]}
                   maxFontSizeMultiplier={1.3}
                 >
-                  {cents < 50 ? 'Enter Amount' : `Charge ${formattedAmount}`}
+                  {cents < 50 ? t('enterAmount') : t('chargeAmount', { amount: formattedAmount })}
                 </Text>
               </Pressable>
 
               <Text style={[styles.minimumHint, { color: colors.textMuted, opacity: cents > 0 && cents < 50 ? 1 : 0 }]} maxFontSizeMultiplier={1.5}>
-                {`Minimum charge is ${formatCents(50, currency)}`}
+                {t('minimumCharge', { amount: formatCents(50, currency) })}
               </Text>
             </View>
           </Pressable>

@@ -13,36 +13,35 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { iapService, SubscriptionProduct, SUBSCRIPTION_SKUS } from '../lib/iap';
-import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { config } from '../lib/config';
 import logger from '../lib/logger';
 import { PRICING } from '../lib/pricing';
+import { useTranslations } from '../lib/i18n';
 
-const PRO_FEATURES = [
-  { icon: 'infinite-outline', text: 'Unlimited custom menus' },
-  { icon: 'people-outline', text: 'Unlimited users & devices' },
-  { icon: 'person-add-outline', text: 'Staff account management' },
-  { icon: 'git-branch-outline', text: 'Revenue splits (venue/promoter)' },
-  { icon: 'cash-outline', text: 'Tip reports & tracking' },
-  { icon: 'wallet-outline', text: 'Tip pooling & tip-out rules' },
-  { icon: 'document-text-outline', text: 'Custom invoicing' },
-  { icon: 'analytics-outline', text: 'Analytics dashboard' },
-  { icon: 'download-outline', text: 'Export to CSV/PDF' },
-];
+const PRO_FEATURE_KEYS = [
+  { icon: 'infinite-outline', key: 'featureUnlimitedMenus' },
+  { icon: 'people-outline', key: 'featureUnlimitedUsers' },
+  { icon: 'person-add-outline', key: 'featureStaffManagement' },
+  { icon: 'git-branch-outline', key: 'featureRevenueSplits' },
+  { icon: 'cash-outline', key: 'featureTipReports' },
+  { icon: 'wallet-outline', key: 'featureTipPooling' },
+  { icon: 'document-text-outline', key: 'featureInvoicing' },
+  { icon: 'analytics-outline', key: 'featureAnalytics' },
+  { icon: 'download-outline', key: 'featureExport' },
+] as const;
 
 export function UpgradeScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const glassColors = isDark ? glass.dark : glass.light;
   const { refreshAuth, user } = useAuth();
+  const t = useTranslations('upgrade');
+  const tc = useTranslations('common');
 
   const [product, setProduct] = useState<SubscriptionProduct | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,7 +73,7 @@ export function UpgradeScreen() {
 
   const handleSubscribe = async () => {
     if (!product) {
-      Alert.alert('Error', 'Subscription not available. Please try again later.');
+      Alert.alert(t('errorAlertTitle'), t('subscriptionNotAvailableMessage'));
       return;
     }
 
@@ -84,11 +83,11 @@ export function UpgradeScreen() {
         setPurchasing(false);
         if (result.success) {
           Alert.alert(
-            'Welcome to Pro!',
-            'Your subscription is now active. Enjoy all the Pro features!',
+            t('welcomeToProTitle'),
+            t('welcomeToProMessage'),
             [
               {
-                text: 'OK',
+                text: tc('ok'),
                 onPress: async () => {
                   // Refresh user profile to get updated subscription
                   await refreshAuth();
@@ -98,12 +97,12 @@ export function UpgradeScreen() {
             ]
           );
         } else if (result.error !== 'Purchase cancelled') {
-          Alert.alert('Purchase Failed', result.error || 'Unable to complete purchase.');
+          Alert.alert(t('purchaseFailedTitle'), result.error || t('purchaseFailedDefaultMessage'));
         }
       });
     } catch (error: any) {
       setPurchasing(false);
-      Alert.alert('Error', error.message || 'Failed to start purchase.');
+      Alert.alert(t('errorAlertTitle'), error.message || t('errorStartPurchaseDefaultMessage'));
     }
   };
 
@@ -113,11 +112,11 @@ export function UpgradeScreen() {
       const status = await iapService.restorePurchases();
       if (status.isActive) {
         Alert.alert(
-          'Subscription Restored',
-          'Your Pro subscription has been restored!',
+          t('subscriptionRestoredTitle'),
+          t('subscriptionRestoredMessage'),
           [
             {
-              text: 'OK',
+              text: tc('ok'),
               onPress: async () => {
                 await refreshAuth();
                 navigation.goBack();
@@ -126,28 +125,28 @@ export function UpgradeScreen() {
           ]
         );
       } else {
-        Alert.alert('No Subscription Found', 'No active subscription was found to restore.');
+        Alert.alert(t('noSubscriptionFoundTitle'), t('noSubscriptionFoundMessage'));
       }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to restore purchases.');
+      Alert.alert(t('errorAlertTitle'), error.message || t('errorRestorePurchasesDefaultMessage'));
     } finally {
       setRestoring(false);
     }
   };
 
-  const styles = createStyles(colors, glassColors);
+  const styles = createStyles(colors);
 
-  const platformName = Platform.OS === 'ios' ? 'App Store' : 'Google Play';
+  const platformName = Platform.OS === 'ios' ? t('platformNameIos') : t('platformNameAndroid');
   const price = product?.localizedPrice || PRICING.pro.monthlyPriceDisplay;
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Go back">
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel={t('goBackAccessibilityLabel')}>
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>Upgrade to Pro</Text>
+        <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>{t('headerTitle')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -161,33 +160,33 @@ export function UpgradeScreen() {
           <View style={styles.proBadge}>
             <Ionicons name="diamond" size={24} color="#fff" />
           </View>
-          <Text style={styles.heroTitle} maxFontSizeMultiplier={1.2}>Rowie Pro</Text>
+          <Text style={styles.heroTitle} maxFontSizeMultiplier={1.2}>{t('heroTitle')}</Text>
           <Text style={styles.heroSubtitle} maxFontSizeMultiplier={1.5}>
-            Unlock the full potential of your business
+            {t('heroSubtitle')}
           </Text>
         </View>
 
         {/* Price */}
         <View style={styles.priceContainer}>
           {loading ? (
-            <ActivityIndicator size="small" color={colors.primary} accessibilityLabel="Loading price" />
+            <ActivityIndicator size="small" color={colors.primary} accessibilityLabel={tc('loading')} />
           ) : (
             <>
               <Text style={styles.price} maxFontSizeMultiplier={1.2}>{price}</Text>
-              <Text style={styles.pricePeriod} maxFontSizeMultiplier={1.3}>/month</Text>
+              <Text style={styles.pricePeriod} maxFontSizeMultiplier={1.3}>{t('pricePeriod')}</Text>
             </>
           )}
         </View>
 
         {/* Features */}
         <View style={styles.featuresCard}>
-          <Text style={styles.featuresTitle} maxFontSizeMultiplier={1.5}>Everything in Pro</Text>
-          {PRO_FEATURES.map((feature, index) => (
+          <Text style={styles.featuresTitle} maxFontSizeMultiplier={1.5}>{t('featuresTitle')}</Text>
+          {PRO_FEATURE_KEYS.map((feature, index) => (
             <View key={index} style={styles.featureRow}>
               <View style={styles.featureIconContainer}>
                 <Ionicons name={feature.icon as any} size={18} color={colors.primary} />
               </View>
-              <Text style={styles.featureText} maxFontSizeMultiplier={1.5}>{feature.text}</Text>
+              <Text style={styles.featureText} maxFontSizeMultiplier={1.5}>{t(feature.key)}</Text>
             </View>
           ))}
         </View>
@@ -196,8 +195,8 @@ export function UpgradeScreen() {
         <View style={styles.feeCard}>
           <Ionicons name="card-outline" size={20} color={colors.success} />
           <View style={styles.feeTextContainer}>
-            <Text style={styles.feeTitle} maxFontSizeMultiplier={1.5}>Lower Transaction Fees</Text>
-            <Text style={styles.feeSubtitle} maxFontSizeMultiplier={1.5}>{user?.rates?.tapToPay.pro || PRICING.pro.transactionFeeDisplay} per tap (vs {user?.rates?.tapToPay.starter || PRICING.starter.transactionFeeDisplay})</Text>
+            <Text style={styles.feeTitle} maxFontSizeMultiplier={1.5}>{t('lowerTransactionFeesTitle')}</Text>
+            <Text style={styles.feeSubtitle} maxFontSizeMultiplier={1.5}>{t('lowerTransactionFeesSubtitle', { proRate: user?.rates?.tapToPay.pro || PRICING.pro.transactionFeeDisplay, starterRate: user?.rates?.tapToPay.starter || PRICING.starter.transactionFeeDisplay })}</Text>
           </View>
         </View>
 
@@ -208,29 +207,26 @@ export function UpgradeScreen() {
           activeOpacity={0.9}
           style={styles.subscribeButtonContainer}
           accessibilityRole="button"
-          accessibilityLabel={`Subscribe for ${price} per month`}
+          accessibilityLabel={t('subscribeAccessibilityLabel', { price })}
           accessibilityState={{ disabled: loading || purchasing || !product }}
         >
-          <LinearGradient
-            colors={[colors.primary, colors.primary700]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
+          <View
             style={[
               styles.subscribeButton,
               (loading || purchasing || !product) && styles.subscribeButtonDisabled,
             ]}
           >
             {purchasing ? (
-              <ActivityIndicator size="small" color="#fff" accessibilityLabel="Processing purchase" />
+              <ActivityIndicator size="small" color="#fff" accessibilityLabel={tc('loading')} />
             ) : (
               <>
                 <Ionicons name="diamond" size={20} color="#fff" />
                 <Text style={styles.subscribeButtonText} maxFontSizeMultiplier={1.3}>
-                  Subscribe for {price}/month
+                  {t('subscribeButtonText', { price })}
                 </Text>
               </>
             )}
-          </LinearGradient>
+          </View>
         </TouchableOpacity>
 
         {/* Restore Purchases */}
@@ -239,40 +235,36 @@ export function UpgradeScreen() {
           onPress={handleRestorePurchases}
           disabled={restoring}
           accessibilityRole="button"
-          accessibilityLabel="Restore Purchases"
+          accessibilityLabel={t('restorePurchasesButtonText')}
           accessibilityState={{ disabled: restoring }}
         >
           {restoring ? (
-            <ActivityIndicator size="small" color={colors.primary} accessibilityLabel="Restoring purchases" />
+            <ActivityIndicator size="small" color={colors.primary} accessibilityLabel={tc('loading')} />
           ) : (
-            <Text style={styles.restoreButtonText} maxFontSizeMultiplier={1.3}>Restore Purchases</Text>
+            <Text style={styles.restoreButtonText} maxFontSizeMultiplier={1.3}>{t('restorePurchasesButtonText')}</Text>
           )}
         </TouchableOpacity>
 
         {/* Legal Text */}
         <Text style={styles.legalText} maxFontSizeMultiplier={1.5}>
-          Payment will be charged to your {platformName} account at confirmation of purchase.
-          Subscription automatically renews unless auto-renew is turned off at least 24 hours
-          before the end of the current period. Your account will be charged for renewal within
-          24 hours prior to the end of the current period. You can manage and cancel your
-          subscriptions in your {platformName} account settings.
+          {t('legalText', { platformName })}
         </Text>
 
         <View style={styles.legalLinks}>
           <TouchableOpacity
             onPress={() => Linking.openURL(`${config.websiteUrl}/terms`)}
             accessibilityRole="link"
-            accessibilityLabel="Terms of Use"
+            accessibilityLabel={t('termsOfUseText')}
           >
-            <Text style={styles.legalLinkText} maxFontSizeMultiplier={1.5}>Terms of Use</Text>
+            <Text style={styles.legalLinkText} maxFontSizeMultiplier={1.5}>{t('termsOfUseText')}</Text>
           </TouchableOpacity>
           <Text style={styles.legalLinkSeparator} maxFontSizeMultiplier={1.5}> | </Text>
           <TouchableOpacity
             onPress={() => Linking.openURL(`${config.websiteUrl}/privacy`)}
             accessibilityRole="link"
-            accessibilityLabel="Privacy Policy"
+            accessibilityLabel={t('privacyPolicyText')}
           >
-            <Text style={styles.legalLinkText} maxFontSizeMultiplier={1.5}>Privacy Policy</Text>
+            <Text style={styles.legalLinkText} maxFontSizeMultiplier={1.5}>{t('privacyPolicyText')}</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -280,7 +272,7 @@ export function UpgradeScreen() {
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark) => {
+const createStyles = (colors: any) => {
   return StyleSheet.create({
     container: {
       flex: 1,
@@ -292,9 +284,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
       justifyContent: 'space-between',
       height: 56,
       paddingHorizontal: 16,
-      backgroundColor: glassColors.backgroundSubtle,
+      backgroundColor: colors.background,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.borderSubtle,
+      borderBottomColor: colors.borderSubtle,
     },
     backButton: {
       width: 40,
@@ -360,10 +352,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
       marginLeft: 4,
     },
     featuresCard: {
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       padding: 20,
       marginBottom: 16,
       ...shadows.sm,
@@ -428,6 +420,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark) => {
       paddingVertical: 18,
       borderRadius: 9999,
       gap: 10,
+      backgroundColor: colors.primary,
       ...shadows.lg,
     },
     subscribeButtonDisabled: {

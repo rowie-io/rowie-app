@@ -11,13 +11,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { EmptyState } from '../components/EmptyState';
 import { useDevice } from '../context/DeviceContext';
 import { useSocket } from '../context/SocketContext';
 import { eventsApi, type OrgEvent, type RecentScan } from '../lib/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { fonts } from '../lib/fonts';
+import { useTranslations } from '../lib/i18n';
 // Dynamically import expo-camera (may not be installed)
 let CameraView: any = null;
 let useCameraPermissions: any = null;
@@ -52,6 +54,7 @@ export function EventsScannerScreen() {
   const queryClient = useQueryClient();
   const wasConnectedRef = useRef(isConnected);
   const hasEverConnectedRef = useRef(false);
+  const t = useTranslations('events');
 
   const [selectedEvent, setSelectedEvent] = useState<OrgEvent | null>(null);
   const [lastScan, setLastScan] = useState<ScanRecord | null>(null);
@@ -77,7 +80,7 @@ export function EventsScannerScreen() {
           tierName: s.tierName,
           timestamp: new Date(s.usedAt),
           valid: true,
-          message: 'Ticket verified',
+          message: t('ticketVerifiedMessage'),
         }));
         setRecentScans(scans);
       } catch (err) {
@@ -162,7 +165,7 @@ export function EventsScannerScreen() {
       const record: ScanRecord = {
         id: Date.now().toString(),
         customerName: result.customerName ?? null,
-        tierName: result.tierName || 'Unknown',
+        tierName: result.tierName || t('unknownTier'),
         timestamp: new Date(),
         valid: result.valid,
         message: result.message,
@@ -173,10 +176,10 @@ export function EventsScannerScreen() {
       const record: ScanRecord = {
         id: Date.now().toString(),
         customerName: null,
-        tierName: 'Unknown',
+        tierName: t('unknownTier'),
         timestamp: new Date(),
         valid: false,
-        message: err?.error || 'Failed to verify ticket',
+        message: err?.error || t('failedToVerifyTicketMessage'),
       };
       showResult(record);
     } finally {
@@ -204,98 +207,76 @@ export function EventsScannerScreen() {
     return (
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={[styles.container, { paddingTop: insets.top }]}>
-          {/* Header - always visible */}
+          {/* Header */}
           <View style={styles.selectHeader}>
-          <Text style={[styles.selectTitle, { color: colors.text }]} maxFontSizeMultiplier={1.2}>Ticket Scanner</Text>
-          <Text style={[styles.selectSubtitle, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-            Select an event to start scanning
-          </Text>
-        </View>
+            <Text style={[styles.selectTitle, { color: colors.text }]} maxFontSizeMultiplier={1.2}>{t('screenTitle')}</Text>
+          </View>
 
-        {/* Content area */}
-        {isLoading ? (
-          // Skeleton loading
-          <View style={styles.skeletonContainer}>
-            {[1, 2, 3].map((i) => (
-              <View key={i} style={[styles.skeletonCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={styles.skeletonContent}>
-                  <View style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
-                  <View style={[styles.skeletonSubtitle, { backgroundColor: colors.border }]} />
-                  <View style={styles.skeletonStats}>
-                    <View style={[styles.skeletonStat, { backgroundColor: colors.border }]} />
-                    <View style={[styles.skeletonStat, { backgroundColor: colors.border }]} />
+          {/* Content area */}
+          {isLoading ? (
+            <View style={styles.skeletonContainer}>
+              {[1, 2, 3].map((i) => (
+                <View key={i} style={[styles.skeletonCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={styles.skeletonContent}>
+                    <View style={[styles.skeletonTitle, { backgroundColor: colors.border }]} />
+                    <View style={[styles.skeletonSubtitle, { backgroundColor: colors.border }]} />
                   </View>
                 </View>
-              </View>
-            ))}
-          </View>
-        ) : eventsError ? (
-          // Error state
-          <View style={styles.emptyStateContainer}>
-            <View style={[styles.emptyIconContainer, { backgroundColor: colors.error + '15' }]}>
-              <Ionicons name="alert-circle-outline" size={32} color={colors.error} />
+              ))}
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-              Unable to Load Events
-            </Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-              Please check your connection and try again
-            </Text>
-          </View>
-        ) : activeEvents.length === 0 ? (
-          // No events
-          <View style={styles.emptyStateContainer}>
-            <View style={[styles.emptyIconContainer, { backgroundColor: colors.textMuted + '10' }]}>
-              <Ionicons name="calendar-outline" size={32} color={colors.textMuted} />
-            </View>
-            <Text style={[styles.emptyTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-              No Active Events
-            </Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-              Create and publish an event from the{'\n'}vendor dashboard to start scanning tickets
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={activeEvents}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.eventList}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[styles.eventCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={() => setSelectedEvent(item)}
-                activeOpacity={0.7}
-                accessibilityRole="button"
-                accessibilityLabel={`${item.name}, ${item.ticketsSold} tickets sold, ${item.ticketsScanned ?? 0} scanned`}
-                accessibilityHint="Double tap to start scanning for this event"
-              >
-                <View style={styles.eventCardContent}>
-                  <Text style={[styles.eventName, { color: colors.text }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-                    {item.name}
-                  </Text>
-                  <Text style={[styles.eventDate, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                    {formatEventDateTime(item)}
-                  </Text>
-                  <View style={styles.eventStats}>
-                    <View style={styles.eventStat}>
-                      <Ionicons name="ticket-outline" size={14} color={colors.textMuted} />
-                      <Text style={[styles.eventStatText, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-                        {item.ticketsSold} sold
+          ) : eventsError ? (
+            <EmptyState
+              icon="alert-circle-outline"
+              title={t('errorLoadTitle')}
+              subtitle={t('errorLoadSubtitle')}
+              animated={false}
+            />
+          ) : activeEvents.length === 0 ? (
+            <EmptyState
+              icon="calendar-outline"
+              title={t('noActiveEventsTitle')}
+              subtitle={t('noActiveEventsSubtitle')}
+            />
+          ) : (
+            <FlatList
+              data={activeEvents}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.eventList}
+              renderItem={({ item }) => {
+                const scanned = item.ticketsScanned ?? 0;
+                const sold = item.ticketsSold || 0;
+                const progress = sold > 0 ? scanned / sold : 0;
+
+                return (
+                  <TouchableOpacity
+                    style={[styles.eventCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => setSelectedEvent(item)}
+                    activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('eventAccessibilityLabel', { name: item.name, sold: String(sold), scanned: String(scanned) })}
+                  >
+                    <View style={styles.eventCardContent}>
+                      <Text style={[styles.eventName, { color: colors.text }]} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                        {item.name}
+                      </Text>
+                      <Text style={[styles.eventDate, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
+                        {formatEventDateTime(item)}
+                      </Text>
+
+                      {/* Progress bar */}
+                      <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+                        <View style={[styles.progressFill, { width: `${Math.min(progress * 100, 100)}%`, backgroundColor: colors.primary }]} />
+                      </View>
+                      <Text style={[styles.progressText, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
+                        {t('scannedOfSold', { scanned: String(scanned), sold: String(sold) })}
                       </Text>
                     </View>
-                    <View style={styles.eventStat}>
-                      <Ionicons name="scan-outline" size={14} color={colors.textMuted} />
-                      <Text style={[styles.eventStatText, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-                        {item.ticketsScanned ?? 0} scanned
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-            )}
-          />
-        )}
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          )}
         </View>
       </View>
     );
@@ -307,51 +288,42 @@ export function EventsScannerScreen() {
       <View style={{ flex: 1, backgroundColor: colors.background }}>
         <View style={[styles.container, { paddingTop: insets.top }]}>
           <View style={styles.selectHeader}>
-            <TouchableOpacity onPress={() => setSelectedEvent(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }} accessibilityRole="button" accessibilityLabel="Back to event selection">
+            <TouchableOpacity onPress={() => setSelectedEvent(null)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }} accessibilityRole="button" accessibilityLabel={t('backToEventSelectionAccessibilityLabel')}>
               <Ionicons name="chevron-back" size={20} color={colors.primary} />
-              <Text style={{ color: colors.primary, fontSize: 15 }} maxFontSizeMultiplier={1.3}>Back</Text>
+              <Text style={{ color: colors.primary, fontSize: 15 }} maxFontSizeMultiplier={1.3}>{t('backButtonText')}</Text>
             </TouchableOpacity>
             <Text style={[styles.selectTitle, { color: colors.text }]} maxFontSizeMultiplier={1.2}>{selectedEvent.name}</Text>
-            <Text style={[styles.selectSubtitle, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-              {!CameraView ? 'Camera module not available' : 'Camera permission required to scan tickets'}
+            <Text style={{ color: colors.textSecondary, fontSize: 15, fontFamily: fonts.regular }} maxFontSizeMultiplier={1.5}>
+              {!CameraView ? t('cameraNotAvailableTitle') : t('cameraAccessRequiredTitle')}
             </Text>
           </View>
           {!CameraView ? (
             <View style={styles.emptyStateContainer}>
-              <View style={[styles.emptyIconContainer, { backgroundColor: colors.textMuted + '15' }]}>
-                <Ionicons name="camera-outline" size={32} color={colors.textMuted} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>Camera Not Available</Text>
+              <Ionicons name="camera-outline" size={44} color={colors.textMuted} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{t('cameraNotAvailableTitle')}</Text>
               <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                The camera module is not installed.{'\n'}Please use a development build.
+                {t('cameraNotAvailableSubtitle')}
               </Text>
             </View>
           ) : (
             <View style={styles.emptyStateContainer}>
-              <View style={[styles.emptyIconContainer, { backgroundColor: colors.primary + '15' }]}>
-                <Ionicons name="camera-outline" size={32} color={colors.primary} />
-              </View>
-              <Text style={[styles.emptyTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>Camera Access Required</Text>
+              <Ionicons name="camera-outline" size={44} color={colors.primary} />
+              <Text style={[styles.emptyTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{t('cameraAccessRequiredTitle')}</Text>
               <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                To scan ticket QR codes, please allow{'\n'}camera access for Rowie
+                {t('cameraAccessRequiredSubtitle')}
               </Text>
               <TouchableOpacity
                 style={styles.primaryButton}
                 onPress={requestPermission}
                 activeOpacity={0.8}
                 accessibilityRole="button"
-                accessibilityLabel="Enable Camera"
-                accessibilityHint="Grant camera permission to scan QR codes"
+                accessibilityLabel={t('enableCameraButtonText')}
+                accessibilityHint={t('cameraAccessRequiredSubtitle')}
               >
-                <LinearGradient
-                  colors={[colors.primary, '#D97706']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.primaryButtonGradient}
-                >
+                <View style={[styles.primaryButtonGradient, { backgroundColor: colors.primary }]}>
                   <Ionicons name="camera" size={18} color="#fff" />
-                  <Text style={styles.primaryButtonText} maxFontSizeMultiplier={1.3}>Enable Camera</Text>
-                </LinearGradient>
+                  <Text style={styles.primaryButtonText} maxFontSizeMultiplier={1.3}>{t('enableCameraButtonText')}</Text>
+                </View>
               </TouchableOpacity>
             </View>
           )}
@@ -373,10 +345,10 @@ export function EventsScannerScreen() {
       />
 
       {/* Overlay */}
-      <View style={[styles.overlay, { paddingTop: insets.top + 16 }]}>
+      <View style={[styles.overlay, { paddingTop: insets.top + 12 }]}>
         {/* Top section: Header + Scan area */}
         <View style={styles.topSection}>
-          {/* Header with selected event */}
+          {/* Header pill */}
           <View style={styles.header}>
             <TouchableOpacity
               style={styles.eventSelector}
@@ -387,15 +359,14 @@ export function EventsScannerScreen() {
               }}
               activeOpacity={0.7}
               accessibilityRole="button"
-              accessibilityLabel={`Scanning ${selectedEvent.name}. Tap to change event`}
+              accessibilityLabel={t('eventAccessibilityLabel', { name: selectedEvent.name, sold: String(selectedEvent.ticketsSold), scanned: String(selectedEvent.ticketsScanned ?? 0) })}
             >
-              <View style={styles.eventSelectorContent}>
-                <Text style={styles.headerTitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>{selectedEvent.name}</Text>
-                <Text style={styles.headerSubtitle} maxFontSizeMultiplier={1.5}>
-                  {selectedEvent.ticketsScanned ?? 0}/{selectedEvent.ticketsSold} scanned · Tap to change
-                </Text>
-              </View>
-              <Ionicons name="swap-horizontal" size={20} color="rgba(255,255,255,0.6)" />
+              <Ionicons name="radio-button-on" size={10} color="#10B981" />
+              <Text style={styles.headerTitle} numberOfLines={1} maxFontSizeMultiplier={1.3}>{selectedEvent.name}</Text>
+              <Text style={styles.headerCount} maxFontSizeMultiplier={1.3}>
+                {selectedEvent.ticketsScanned ?? 0}/{selectedEvent.ticketsSold}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.5)" />
             </TouchableOpacity>
           </View>
 
@@ -409,7 +380,7 @@ export function EventsScannerScreen() {
               <View style={[styles.corner, styles.bottomRight]} />
             </View>
             <Text style={styles.scanHint} maxFontSizeMultiplier={1.5}>
-              {processing ? 'Verifying...' : 'Point camera at ticket QR code'}
+              {processing ? t('scanHintVerifying') : t('scanHintDefault')}
             </Text>
           </View>
 
@@ -431,7 +402,7 @@ export function EventsScannerScreen() {
                 },
               ]}
               accessibilityRole="alert"
-              accessibilityLabel={`${lastScan.valid ? 'Valid Ticket' : 'Invalid Ticket'}. ${lastScan.message || ''}${lastScan.customerName ? `, ${lastScan.customerName}` : ''}`}
+              accessibilityLabel={t('resultAccessibilityLabel', { validity: lastScan.valid ? t('resultValidTitle') : t('resultInvalidTitle'), message: lastScan.message || '', customerName: lastScan.customerName ? `, ${lastScan.customerName}` : '' })}
             >
               <Ionicons
                 name={lastScan.valid ? 'checkmark-circle' : 'close-circle'}
@@ -440,7 +411,7 @@ export function EventsScannerScreen() {
               />
               <View style={styles.resultInfo}>
                 <Text style={styles.resultTitle} maxFontSizeMultiplier={1.3}>
-                  {lastScan.valid ? 'Valid Ticket' : 'Invalid'}
+                  {lastScan.valid ? t('resultValidTitle') : t('resultInvalidTitle')}
                 </Text>
                 <Text style={styles.resultMessage} maxFontSizeMultiplier={1.5}>
                   {lastScan.message}
@@ -450,14 +421,14 @@ export function EventsScannerScreen() {
                     {lastScan.customerName}
                   </Text>
                 )}
-                {lastScan.tierName && lastScan.tierName !== 'Unknown' && (
+                {lastScan.tierName && lastScan.tierName !== t('unknownTier') && (
                   <Text style={styles.resultDetail} maxFontSizeMultiplier={1.5}>
                     {lastScan.tierName}
                   </Text>
                 )}
                 {lastScan.ticketEvent && (
                   <Text style={styles.resultDetail} maxFontSizeMultiplier={1.5}>
-                    Ticket is for: {lastScan.ticketEvent}
+                    {t('ticketIsForPrefix', { eventName: lastScan.ticketEvent })}
                   </Text>
                 )}
               </View>
@@ -468,15 +439,15 @@ export function EventsScannerScreen() {
         {/* Recent scans - always visible at bottom */}
         <View style={[styles.recentContainer, { paddingBottom: insets.bottom + 16 }]}>
           <Text style={styles.recentTitle} maxFontSizeMultiplier={1.5}>
-            Recent Scans {recentScans.length > 0 ? `(${recentScans.length})` : ''}
+            {recentScans.length > 0 ? t('recentScansTitleWithCount', { count: String(recentScans.length) }) : t('recentScansTitle')}
           </Text>
           {loadingScans ? (
             <View style={styles.emptyScans}>
-              <Text style={styles.emptyScansText} maxFontSizeMultiplier={1.5}>Loading scans...</Text>
+              <Text style={styles.emptyScansText} maxFontSizeMultiplier={1.5}>{t('loadingScansText')}</Text>
             </View>
           ) : recentScans.length === 0 ? (
             <View style={styles.emptyScans}>
-              <Text style={styles.emptyScansText} maxFontSizeMultiplier={1.5}>No scans yet</Text>
+              <Text style={styles.emptyScansText} maxFontSizeMultiplier={1.5}>{t('noScansYetText')}</Text>
             </View>
           ) : (
             <FlatList
@@ -513,70 +484,53 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  // Empty state styles (shared)
+  // Empty states
   emptyStateContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 40,
-  },
-  emptyIconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
+    gap: 12,
   },
   emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 18,
+    fontFamily: fonts.semiBold,
     textAlign: 'center',
-    marginBottom: 8,
+    marginTop: 4,
   },
   emptySubtitle: {
     fontSize: 15,
+    fontFamily: fonts.regular,
     textAlign: 'center',
     lineHeight: 22,
-    opacity: 0.8,
   },
-  // Skeleton loading styles
+  // Skeleton
   skeletonContainer: {
     paddingHorizontal: 20,
     gap: 12,
   },
   skeletonCard: {
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 16,
+    padding: 20,
   },
   skeletonContent: {
     gap: 12,
   },
   skeletonTitle: {
-    height: 18,
-    width: '60%',
+    height: 16,
+    width: '55%',
     borderRadius: 8,
   },
   skeletonSubtitle: {
-    height: 14,
-    width: '40%',
-    borderRadius: 6,
-  },
-  skeletonStats: {
-    flexDirection: 'row',
-    gap: 16,
-    marginTop: 4,
-  },
-  skeletonStat: {
     height: 12,
-    width: 70,
+    width: '35%',
     borderRadius: 6,
   },
   // Buttons
   primaryButton: {
     marginTop: 24,
-    borderRadius: 14,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   primaryButtonGradient: {
@@ -590,22 +544,18 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
-  // Event selection styles
+  // Event selection
   selectHeader: {
     paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
   selectTitle: {
     fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  selectSubtitle: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontFamily: fonts.bold,
+    letterSpacing: -0.5,
   },
   eventList: {
     paddingHorizontal: 20,
@@ -614,8 +564,8 @@ const styles = StyleSheet.create({
   eventCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 16,
+    padding: 18,
+    borderRadius: 20,
     borderWidth: 1,
     marginBottom: 12,
   },
@@ -624,26 +574,28 @@ const styles = StyleSheet.create({
   },
   eventName: {
     fontSize: 17,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontFamily: fonts.semiBold,
+    marginBottom: 3,
   },
   eventDate: {
     fontSize: 14,
+    fontFamily: fonts.regular,
+    marginBottom: 14,
+  },
+  progressTrack: {
+    height: 4,
+    borderRadius: 2,
     marginBottom: 8,
   },
-  eventStats: {
-    flexDirection: 'row',
-    gap: 16,
+  progressFill: {
+    height: 4,
+    borderRadius: 2,
   },
-  eventStat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  progressText: {
+    fontSize: 12,
+    fontFamily: fonts.medium,
   },
-  eventStatText: {
-    fontSize: 13,
-  },
-  // Scanner overlay styles
+  // Scanner overlay
   overlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'space-between',
@@ -653,30 +605,28 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    paddingVertical: 12,
     paddingHorizontal: 20,
+    paddingBottom: 8,
   },
   eventSelector: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    borderRadius: 24,
     paddingVertical: 10,
     paddingHorizontal: 16,
-    gap: 12,
-  },
-  eventSelectorContent: {
-    flex: 1,
+    gap: 8,
   },
   headerTitle: {
+    flex: 1,
     color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 15,
+    fontFamily: fonts.semiBold,
   },
-  headerSubtitle: {
+  headerCount: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 13,
-    marginTop: 2,
+    fontFamily: fonts.medium,
   },
   scanAreaContainer: {
     alignItems: 'center',
@@ -688,25 +638,27 @@ const styles = StyleSheet.create({
   },
   corner: {
     position: 'absolute',
-    width: 24,
-    height: 24,
+    width: 28,
+    height: 28,
     borderColor: '#F59E0B',
     borderWidth: 3,
   },
-  topLeft: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 8 },
-  topRight: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 8 },
-  bottomLeft: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 8 },
-  bottomRight: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 8 },
+  topLeft: { top: 0, left: 0, borderRightWidth: 0, borderBottomWidth: 0, borderTopLeftRadius: 10 },
+  topRight: { top: 0, right: 0, borderLeftWidth: 0, borderBottomWidth: 0, borderTopRightRadius: 10 },
+  bottomLeft: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 10 },
+  bottomRight: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 10 },
   scanHint: {
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.6)',
     fontSize: 14,
-    marginTop: 16,
+    fontFamily: fonts.medium,
+    marginTop: 20,
     textAlign: 'center',
   },
   resultCard: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: 20,
+    marginTop: 16,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
@@ -718,33 +670,35 @@ const styles = StyleSheet.create({
   resultTitle: {
     color: '#fff',
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
   },
   resultMessage: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 14,
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   resultDetail: {
     color: 'rgba(255,255,255,0.6)',
     fontSize: 13,
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   recentContainer: {
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingHorizontal: 20,
     paddingTop: 16,
-    maxHeight: 220,
+    maxHeight: 240,
   },
   recentList: {
-    maxHeight: 150,
+    maxHeight: 170,
   },
   recentTitle: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 13,
-    fontWeight: '600',
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 12,
+    fontFamily: fonts.semiBold,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 12,
@@ -754,16 +708,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   recentName: {
     color: '#fff',
     fontSize: 15,
-    fontWeight: '500',
+    fontFamily: fonts.medium,
   },
   recentMeta: {
-    color: 'rgba(255,255,255,0.5)',
+    color: 'rgba(255,255,255,0.45)',
     fontSize: 13,
+    fontFamily: fonts.regular,
     marginTop: 2,
   },
   emptyScans: {
@@ -773,5 +728,6 @@ const styles = StyleSheet.create({
   emptyScansText: {
     color: 'rgba(255,255,255,0.3)',
     fontSize: 14,
+    fontFamily: fonts.regular,
   },
 });

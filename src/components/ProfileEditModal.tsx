@@ -19,8 +19,8 @@ import PhoneInput, { ICountry, isValidPhoneNumber } from 'react-native-internati
 
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useTranslations } from '../lib/i18n';
 import { apiClient } from '../lib/api/client';
-import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import logger from '../lib/logger';
@@ -33,8 +33,9 @@ interface ProfileEditModalProps {
 export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
   const { colors, isDark } = useTheme();
   const { user, refreshAuth } = useAuth();
+  const t = useTranslations('components.profileEdit');
+  const tc = useTranslations('common');
   const insets = useSafeAreaInsets();
-  const glassColors = isDark ? glass.dark : glass.light;
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
   const [phone, setPhone] = useState(user?.phone || '');
@@ -60,7 +61,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
       // Request permission
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please allow access to your photo library to change your profile picture.');
+        Alert.alert(t('permissionRequiredTitle'), t('permissionPhotoLibrary'));
         return;
       }
 
@@ -79,7 +80,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
       }
     } catch (error) {
       logger.error('[ProfileEditModal] Error picking image:', error);
-      Alert.alert('Error', 'Failed to select image. Please try again.');
+      Alert.alert(tc('error'), t('errorSelectImage'));
     }
   };
 
@@ -88,7 +89,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
       // Request permission
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please allow access to your camera to take a photo.');
+        Alert.alert(t('permissionRequiredTitle'), t('permissionCamera'));
         return;
       }
 
@@ -106,7 +107,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
       }
     } catch (error) {
       logger.error('[ProfileEditModal] Error taking photo:', error);
-      Alert.alert('Error', 'Failed to take photo. Please try again.');
+      Alert.alert(tc('error'), t('errorTakePhoto'));
     }
   };
 
@@ -131,7 +132,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
       logger.log('[ProfileEditModal] Avatar uploaded successfully');
     } catch (error: any) {
       logger.error('[ProfileEditModal] Error uploading avatar:', error);
-      Alert.alert('Upload Failed', error.message || 'Failed to upload profile picture.');
+      Alert.alert(t('uploadFailedTitle'), error.message || t('uploadFailedMessage'));
       setAvatarPreview(null);
     } finally {
       setIsUploadingAvatar(false);
@@ -140,12 +141,12 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
 
   const showImageOptions = () => {
     Alert.alert(
-      'Change Profile Picture',
-      'Choose an option',
+      t('changeProfilePictureTitle'),
+      undefined,
       [
-        { text: 'Take Photo', onPress: takePhoto },
-        { text: 'Choose from Library', onPress: pickImage },
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('takePhoto'), onPress: takePhoto },
+        { text: t('chooseFromLibrary'), onPress: pickImage },
+        { text: tc('cancel'), style: 'cancel' },
       ]
     );
   };
@@ -169,7 +170,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
         if (cleanPhone.length === 0) {
           updateData.phone = null;
         } else if (selectedCountry && !isValidPhoneNumber(phone, selectedCountry)) {
-          Alert.alert('Invalid Phone', 'Please enter a valid phone number.');
+          Alert.alert(t('invalidPhoneTitle'), t('invalidPhoneMessage'));
           setIsSaving(false);
           return;
         } else {
@@ -190,7 +191,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
       onClose();
     } catch (error: any) {
       logger.error('[ProfileEditModal] Error saving profile:', error);
-      Alert.alert('Save Failed', error.error || error.message || 'Failed to save profile.');
+      Alert.alert(t('saveFailedTitle'), error.error || error.message || t('saveFailedMessage'));
     } finally {
       setIsSaving(false);
     }
@@ -218,7 +219,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
 
   const displayAvatarUrl = avatarPreview || user?.avatarUrl;
 
-  const styles = createStyles(colors, glassColors, isDark);
+  const styles = createStyles(colors, isDark);
 
   return (
     <Modal
@@ -230,22 +231,22 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
       <View style={[styles.container, { paddingTop: insets.top }]}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.headerButton} accessibilityRole="button" accessibilityLabel="Cancel">
-            <Text style={styles.cancelText} maxFontSizeMultiplier={1.3}>Cancel</Text>
+          <TouchableOpacity onPress={onClose} style={styles.headerButton} accessibilityRole="button" accessibilityLabel={tc('cancel')}>
+            <Text style={styles.cancelText} maxFontSizeMultiplier={1.3}>{tc('cancel')}</Text>
           </TouchableOpacity>
-          <Text style={styles.title} maxFontSizeMultiplier={1.3}>Edit Profile</Text>
+          <Text style={styles.title} maxFontSizeMultiplier={1.3}>{t('title')}</Text>
           <TouchableOpacity
             onPress={handleSave}
             style={styles.headerButton}
             disabled={isSaving || !hasChanges()}
             accessibilityRole="button"
-            accessibilityLabel={isSaving ? 'Saving profile' : 'Save profile'}
+            accessibilityLabel={isSaving ? tc('saving') : tc('save')}
           >
             {isSaving ? (
-              <ActivityIndicator size="small" color={colors.primary} accessibilityLabel="Saving" />
+              <ActivityIndicator size="small" color={colors.primary} accessibilityLabel={tc('saving')} />
             ) : (
               <Text style={[styles.saveText, !hasChanges() && styles.saveTextDisabled]} maxFontSizeMultiplier={1.3}>
-                Save
+                {tc('save')}
               </Text>
             )}
           </TouchableOpacity>
@@ -259,8 +260,8 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
               onPress={showImageOptions}
               disabled={isUploadingAvatar}
               accessibilityRole="button"
-              accessibilityLabel="Change profile picture"
-              accessibilityHint="Opens options to take a photo or choose from library"
+              accessibilityLabel={t('changeProfilePicture')}
+              accessibilityHint={t('opensPhotoOptionsHint')}
             >
               {displayAvatarUrl ? (
                 <Image source={{ uri: displayAvatarUrl }} style={styles.avatar} />
@@ -271,7 +272,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
               )}
               {isUploadingAvatar ? (
                 <View style={styles.avatarOverlay}>
-                  <ActivityIndicator size="small" color="#fff" accessibilityLabel="Uploading profile picture" />
+                  <ActivityIndicator size="small" color="#fff" accessibilityLabel={t('uploading')} />
                 </View>
               ) : (
                 <View style={styles.cameraButton}>
@@ -279,9 +280,9 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
                 </View>
               )}
             </TouchableOpacity>
-            <TouchableOpacity onPress={showImageOptions} disabled={isUploadingAvatar} accessibilityRole="button" accessibilityLabel={isUploadingAvatar ? 'Uploading photo' : 'Change photo'}>
+            <TouchableOpacity onPress={showImageOptions} disabled={isUploadingAvatar} accessibilityRole="button" accessibilityLabel={isUploadingAvatar ? t('uploading') : t('changePhoto')}>
               <Text style={styles.changePhotoText} maxFontSizeMultiplier={1.3}>
-                {isUploadingAvatar ? 'Uploading...' : 'Change Photo'}
+                {isUploadingAvatar ? t('uploading') : t('changePhoto')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -289,35 +290,35 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
           {/* Form Fields */}
           <View style={styles.form}>
             <View style={styles.inputGroup}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>First Name</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('firstNameLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={firstName}
                 onChangeText={setFirstName}
-                placeholder="First name"
+                placeholder={t('firstNamePlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 autoCapitalize="words"
                 autoCorrect={false}
-                accessibilityLabel="First name"
+                accessibilityLabel={t('firstNameLabel')}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>Last Name</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('lastNameLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={lastName}
                 onChangeText={setLastName}
-                placeholder="Last name"
+                placeholder={t('lastNamePlaceholder')}
                 placeholderTextColor={colors.textMuted}
                 autoCapitalize="words"
                 autoCorrect={false}
-                accessibilityLabel="Last name"
+                accessibilityLabel={t('lastNameLabel')}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>Phone Number</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('phoneNumberLabel')}</Text>
               <PhoneInput
                 ref={phoneInputRef}
                 defaultValue={phone ? `+1${phone}` : undefined}
@@ -325,7 +326,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
                 selectedCountry={selectedCountry}
                 onChangeSelectedCountry={setSelectedCountry}
                 defaultCountry="US"
-                placeholder="(555) 123-4567"
+                placeholder={t('phonePlaceholder')}
                 disabled={isSaving}
                 theme={isDark ? 'dark' : 'light'}
                 phoneInputStyles={{
@@ -346,12 +347,12 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>Email</Text>
+              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('emailLabel')}</Text>
               <View style={styles.emailContainer}>
                 <Text style={styles.emailText} maxFontSizeMultiplier={1.5}>{user?.email}</Text>
                 <Ionicons name="lock-closed" size={16} color={colors.textMuted} />
               </View>
-              <Text style={styles.emailHint} maxFontSizeMultiplier={1.5}>Email cannot be changed</Text>
+              <Text style={styles.emailHint} maxFontSizeMultiplier={1.5}>{t('emailCannotBeChanged')}</Text>
             </View>
           </View>
         </ScrollView>
@@ -360,7 +361,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) => {
+const createStyles = (colors: any, isDark: boolean) => {
   const cardBackground = isDark ? '#292524' : 'rgba(255,255,255,0.95)';
   const inputBackground = isDark ? '#0C0A09' : '#f5f5f5';
 

@@ -21,28 +21,35 @@ import { usePreorders } from '../context/PreordersContext';
 import { useCatalog } from '../context/CatalogContext';
 import { preordersApi, Preorder, PreorderStatus } from '../lib/api/preorders';
 import { formatCurrency } from '../utils/currency';
-import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
+import { EmptyState } from '../components/EmptyState';
 import { shadows } from '../lib/shadows';
+import { useTranslations } from '../lib/i18n';
 type TabType = 'new' | 'preparing' | 'ready';
 
-const TABS: { key: TabType; label: string; statuses: PreorderStatus[] }[] = [
-  { key: 'new', label: 'New', statuses: ['pending'] },
-  { key: 'preparing', label: 'Making', statuses: ['preparing'] },
-  { key: 'ready', label: 'Ready', statuses: ['ready'] },
+const TAB_LABEL_KEYS: Record<TabType, string> = {
+  new: 'tabNew',
+  preparing: 'tabMaking',
+  ready: 'tabReady',
+};
+
+const TAB_STATUSES: { key: TabType; statuses: PreorderStatus[] }[] = [
+  { key: 'new', statuses: ['pending'] },
+  { key: 'preparing', statuses: ['preparing'] },
+  { key: 'ready', statuses: ['ready'] },
 ];
 
-function formatTimeAgo(dateString: string): string {
+function formatTimeAgo(dateString: string, t: (key: string, params?: Record<string, string>) => string): string {
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / (1000 * 60));
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
 
-  if (diffMins < 1) return 'Just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  return `${Math.floor(diffHours / 24)}d ago`;
+  if (diffMins < 1) return t('timeJustNow');
+  if (diffMins < 60) return t('timeMinutesAgo', { minutes: String(diffMins) });
+  if (diffHours < 24) return t('timeHoursAgo', { hours: String(diffHours) });
+  return t('timeDaysAgo', { days: String(Math.floor(diffHours / 24)) });
 }
 
 function getStatusColor(status: PreorderStatus, colors: any): string {
@@ -62,140 +69,69 @@ function getStatusColor(status: PreorderStatus, colors: any): string {
   }
 }
 
-function getStatusLabel(status: PreorderStatus): string {
+function getStatusLabel(status: PreorderStatus, t: (key: string) => string): string {
   switch (status) {
     case 'pending':
-      return 'New Order';
+      return t('statusNewOrder');
     case 'preparing':
-      return 'Preparing';
+      return t('statusPreparing');
     case 'ready':
-      return 'Ready for Pickup';
+      return t('statusReadyForPickup');
     case 'picked_up':
-      return 'Picked Up';
+      return t('statusPickedUp');
     case 'cancelled':
-      return 'Cancelled';
+      return t('statusCancelled');
     default:
       return status;
   }
 }
 
-// Central glowing star for loading
-function GlowingStar({ size = 32, color, glowColor, pulseAnim }: { size?: number; color: string; glowColor: string; pulseAnim: Animated.Value }) {
+// Skeleton row for loading state
+function SkeletonRow({ colors }: { colors: any }) {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.7, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
   return (
-    <Animated.View style={{
-      width: size * 2,
-      height: size * 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-      opacity: pulseAnim,
-      transform: [{ scale: pulseAnim }],
-    }}>
-      <View style={{
-        position: 'absolute',
-        width: size * 1.5,
-        height: size * 1.5,
-        borderRadius: size,
-        backgroundColor: glowColor,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: size,
-      }} />
-      <View style={{
-        position: 'absolute',
-        width: 3,
-        height: size,
-        backgroundColor: color,
-        borderRadius: 1.5,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 8,
-      }} />
-      <View style={{
-        position: 'absolute',
-        width: size,
-        height: 3,
-        backgroundColor: color,
-        borderRadius: 1.5,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 8,
-      }} />
-      <View style={{
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: color,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 10,
-      }} />
+    <Animated.View style={{ opacity: pulseAnim, flexDirection: 'row', alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
+      <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: colors.border, marginRight: 12 }} />
+      <View style={{ flex: 1, gap: 8 }}>
+        <View style={{ width: '55%', height: 13, borderRadius: 6, backgroundColor: colors.border }} />
+        <View style={{ width: '30%', height: 11, borderRadius: 5, backgroundColor: colors.border }} />
+      </View>
+      <View style={{ width: 50, height: 13, borderRadius: 6, backgroundColor: colors.border }} />
     </Animated.View>
   );
 }
 
-// Loading state with glowing star animation
-function LoadingContent({ colors, isDark }: { colors: any; isDark: boolean }) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(0.7)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.7,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
-
-    Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 8000,
-        useNativeDriver: true,
-      })
-    ).start();
-  }, []);
-
-  const rotation = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const starColor = isDark ? '#fff' : colors.primary;
-  const glowColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(245,158,11,0.2)';
-
+// Skeleton loading state
+function LoadingContent({ colors }: { colors: any; isDark: boolean }) {
   return (
-    <Animated.View style={[loadingStyles.container, { opacity: fadeAnim }]}>
-      <Animated.View style={{ transform: [{ rotate: rotation }] }}>
-        <GlowingStar size={36} color={starColor} glowColor={glowColor} pulseAnim={pulseAnim} />
-      </Animated.View>
-    </Animated.View>
+    <View style={loadingStyles.container}>
+      <View style={{ backgroundColor: colors.card, borderRadius: 20, borderWidth: 1, borderColor: colors.border, marginHorizontal: 20, overflow: 'hidden', width: '100%', maxWidth: 400, alignSelf: 'center' }}>
+        {[0, 1, 2, 3].map((i) => (
+          <View key={i}>
+            <SkeletonRow colors={colors} />
+            {i < 3 && <View style={{ height: 1, backgroundColor: colors.divider, marginLeft: 64 }} />}
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }
 
 const loadingStyles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: 16,
     backgroundColor: 'transparent',
   },
 });
@@ -209,8 +145,7 @@ export function PreordersScreen() {
   const { selectedCatalog } = useCatalog();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
-  const glassColors = isDark ? glass.dark : glass.light;
-
+  const t = useTranslations('preorders');
   // Seed from prefetch cache if available
   const prefetchedPending = queryClient.getQueryData<{ preorders: Preorder[] }>(['preorders', 'pending']);
 
@@ -233,12 +168,12 @@ export function PreordersScreen() {
     ready: counts?.ready || 0,
   };
 
-  const styles = createStyles(colors, glassColors, isDark);
+  const styles = createStyles(colors, isDark);
 
   const fetchPreorders = useCallback(async () => {
     if (!selectedCatalog) return;
     try {
-      const tab = TABS.find(t => t.key === activeTab)!;
+      const tab = TAB_STATUSES.find(ts => ts.key === activeTab)!;
       const response = await preordersApi.list({ status: tab.statuses, catalogId: selectedCatalog.id });
       tabCacheRef.current[activeTab] = response.preorders;
       setPreorders(response.preorders);
@@ -331,8 +266,8 @@ export function PreordersScreen() {
         onPress={() => handlePreorderPress(item)}
         activeOpacity={0.7}
         accessibilityRole="button"
-        accessibilityLabel={`Order ${item.dailyNumber}, ${item.customerName || 'Customer'}, ${getStatusLabel(item.status)}, ${formatCurrency(item.totalAmount || 0, currency)}`}
-        accessibilityHint="Double tap to view order details"
+        accessibilityLabel={t('orderAccessibilityLabel', { dailyNumber: String(item.dailyNumber), customerName: item.customerName || t('customerFallbackName'), statusLabel: getStatusLabel(item.status, t), total: formatCurrency(item.totalAmount || 0, currency) })}
+        accessibilityHint={t('orderAccessibilityHint')}
       >
         <View style={styles.orderHeader}>
           <View style={styles.orderTitleRow}>
@@ -340,29 +275,35 @@ export function PreordersScreen() {
             <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
               <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
               <Text style={[styles.statusText, { color: statusColor }]} maxFontSizeMultiplier={1.5}>
-                {getStatusLabel(item.status)}
+                {getStatusLabel(item.status, t)}
               </Text>
             </View>
           </View>
           <View style={styles.orderTimeRow}>
-            <Text style={styles.orderTime} maxFontSizeMultiplier={1.5}>{item.createdAt ? formatTimeAgo(item.createdAt) : '—'}</Text>
+            <Text style={styles.orderTime} maxFontSizeMultiplier={1.5}>{item.createdAt ? formatTimeAgo(item.createdAt, t) : '—'}</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </View>
         </View>
 
         <View style={styles.customerRow}>
           <Ionicons name="person-outline" size={16} color={colors.textSecondary} />
-          <Text style={styles.customerName} maxFontSizeMultiplier={1.5}>{item.customerName || 'Customer'}</Text>
+          <Text style={styles.customerName} maxFontSizeMultiplier={1.5}>{item.customerName || t('customerFallbackName')}</Text>
+          {item.tableIdentifier && (
+            <View style={styles.tableBadge}>
+              <Ionicons name="restaurant-outline" size={12} color={colors.textSecondary} />
+              <Text style={styles.tableBadgeText} maxFontSizeMultiplier={1.5}>{item.tableIdentifier}</Text>
+            </View>
+          )}
           {item.paymentType === 'pay_now' && (
             <View style={styles.paidBadge}>
               <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-              <Text style={styles.paidText} maxFontSizeMultiplier={1.5}>Paid</Text>
+              <Text style={styles.paidText} maxFontSizeMultiplier={1.5}>{t('paidBadgeText')}</Text>
             </View>
           )}
           {item.paymentType === 'pay_at_pickup' && (
             <View style={styles.unpaidBadge}>
               <Ionicons name="card-outline" size={14} color={colors.warning} />
-              <Text style={styles.unpaidText} maxFontSizeMultiplier={1.5}>Pay at Pickup</Text>
+              <Text style={styles.unpaidText} maxFontSizeMultiplier={1.5}>{t('payAtPickupBadgeText')}</Text>
             </View>
           )}
         </View>
@@ -370,7 +311,7 @@ export function PreordersScreen() {
         <View style={styles.orderDetails}>
           <View style={styles.orderInfo}>
             <Text style={styles.itemCount} maxFontSizeMultiplier={1.5}>
-              {itemCount} {itemCount === 1 ? 'item' : 'items'}
+              {itemCount === 1 ? t('itemCountSingular', { count: String(itemCount) }) : t('itemCountPlural', { count: String(itemCount) })}
             </Text>
             {item.orderNotes && (
               <View style={styles.notesIndicator}>
@@ -391,49 +332,50 @@ export function PreordersScreen() {
   };
 
   const renderEmptyState = () => {
-    const emptyConfig: Record<TabType, { title: string; subtitle: string }> = {
+    const emptyConfig: Record<TabType, { titleKey: string; subtitleKey: string }> = {
       new: {
-        title: 'No New Orders',
-        subtitle: 'New orders will appear here.',
+        titleKey: 'emptyNewOrdersTitle',
+        subtitleKey: 'emptyNewOrdersSubtitle',
       },
       preparing: {
-        title: 'No Orders In Progress',
-        subtitle: 'In-progress orders will appear here.',
+        titleKey: 'emptyPreparingTitle',
+        subtitleKey: 'emptyPreparingSubtitle',
       },
       ready: {
-        title: 'No Orders Ready',
-        subtitle: 'Completed orders will appear here.',
+        titleKey: 'emptyReadyTitle',
+        subtitleKey: 'emptyReadySubtitle',
       },
     };
     const config = emptyConfig[activeTab];
 
     return (
-      <View style={styles.emptyState}>
-        <Ionicons name="receipt-outline" size={64} color={colors.textMuted} />
-        <Text style={styles.emptyTitle} maxFontSizeMultiplier={1.3}>{config.title}</Text>
-        <Text style={styles.emptySubtitle} maxFontSizeMultiplier={1.5}>{config.subtitle}</Text>
-      </View>
+      <EmptyState
+        icon="receipt-outline"
+        title={t(config.titleKey)}
+        subtitle={t(config.subtitleKey)}
+      />
     );
   };
 
   const renderHeader = () => (
     <View style={styles.headerContainer}>
-      <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>Orders</Text>
+      <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>{t('headerTitle')}</Text>
       <View style={styles.tabBar}>
-        {TABS.map(tab => {
+        {TAB_STATUSES.map(tab => {
           const count = tabCounts[tab.key];
           const isActive = activeTab === tab.key;
+          const label = t(TAB_LABEL_KEYS[tab.key]);
           return (
             <TouchableOpacity
               key={tab.key}
               style={[styles.tab, isActive && styles.tabActive]}
               onPress={() => setActiveTab(tab.key)}
               accessibilityRole="button"
-              accessibilityLabel={`${tab.label}${typeof count === 'number' && count > 0 ? `, ${count} orders` : ''}`}
+              accessibilityLabel={typeof count === 'number' && count > 0 ? t('tabAccessibilityLabel', { label, count: String(count) }) : label}
               accessibilityState={{ selected: isActive }}
             >
               <Text style={[styles.tabText, isActive && styles.tabTextActive]} maxFontSizeMultiplier={1.3}>
-                {tab.label}
+                {label}
               </Text>
               {typeof count === 'number' && count > 0 ? (
                 <View style={[styles.tabBadge, isActive && styles.tabBadgeActive]}>
@@ -488,7 +430,7 @@ export function PreordersScreen() {
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) =>
+const createStyles = (colors: any, isDark: boolean) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -521,9 +463,9 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       gap: 8,
       paddingVertical: 12,
       borderRadius: 12,
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     tabActive: {
       backgroundColor: colors.primary,
@@ -563,11 +505,11 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       flex: 1,
     },
     orderCard: {
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 16,
       padding: 16,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
       ...shadows.sm,
     },
     orderHeader: {
@@ -625,6 +567,20 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       fontFamily: fonts.medium,
       color: colors.text,
       flex: 1,
+    },
+    tableBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      backgroundColor: colors.border,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 8,
+    },
+    tableBadgeText: {
+      fontSize: 11,
+      fontFamily: fonts.medium,
+      color: colors.textSecondary,
     },
     paidBadge: {
       flexDirection: 'row',

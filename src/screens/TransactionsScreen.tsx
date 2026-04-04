@@ -15,8 +15,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
-import { LinearGradient } from 'expo-linear-gradient';
-
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../context/CatalogContext';
@@ -25,201 +23,63 @@ import { useSocketEvent, useSocket, SocketEvents } from '../context/SocketContex
 import { transactionsApi, Transaction, ordersApi, Order } from '../lib/api';
 import { getDeviceId } from '../lib/device';
 import { formatCents } from '../utils/currency';
-import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
+import { brandGradient } from '../lib/colors';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useTapToPayGuard } from '../hooks';
+import { useTranslations } from '../lib/i18n';
 
-type TabType = 'transactions' | 'held';
+// Held orders shown inline, no tab switching needed
 
 type TransactionsScreenParams = {
   History: {
-    initialTab?: TabType;
+    initialTab?: string;
   };
 };
 
-// Empty state content (no longer needs star background - parent has it)
-function EmptyTransactionsContent({ colors, isDark }: { colors: any; isDark: boolean }) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+// Empty state uses shared component
+import { EmptyState } from '../components/EmptyState';
+
+// Skeleton row for loading state
+function SkeletonRow({ colors }: { colors: any }) {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
-  return (
-    <Animated.View style={[emptyStyles.container, { opacity: fadeAnim }]}>
-      <View style={emptyStyles.content}>
-        <View style={[emptyStyles.iconContainer, {
-          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(245,158,11,0.1)',
-          borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(245,158,11,0.15)'
-        }]}>
-          <Ionicons name="receipt-outline" size={44} color={isDark ? 'rgba(255,255,255,0.95)' : colors.primary} />
-        </View>
-        <Text maxFontSizeMultiplier={1.2} style={[emptyStyles.title, { color: isDark ? '#fff' : colors.text }]}>
-          No transactions yet
-        </Text>
-        <Text maxFontSizeMultiplier={1.5} style={[emptyStyles.subtitle, { color: isDark ? 'rgba(255,255,255,0.55)' : colors.textSecondary }]}>
-          Transactions will appear here after you accept payments
-        </Text>
-      </View>
-    </Animated.View>
-  );
-}
-
-const emptyStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    position: 'relative',
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
-  },
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    zIndex: 10,
-  },
-  iconContainer: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-    borderWidth: 1,
-  },
-  title: {
-    fontSize: 24,
-    fontFamily: fonts.bold,
-    textAlign: 'center',
-    marginBottom: 8,
-    letterSpacing: -0.3,
-  },
-  subtitle: {
-    fontSize: 16,
-    fontFamily: fonts.regular,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-});
-
-// Central glowing star for loading
-function GlowingStar({ size = 32, color, glowColor, pulseAnim }: { size?: number; color: string; glowColor: string; pulseAnim: Animated.Value }) {
-  return (
-    <Animated.View style={{
-      width: size * 2,
-      height: size * 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-      opacity: pulseAnim,
-      transform: [{ scale: pulseAnim }],
-    }}>
-      <View style={{
-        position: 'absolute',
-        width: size * 1.5,
-        height: size * 1.5,
-        borderRadius: size,
-        backgroundColor: glowColor,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 0.8,
-        shadowRadius: size,
-      }} />
-      <View style={{
-        position: 'absolute',
-        width: 3,
-        height: size,
-        backgroundColor: color,
-        borderRadius: 1.5,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 8,
-      }} />
-      <View style={{
-        position: 'absolute',
-        width: size,
-        height: 3,
-        backgroundColor: color,
-        borderRadius: 1.5,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 8,
-      }} />
-      <View style={{
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: color,
-        shadowColor: color,
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 10,
-      }} />
-    </Animated.View>
-  );
-}
-
-// Loading state content (no longer needs star background - parent has it)
-function LoadingTransactionsContent({ colors, isDark }: { colors: any; isDark: boolean }) {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(0.7)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 400,
-      useNativeDriver: true,
-    }).start();
-
     Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 0.7,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
+        Animated.timing(pulseAnim, { toValue: 0.7, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
       ])
     ).start();
-
-    Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 8000,
-        useNativeDriver: true,
-      })
-    ).start();
-  }, []);
-
-  const rotation = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const starColor = isDark ? '#fff' : colors.primary;
-  const glowColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(245,158,11,0.2)';
+  }, [pulseAnim]);
 
   return (
-    <Animated.View style={[emptyStyles.container, { opacity: fadeAnim }]}>
-      <View style={emptyStyles.content}>
-        <Animated.View style={{ transform: [{ rotate: rotation }] }}>
-          <GlowingStar size={36} color={starColor} glowColor={glowColor} pulseAnim={pulseAnim} />
-        </Animated.View>
+    <Animated.View style={{ opacity: pulseAnim, flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 20 }}>
+      <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: colors.border, marginRight: 14 }} />
+      <View style={{ flex: 1, gap: 8 }}>
+        <View style={{ width: '60%', height: 14, borderRadius: 7, backgroundColor: colors.border }} />
+        <View style={{ width: '35%', height: 12, borderRadius: 6, backgroundColor: colors.border }} />
       </View>
+      <View style={{ width: 60, height: 14, borderRadius: 7, backgroundColor: colors.border }} />
     </Animated.View>
+  );
+}
+
+// Skeleton loading state
+function LoadingTransactionsContent({ colors }: { colors: any; isDark: boolean }) {
+  return (
+    <View style={{ flex: 1, paddingTop: 16 }}>
+      <View style={{ backgroundColor: colors.card, borderRadius: 20, borderWidth: 1, borderColor: colors.border, marginHorizontal: 20, overflow: 'hidden' }}>
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <View key={i}>
+            <SkeletonRow colors={colors} />
+            {i < 5 && <View style={{ height: 1, backgroundColor: colors.divider, marginLeft: 74 }} />}
+          </View>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -235,6 +95,7 @@ const AnimatedTransactionItem = memo(function AnimatedTransactionItem({
   getStatusLabel,
   formatDate,
   currency,
+  t,
 }: {
   item: Transaction;
   onPress: () => void;
@@ -244,6 +105,7 @@ const AnimatedTransactionItem = memo(function AnimatedTransactionItem({
   getStatusLabel: (status: string) => string;
   formatDate: (timestamp: number) => string;
   currency: string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
@@ -270,21 +132,21 @@ const AnimatedTransactionItem = memo(function AnimatedTransactionItem({
       const parts: string[] = [];
       if (item.customerName) parts.push(item.customerName);
       if (item.catalogName) parts.push(item.catalogName);
-      if (item.itemCount && item.itemCount > 0) parts.push(`${item.itemCount} item${item.itemCount > 1 ? 's' : ''}`);
-      return parts.join(' • ') || 'Preorder';
+      if (item.itemCount && item.itemCount > 0) parts.push(item.itemCount > 1 ? t('itemCountPlural', { count: item.itemCount }) : t('itemCount', { count: item.itemCount }));
+      return parts.join(' • ') || t('preorderLabel');
     }
     // Default: order
-    if (item.paymentMethod?.type === 'cash') return 'Cash';
-    if (item.paymentMethod?.type === 'split') return 'Split Payment';
+    if (item.paymentMethod?.type === 'cash') return t('paymentMethodCash');
+    if (item.paymentMethod?.type === 'split') return t('paymentMethodSplitPayment');
     if (item.paymentMethod?.brand && item.paymentMethod?.last4)
-      return `${item.paymentMethod.brand.toUpperCase()} ****${item.paymentMethod.last4}`;
-    if (item.paymentMethod?.last4) return `Card ****${item.paymentMethod.last4}`;
-    return 'Card payment';
+      return t('paymentMethodCardBrandLast4', { brand: item.paymentMethod.brand.toUpperCase(), last4: item.paymentMethod.last4 });
+    if (item.paymentMethod?.last4) return t('paymentMethodCardLast4', { last4: item.paymentMethod.last4 });
+    return t('paymentMethodCard');
   };
 
   const getSourceBadge = () => {
     if (item.sourceType === 'preorder') {
-      return { label: item.dailyNumber ? `Preorder #${item.dailyNumber}` : 'Preorder', color: '#a855f7' };
+      return { label: item.dailyNumber ? t('preorderWithNumber', { dailyNumber: item.dailyNumber }) : t('preorderLabel'), color: '#a855f7' };
     }
     return null;
   };
@@ -297,8 +159,8 @@ const AnimatedTransactionItem = memo(function AnimatedTransactionItem({
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       accessibilityRole="button"
-      accessibilityLabel={`Transaction ${formatCents(item.amount, currency)}, ${getStatusLabel(item.status)}, ${formatDate(item.created)}${item.sourceType === 'preorder' ? ', preorder' : ''}`}
-      accessibilityHint="View transaction details"
+      accessibilityLabel={t('transactionAccessibilityLabel', { amount: formatCents(item.amount, currency), status: getStatusLabel(item.status), date: formatDate(item.created) }) + (item.sourceType === 'preorder' ? ', ' + t('preorderLabel').toLowerCase() : '')}
+      accessibilityHint={t('transactionAccessibilityHint')}
     >
       <Animated.View style={[styles.transactionItem, { transform: [{ scale: scaleAnim }] }]}>
         <View style={styles.transactionLeft}>
@@ -349,6 +211,8 @@ const AnimatedTransactionItem = memo(function AnimatedTransactionItem({
 
 export function TransactionsScreen() {
   const { colors, isDark } = useTheme();
+  const t = useTranslations('transactions');
+  const tc = useTranslations('common');
   const { currency } = useAuth();
   const { selectedCatalog } = useCatalog();
   const { deviceId } = useDevice();
@@ -358,9 +222,8 @@ export function TransactionsScreen() {
   const route = useRoute<RouteProp<TransactionsScreenParams, 'History'>>();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
-  const glassColors = isDark ? glass.dark : glass.light;
-  const [activeTab, setActiveTab] = useState<TabType>('transactions');
   const [filter, setFilter] = useState<FilterType>('all');
+  const [showHeld, setShowHeld] = useState(false);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const wasConnectedRef = useRef(isConnected);
   const hasEverConnectedRef = useRef(false);
@@ -372,28 +235,17 @@ export function TransactionsScreen() {
   const [isRefreshingHeld, setIsRefreshingHeld] = useState(false);
   const hasFetchedHeldRef = useRef(!!prefetchedHeld);
 
-  // Handle initialTab route param - switch tabs when navigating with initialTab
+  // Handle initialTab route param
   useEffect(() => {
     const initialTab = route.params?.initialTab;
+    if (initialTab === 'held') {
+      setShowHeld(true);
+      fetchHeldOrders();
+    }
     if (initialTab) {
-      setActiveTab(initialTab);
-      // Force refresh if switching to held tab
-      if (initialTab === 'held') {
-        setIsLoadingHeld(true);
-        // Small delay to ensure state update happens first
-        setTimeout(() => {
-          ordersApi.listHeld(deviceId || undefined).then(response => {
-            setHeldOrders(response.orders);
-            setIsLoadingHeld(false);
-          }).catch(error => {
-            setIsLoadingHeld(false);
-          });
-        }, 100);
-      }
-      // Clear the param to prevent re-triggering on subsequent focuses
       navigation.setParams({ initialTab: undefined });
     }
-  }, [route.params?.initialTab, navigation, deviceId]);
+  }, [route.params?.initialTab, navigation]);
 
   // Fetch held orders
   const fetchHeldOrders = useCallback(async () => {
@@ -408,13 +260,12 @@ export function TransactionsScreen() {
     }
   }, [deviceId]);
 
-  // Load held orders on first visit only - socket events keep it in sync after that
+  // Load held orders eagerly on mount
   useEffect(() => {
-    if (activeTab === 'held' && !hasFetchedHeldRef.current) {
-      setIsLoadingHeld(true);
+    if (!hasFetchedHeldRef.current) {
       fetchHeldOrders();
     }
-  }, [activeTab]);
+  }, []);
 
   // Refetch when socket REconnects (not initial connection)
   useEffect(() => {
@@ -424,7 +275,7 @@ export function TransactionsScreen() {
     }
     if (isConnected) hasEverConnectedRef.current = true;
     wasConnectedRef.current = isConnected;
-  }, [isConnected, queryClient, activeTab, fetchHeldOrders]);
+  }, [isConnected, queryClient, fetchHeldOrders]);
 
   // Auto-refresh transactions when payment events occur
   const handlePaymentEvent = useCallback((data: any) => {
@@ -496,7 +347,7 @@ export function TransactionsScreen() {
   // Filtering is now done server-side via the status query parameter
   const transactions = data?.pages.flatMap((page) => page.data) || [];
 
-  const styles = createStyles(colors, glassColors, isDark);
+  const styles = createStyles(colors, isDark);
 
   const getStatusColor = useCallback((status: string) => {
     switch (status) {
@@ -516,21 +367,21 @@ export function TransactionsScreen() {
   const getStatusLabel = useCallback((status: string) => {
     switch (status) {
       case 'succeeded':
-        return 'Succeeded';
+        return t('statusSucceeded');
       case 'refunded':
-        return 'Refunded';
+        return t('statusRefunded');
       case 'partially_refunded':
-        return 'Partial Refund';
+        return t('statusPartialRefund');
       case 'failed':
-        return 'Failed';
+        return t('statusFailed');
       case 'pending':
-        return 'Pending';
+        return t('statusPending');
       case 'cancelled':
-        return 'Cancelled';
+        return t('statusCancelled');
       default:
         return status;
     }
-  }, []);
+  }, [t]);
 
   const formatDate = useCallback((timestamp: number) => {
     const date = new Date(timestamp * 1000);
@@ -561,8 +412,9 @@ export function TransactionsScreen() {
       getStatusLabel={getStatusLabel}
       formatDate={formatDate}
       currency={currency}
+      t={t}
     />
-  ), [handleTransactionPress, colors, styles, getStatusColor, getStatusLabel, formatDate, currency]);
+  ), [handleTransactionPress, colors, styles, getStatusColor, getStatusLabel, formatDate, currency, t]);
 
   const renderFooter = () => {
     if (!isFetchingNextPage) return null;
@@ -613,25 +465,25 @@ export function TransactionsScreen() {
         resumedOrder: resumedOrder,
       });
     } catch (error: any) {
-      Alert.alert('Error', error.error || error.message || 'Failed to resume order');
+      Alert.alert(t('errorTitle'), error.error || error.message || t('errorResumeOrder'));
     }
   };
 
   const handleCancelOrder = async (order: Order) => {
     Alert.alert(
-      'Cancel Order',
-      `Are you sure you want to cancel "${order.holdName || `Order #${order.orderNumber}`}"?`,
+      t('cancelOrder'),
+      t('cancelOrderConfirmMessage', { name: order.holdName || t('orderHashPrefix', { orderNumber: order.orderNumber }) }),
       [
-        { text: 'Keep', style: 'cancel' },
+        { text: t('cancelOrderKeep'), style: 'cancel' },
         {
-          text: 'Cancel Order',
+          text: t('cancelOrderConfirm'),
           style: 'destructive',
           onPress: async () => {
             try {
               await ordersApi.cancel(order.id);
               setHeldOrders(prev => prev.filter(o => o.id !== order.id));
             } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to cancel order');
+              Alert.alert(t('errorTitle'), error.message || t('errorCancelOrder'));
             }
           },
         },
@@ -647,10 +499,10 @@ export function TransactionsScreen() {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    return `${diffDays}d ago`;
+    if (diffMins < 1) return t('timeAgoJustNow');
+    if (diffMins < 60) return t('timeAgoMinutes', { minutes: diffMins });
+    if (diffHours < 24) return t('timeAgoHours', { hours: diffHours });
+    return t('timeAgoDays', { days: diffDays });
   };
 
   const renderHeldOrder = ({ item }: { item: Order }) => {
@@ -661,10 +513,10 @@ export function TransactionsScreen() {
         style={styles.heldDeleteAction}
         onPress={() => handleCancelOrder(item)}
         accessibilityRole="button"
-        accessibilityLabel={`Cancel ${item.holdName || `Order ${item.orderNumber}`}`}
+        accessibilityLabel={t('cancelAccessibilityLabel', { name: item.holdName || t('orderHashPrefix', { orderNumber: item.orderNumber }) })}
       >
         <Ionicons name="trash-outline" size={22} color="#fff" />
-        <Text maxFontSizeMultiplier={1.3} style={styles.heldDeleteText}>Cancel</Text>
+        <Text maxFontSizeMultiplier={1.3} style={styles.heldDeleteText}>{tc('cancel')}</Text>
       </TouchableOpacity>
     );
 
@@ -678,17 +530,17 @@ export function TransactionsScreen() {
           onPress={() => handleResumeOrder(item)}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel={`${item.holdName || `Order ${item.orderNumber}`}, ${itemCount} ${itemCount === 1 ? 'item' : 'items'}, ${formatCents(item.totalAmount, currency)}`}
-          accessibilityHint="Tap to resume this order"
+          accessibilityLabel={t('heldOrderAccessibilityLabel', { name: item.holdName || t('orderHashPrefix', { orderNumber: item.orderNumber }), count: itemCount, itemWord: itemCount === 1 ? tc('item') : tc('items'), total: formatCents(item.totalAmount, currency) })}
+          accessibilityHint={t('heldOrderAccessibilityHint')}
         >
           <View style={styles.heldOrderLeft}>
             <Ionicons name="time-outline" size={20} color={colors.primary} />
             <View style={styles.heldOrderInfo}>
               <Text maxFontSizeMultiplier={1.5} style={styles.heldOrderName} numberOfLines={1}>
-                {item.holdName || `Order #${item.orderNumber}`}
+                {item.holdName || t('orderHashPrefix', { orderNumber: item.orderNumber })}
               </Text>
               <Text maxFontSizeMultiplier={1.5} style={styles.heldOrderMeta}>
-                {itemCount} {itemCount === 1 ? 'item' : 'items'} • {item.heldAt ? formatTimeAgo(item.heldAt) : ''}
+                {itemCount === 1 ? t('itemCount', { count: itemCount }) : t('itemCountPlural', { count: itemCount })} • {item.heldAt ? formatTimeAgo(item.heldAt) : ''}
               </Text>
             </View>
           </View>
@@ -696,7 +548,7 @@ export function TransactionsScreen() {
             <Text maxFontSizeMultiplier={1.3} style={styles.heldOrderTotal}>
               {formatCents(item.totalAmount, currency)}
             </Text>
-            <Text maxFontSizeMultiplier={1.5} style={styles.heldOrderTapText}>Tap to resume</Text>
+            <Text maxFontSizeMultiplier={1.5} style={styles.heldOrderTapText}>{t('tapToResume')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
         </TouchableOpacity>
@@ -707,10 +559,9 @@ export function TransactionsScreen() {
   const renderEmptyHeld = () => (
     <View style={styles.emptyHeldContainer}>
       <Ionicons name="pause-circle-outline" size={64} color={colors.textMuted} />
-      <Text maxFontSizeMultiplier={1.3} style={styles.emptyHeldTitle}>No Held Orders</Text>
+      <Text maxFontSizeMultiplier={1.3} style={styles.emptyHeldTitle}>{t('noHeldOrdersTitle')}</Text>
       <Text maxFontSizeMultiplier={1.5} style={styles.emptyHeldSubtitle}>
-        Orders you put on hold will appear here.{'\n'}
-        Tap "Hold Order" at checkout to save an order for later.
+        {t('noHeldOrdersSubtitle')}
       </Text>
     </View>
   );
@@ -718,112 +569,82 @@ export function TransactionsScreen() {
   return (
     <View style={{ flex: 1 }}>
       <View style={[styles.container, { paddingTop: insets.top }]}>
+        {/* Header */}
         <View style={styles.headerContainer}>
-          <Text maxFontSizeMultiplier={1.3} style={styles.title}>History</Text>
-          <View style={styles.tabBar}>
+          <Text maxFontSizeMultiplier={1.3} style={styles.title}>{t('historyTitle')}</Text>
+          {/* Held orders badge — tap to expand */}
+          {heldOrders.length > 0 && (
             <TouchableOpacity
-              style={[styles.tab, activeTab === 'transactions' && styles.tabActive]}
-              onPress={() => setActiveTab('transactions')}
+              onPress={() => setShowHeld(!showHeld)}
+              style={[styles.heldBadge, { backgroundColor: colors.chipBg, borderColor: colors.border }]}
               accessibilityRole="button"
-              accessibilityLabel="Transactions"
-              accessibilityState={{ selected: activeTab === 'transactions' }}
+              accessibilityLabel={t('heldBadgeAccessibilityLabel', { count: heldOrders.length })}
             >
-              <Text maxFontSizeMultiplier={1.3} style={[styles.tabText, activeTab === 'transactions' && styles.tabTextActive]}>
-                Transactions
-              </Text>
+              <Ionicons name="pause-circle" size={16} color={colors.primary} />
+              <Text maxFontSizeMultiplier={1.3} style={[styles.heldBadgeText, { color: colors.text }]}>{t('heldBadgeLabel', { count: heldOrders.length })}</Text>
+              <Ionicons name={showHeld ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textMuted} />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'held' && styles.tabActive]}
-              onPress={() => setActiveTab('held')}
-              accessibilityRole="button"
-              accessibilityLabel={`Held Orders${heldOrders.length > 0 ? `, ${heldOrders.length} orders` : ''}`}
-              accessibilityState={{ selected: activeTab === 'held' }}
-            >
-              <Text maxFontSizeMultiplier={1.3} style={[styles.tabText, activeTab === 'held' && styles.tabTextActive]}>
-                Held Orders
-              </Text>
-              {heldOrders.length > 0 && (
-                <View style={styles.tabBadge}>
-                  <Text maxFontSizeMultiplier={1.3} style={styles.tabBadgeText}>{heldOrders.length}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
 
-        {activeTab === 'held' ? (
-          // Held Orders Tab
-          isLoadingHeld ? (
-            <LoadingTransactionsContent colors={colors} isDark={isDark} />
-          ) : heldOrders.length === 0 ? (
-            renderEmptyHeld()
-          ) : (
-            <FlatList
-              data={heldOrders}
-              renderItem={renderHeldOrder}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={[styles.list, { flexGrow: 1 }]}
-              style={styles.listContainer}
-              refreshControl={
-                <RefreshControl
-                  refreshing={isRefreshingHeld}
-                  onRefresh={handleRefreshHeld}
-                  tintColor={colors.primary}
-                />
-              }
-            />
-          )
-        ) : (
-          // Transactions Tab
-          <>
-            {/* Filter Tabs */}
-            <View style={styles.filterContainer}>
-              {(['all', 'succeeded', 'refunded', 'failed'] as FilterType[]).map((f) => {
-                const isActive = filter === f;
-                // Use solid colors in dark mode to prevent stars showing through
-                const filterColors = isDark ? {
-                  all: { bg: 'rgba(245, 158, 11, 0.06)', border: '#44403C', text: colors.primary },
-                  succeeded: { bg: '#0a1a0f', border: '#0f2a17', text: colors.success },
-                  refunded: { bg: '#1a1408', border: '#2a200d', text: colors.warning },
-                  failed: { bg: '#1a0a0a', border: '#2a0f0f', text: colors.error },
-                } : {
-                  all: { bg: colors.primary + '20', border: colors.primary + '40', text: colors.primary },
-                  succeeded: { bg: colors.success + '20', border: colors.success + '40', text: colors.success },
-                  refunded: { bg: colors.warning + '20', border: colors.warning + '40', text: colors.warning },
-                  failed: { bg: colors.error + '20', border: colors.error + '40', text: colors.error },
-                };
-                const colorSet = filterColors[f];
+        {/* Held orders inline section */}
+        {showHeld && heldOrders.length > 0 && (
+          <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
+            {heldOrders.map((item, index) => (
+              <View key={item.id}>
+                {renderHeldOrder({ item, index } as any)}
+              </View>
+            ))}
+          </View>
+        )}
 
-                return (
-                  <TouchableOpacity
-                    key={f}
-                    style={[
-                      styles.filterTab,
-                      isActive && { backgroundColor: colorSet.bg, borderColor: colorSet.border },
-                    ]}
-                    onPress={() => setFilter(f)}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Filter by ${f === 'all' ? 'all statuses' : f}`}
-                    accessibilityState={{ selected: isActive }}
-                  >
-                    <Text
-                      maxFontSizeMultiplier={1.3}
-                      style={[
-                        styles.filterText,
-                        isActive && { color: colorSet.text, fontFamily: fonts.semiBold },
-                      ]}
-                    >
-                      {f.charAt(0).toUpperCase() + f.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+        {/* Filter row */}
+        <View style={styles.filterContainer}>
+          {(['all', 'succeeded', 'refunded', 'failed'] as FilterType[]).map((f) => {
+            const isActive = filter === f;
+            return (
+              <TouchableOpacity
+                key={f}
+                onPress={() => setFilter(f)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={t('filterAccessibilityLabel', { filter: f === 'all' ? t('filterAll').toLowerCase() : f })}
+                accessibilityState={{ selected: isActive }}
+                style={[
+                  styles.filterTab,
+                  {
+                    backgroundColor: isActive ? colors.chipBgActive : colors.chipBg,
+                    borderColor: isActive ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  maxFontSizeMultiplier={1.3}
+                  style={[
+                    styles.filterText,
+                    { color: isActive ? colors.primary : colors.textSecondary },
+                    isActive && { fontFamily: fonts.semiBold },
+                  ]}
+                >
+                  {f === 'all' ? t('filterAll') : f === 'succeeded' ? t('filterSucceeded') : f === 'refunded' ? t('filterRefunded') : t('filterFailed')}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
+
+
+        {/* Transactions list */}
+        <>
             {isLoading ? (
               <LoadingTransactionsContent colors={colors} isDark={isDark} />
             ) : transactions.length === 0 ? (
-              <EmptyTransactionsContent colors={colors} isDark={isDark} />
+              <EmptyState
+                icon="receipt-outline"
+                title={t('emptyTitle')}
+                subtitle={t('emptySubtitle')}
+              />
             ) : (
               <FlatList
                 data={transactions}
@@ -844,16 +665,14 @@ export function TransactionsScreen() {
               />
             )}
           </>
-        )}
       </View>
     </View>
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) => {
-  // Card backgrounds - solid colors matching the stone-800 brand palette
-  const cardBackground = isDark ? '#292524' : 'rgba(255,255,255,0.85)';
-  const cardBorder = isDark ? '#292524' : 'rgba(0,0,0,0.08)';
+const createStyles = (colors: any, isDark: boolean) => {
+  const cardBackground = colors.card;
+  const cardBorder = colors.border;
 
   return StyleSheet.create({
     container: {
@@ -861,35 +680,47 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       backgroundColor: colors.background,
     },
     headerContainer: {
-      paddingTop: 4,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      paddingBottom: 4,
     },
     title: {
-      fontSize: 22,
+      fontSize: 28,
       fontFamily: fonts.bold,
       color: colors.text,
-      letterSpacing: -0.3,
-      paddingHorizontal: 16,
-      marginBottom: 8,
+      letterSpacing: -0.5,
+    },
+    heldBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1,
+    },
+    heldBadgeText: {
+      fontSize: 13,
+      fontFamily: fonts.semiBold,
     },
     filterContainer: {
       flexDirection: 'row',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
       gap: 8,
-      backgroundColor: 'transparent',
     },
     filterTab: {
-      paddingHorizontal: 18,
-      paddingVertical: 10,
-      borderRadius: 16,
-      backgroundColor: cardBackground,
-      borderWidth: 1.5,
-      borderColor: cardBorder,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 20,
+      borderWidth: 1,
     },
     filterText: {
-      fontSize: 14,
+      fontSize: 13,
       fontFamily: fonts.medium,
-      color: colors.textSecondary,
     },
     list: {
       padding: 16,
@@ -978,7 +809,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       width: 10,
       height: 10,
       borderRadius: 5,
-      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+      backgroundColor: colors.border,
       marginRight: 14,
     },
     skeletonInfo: {
@@ -988,54 +819,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       alignItems: 'flex-end',
     },
     skeletonBox: {
-      backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+      backgroundColor: colors.border,
       borderRadius: 6,
     },
-    // Tab bar styles
-    tabBar: {
-      flexDirection: 'row',
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      borderBottomWidth: 1,
-      borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
-      gap: 12,
-    },
-    tab: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      paddingVertical: 12,
-      borderRadius: 12,
-      backgroundColor: glassColors.backgroundElevated,
-      borderWidth: 1,
-      borderColor: glassColors.border,
-    },
-    tabActive: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-    },
-    tabText: {
-      fontSize: 14,
-      fontFamily: fonts.medium,
-      color: colors.textSecondary,
-    },
-    tabTextActive: {
-      color: '#fff',
-      fontFamily: fonts.semiBold,
-    },
-    tabBadge: {
-      backgroundColor: 'rgba(255,255,255,0.3)',
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 10,
-    },
-    tabBadgeText: {
-      fontSize: 12,
-      fontFamily: fonts.semiBold,
-      color: '#fff',
-    },
+    // (tab bar removed — held orders shown inline)
     // Held orders styles
     heldOrderItem: {
       flexDirection: 'row',

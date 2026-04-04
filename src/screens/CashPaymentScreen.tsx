@@ -15,9 +15,9 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { ordersApi } from '../lib/api';
 import { formatCents, getCurrencySymbol, isZeroDecimal, fromSmallestUnit, toSmallestUnit } from '../utils/currency';
-import { glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
+import { useTranslations } from '../lib/i18n';
 
 type RouteParams = {
   CashPayment: {
@@ -29,13 +29,13 @@ type RouteParams = {
 };
 
 export function CashPaymentScreen() {
-  const { colors, isDark } = useTheme();
+  const { colors } = useTheme();
   const { currency } = useAuth();
+  const t = useTranslations('payment');
+  const tc = useTranslations('common');
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'CashPayment'>>();
-  const glassColors = isDark ? glass.dark : glass.light;
-
   const { orderId, orderNumber, totalAmount, customerEmail } = route.params;
 
   const [cashTendered, setCashTendered] = useState<string>('');
@@ -45,7 +45,7 @@ export function CashPaymentScreen() {
   const changeAmount = Math.max(0, cashTenderedCents - totalAmount);
   const isEnoughCash = cashTenderedCents >= totalAmount;
 
-  const styles = createStyles(colors, glassColors, isDark);
+  const styles = createStyles(colors);
 
   // Handle keypad input
   const handleKeyPress = (key: string) => {
@@ -76,7 +76,7 @@ export function CashPaymentScreen() {
   // Complete cash payment
   const handleComplete = async () => {
     if (!isEnoughCash) {
-      Alert.alert('Insufficient Cash', 'The cash tendered is less than the total amount.');
+      Alert.alert(t('insufficientCashAlertTitle'), t('insufficientCashAlertMessage'));
       return;
     }
 
@@ -107,7 +107,7 @@ export function CashPaymentScreen() {
         })
       );
     } catch (error: any) {
-      Alert.alert('Payment Failed', error.message || 'Failed to complete cash payment.');
+      Alert.alert(t('cashPaymentFailedTitle'), error.message || t('cashPaymentFailedMessage'));
     } finally {
       setIsProcessing(false);
     }
@@ -121,35 +121,35 @@ export function CashPaymentScreen() {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={tc('goBack')}
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>Cash Payment</Text>
+        <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>{t('cashPaymentTitle')}</Text>
         <View style={{ width: 48 }} />
       </View>
 
       {/* Total Amount Display */}
       <View style={styles.totalSection}>
-        <Text style={styles.totalLabel} maxFontSizeMultiplier={1.5}>Total Due</Text>
-        <Text style={styles.totalAmount} maxFontSizeMultiplier={1.2} accessibilityRole="summary" accessibilityLabel={`Total due ${formatCents(totalAmount, currency)}`}>{formatCents(totalAmount, currency)}</Text>
+        <Text style={styles.totalLabel} maxFontSizeMultiplier={1.5}>{t('totalDue')}</Text>
+        <Text style={styles.totalAmount} maxFontSizeMultiplier={1.2} accessibilityRole="summary" accessibilityLabel={t('totalDueAccessibility', { amount: formatCents(totalAmount, currency) })}>{formatCents(totalAmount, currency)}</Text>
       </View>
 
       {/* Cash Tendered Display */}
       <View style={styles.tenderedSection}>
-        <Text style={styles.tenderedLabel} maxFontSizeMultiplier={1.5}>Cash Tendered</Text>
+        <Text style={styles.tenderedLabel} maxFontSizeMultiplier={1.5}>{t('cashTendered')}</Text>
         <View style={styles.tenderedDisplay}>
           <Text style={styles.dollarSign} maxFontSizeMultiplier={1.2}>{getCurrencySymbol(currency)}</Text>
-          <Text style={[styles.tenderedAmount, !cashTendered && styles.tenderedPlaceholder]} maxFontSizeMultiplier={1.2} accessibilityRole="text" accessibilityLabel={`Cash tendered ${getCurrencySymbol(currency)}${cashTendered || (isZeroDecimal(currency) ? '0' : '0.00')}`}>
-            {cashTendered || (isZeroDecimal(currency) ? '0' : '0.00')}
+          <Text style={[styles.tenderedAmount, !cashTendered && styles.tenderedPlaceholder]} maxFontSizeMultiplier={1.2} accessibilityRole="text" accessibilityLabel={t('cashTenderedAccessibility', { symbol: getCurrencySymbol(currency), amount: cashTendered || (isZeroDecimal(currency) ? t('zeroDecimalPlaceholder') : t('decimalPlaceholder')) })}>
+            {cashTendered || (isZeroDecimal(currency) ? t('zeroDecimalPlaceholder') : t('decimalPlaceholder'))}
           </Text>
         </View>
       </View>
 
       {/* Change Display */}
       {isEnoughCash && changeAmount > 0 && (
-        <View style={styles.changeSection} accessibilityRole="summary" accessibilityLabel={`Change due ${formatCents(changeAmount, currency)}`}>
-          <Text style={styles.changeLabel} maxFontSizeMultiplier={1.5}>Change Due</Text>
+        <View style={styles.changeSection} accessibilityRole="summary" accessibilityLabel={t('changeDueAccessibility', { amount: formatCents(changeAmount, currency) })}>
+          <Text style={styles.changeLabel} maxFontSizeMultiplier={1.5}>{t('changeDue')}</Text>
           <Text style={styles.changeAmount} maxFontSizeMultiplier={1.2}>{formatCents(changeAmount, currency)}</Text>
         </View>
       )}
@@ -159,15 +159,15 @@ export function CashPaymentScreen() {
         <View style={styles.insufficientSection} accessibilityRole="alert">
           <Ionicons name="warning-outline" size={18} color={colors.error} />
           <Text style={styles.insufficientText} maxFontSizeMultiplier={1.5}>
-            Insufficient — {formatCents(totalAmount - cashTenderedCents, currency)} more needed
+            {t('insufficientMoreNeeded', { amount: formatCents(totalAmount - cashTenderedCents, currency) })}
           </Text>
         </View>
       )}
 
       {/* Exact Amount Button */}
       <View style={styles.exactRow}>
-        <TouchableOpacity style={styles.exactButton} onPress={handleExactAmount} accessibilityRole="button" accessibilityLabel={`Exact amount ${formatCents(totalAmount, currency)}`}>
-          <Text style={styles.exactButtonText} maxFontSizeMultiplier={1.3}>Exact Amount</Text>
+        <TouchableOpacity style={styles.exactButton} onPress={handleExactAmount} accessibilityRole="button" accessibilityLabel={t('exactAmountAccessibility', { amount: formatCents(totalAmount, currency) })}>
+          <Text style={styles.exactButtonText} maxFontSizeMultiplier={1.3}>{t('exactAmount')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -179,7 +179,7 @@ export function CashPaymentScreen() {
             style={styles.keypadButton}
             onPress={() => handleKeyPress(key)}
             accessibilityRole="button"
-            accessibilityLabel={key === 'backspace' ? 'Delete' : key === '.' ? 'Decimal point' : key}
+            accessibilityLabel={key === 'backspace' ? t('deleteKey') : key === '.' ? t('decimalPoint') : key}
           >
             {key === 'backspace' ? (
               <Ionicons name="backspace-outline" size={28} color={colors.text} />
@@ -200,16 +200,16 @@ export function CashPaymentScreen() {
           onPress={handleComplete}
           disabled={!isEnoughCash || isProcessing}
           accessibilityRole="button"
-          accessibilityLabel={isProcessing ? 'Processing payment' : isEnoughCash ? 'Complete payment' : 'Enter cash amount'}
+          accessibilityLabel={isProcessing ? t('processingPaymentButtonAccessibility') : isEnoughCash ? t('completePaymentAccessibility') : t('enterCashAmountAccessibility')}
           accessibilityState={{ disabled: !isEnoughCash || isProcessing }}
         >
           {isProcessing ? (
-            <ActivityIndicator color="#fff" accessibilityLabel="Processing payment" />
+            <ActivityIndicator color="#fff" accessibilityLabel={t('processingPaymentIndicator')} />
           ) : (
             <>
               <Ionicons name="checkmark-circle" size={24} color="#fff" />
               <Text style={styles.completeButtonText} maxFontSizeMultiplier={1.3}>
-                {isEnoughCash ? 'Complete Payment' : 'Enter Cash Amount'}
+                {isEnoughCash ? t('completePayment') : t('enterCashAmount')}
               </Text>
             </>
           )}
@@ -219,7 +219,7 @@ export function CashPaymentScreen() {
   );
 }
 
-const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boolean) =>
+const createStyles = (colors: any) =>
   StyleSheet.create({
     container: {
       flex: 1,
@@ -231,19 +231,19 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 12,
-      backgroundColor: glassColors.backgroundSubtle,
+      backgroundColor: colors.background,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.borderSubtle,
+      borderBottomColor: colors.borderSubtle,
     },
     backButton: {
       width: 48,
       height: 48,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     headerTitle: {
       fontSize: 18,
@@ -254,7 +254,7 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       alignItems: 'center',
       paddingVertical: 20,
       borderBottomWidth: 1,
-      borderBottomColor: glassColors.border,
+      borderBottomColor: colors.border,
     },
     totalLabel: {
       fontSize: 14,
@@ -364,10 +364,10 @@ const createStyles = (colors: any, glassColors: typeof glass.dark, isDark: boole
       alignItems: 'center',
       justifyContent: 'center',
       margin: '1.5%',
-      backgroundColor: glassColors.backgroundElevated,
+      backgroundColor: colors.card,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: glassColors.border,
+      borderColor: colors.border,
     },
     keypadButtonText: {
       fontSize: 28,

@@ -8,6 +8,8 @@ import Animated, {
   interpolateColor,
 } from 'react-native-reanimated';
 import { useTheme } from '../context/ThemeContext';
+import { useTranslations } from '../lib/i18n';
+import { brandGradient } from '../lib/colors';
 
 interface ToggleProps {
   value: boolean;
@@ -21,20 +23,21 @@ const TRACK_PADDING = 2;
 const THUMB_SIZE = 20;
 const THUMB_TRAVEL = TRACK_WIDTH - TRACK_PADDING * 2 - THUMB_SIZE;
 
-export function Toggle({ value, onValueChange, disabled = false, accessibilityLabel = 'Toggle' }: ToggleProps) {
+export function Toggle({ value, onValueChange, disabled = false, accessibilityLabel }: ToggleProps) {
   const { colors, isDark } = useTheme();
+  const t = useTranslations('components.toggle');
 
   const progress = useSharedValue(value ? 1 : 0);
 
   useEffect(() => {
     progress.value = withSpring(value ? 1 : 0, {
-      damping: 15,
-      stiffness: 120,
+      damping: 20,
+      stiffness: 300,
     });
   }, [value]);
 
   const offColor = isDark ? '#44403C' : '#D6D3D1';
-  const onColor = colors.primary;
+  const onColor = isDark ? '#D97706' : '#B45309';
 
   const trackStyle = useAnimatedStyle(() => {
     const backgroundColor = interpolateColor(
@@ -68,8 +71,8 @@ export function Toggle({ value, onValueChange, disabled = false, accessibilityLa
       style={[styles.touchable, disabled && styles.disabled]}
       accessibilityRole="switch"
       accessibilityState={{ checked: value }}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityHint="Double tap to toggle"
+      accessibilityLabel={accessibilityLabel || t('defaultLabel')}
+      accessibilityHint={t('hint')}
     >
       <Animated.View style={[styles.track, trackStyle]}>
         <Animated.View style={[styles.thumb, thumbStyle]} />

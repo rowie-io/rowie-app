@@ -12,14 +12,12 @@ import {
   Linking,
   Alert,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth, SKIP_BIOMETRIC_KEY } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Input } from '../components/Input';
-import { colors, glass } from '../lib/colors';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { config } from '../lib/config';
@@ -35,17 +33,18 @@ import {
 import { authService } from '../lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import logger from '../lib/logger';
+import { useTranslations } from '../lib/i18n';
 
 // Key to track if user has been asked about biometric setup
 const BIOMETRIC_PROMPT_SHOWN_KEY = 'biometric_prompt_shown';
 
 
 export function LoginScreen() {
-  const { isDark } = useTheme();
+  const { colors: themeColors } = useTheme();
   const insets = useSafeAreaInsets();
-  const glassColors = isDark ? glass.dark : glass.light;
   const navigation = useNavigation<any>();
   const { signIn, refreshAuth } = useAuth();
+  const t = useTranslations('auth');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -58,7 +57,7 @@ export function LoginScreen() {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [storedEmail, setStoredEmail] = useState<string | null>(null);
 
-  const styles = createStyles(glassColors);
+  const styles = createStyles(themeColors);
 
   // Check biometric capabilities and stored credentials on mount
   useEffect(() => {
@@ -125,7 +124,7 @@ export function LoginScreen() {
       logger.log('[Login] Biometric login successful');
     } catch (err: any) {
       logger.error('[Login] Biometric login failed:', err);
-      setError('Biometric login failed. Please use your password.');
+      setError(t('biometricLoginFailed'));
     } finally {
       setBiometricLoading(false);
     }
@@ -133,7 +132,7 @@ export function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      setError('Please enter email and password');
+      setError(t('emailAndPasswordRequired'));
       return;
     }
 
@@ -149,7 +148,7 @@ export function LoginScreen() {
       // After successful login, prompt for biometric setup if available
       promptForBiometricSetup();
     } catch (err: any) {
-      setError(err.message || 'Invalid credentials');
+      setError(err.message || t('invalidCredentials'));
     } finally {
       setLoading(false);
     }
@@ -178,22 +177,22 @@ export function LoginScreen() {
 
       // Ask user if they want to enable biometric login
       Alert.alert(
-        `Enable ${capabilities.biometricName}?`,
-        `Would you like to use ${capabilities.biometricName} to sign in faster next time?`,
+        t('enableBiometricTitle', { biometricName: capabilities.biometricName }),
+        t('enableBiometricMessage', { biometricName: capabilities.biometricName }),
         [
           {
-            text: 'Not Now',
+            text: t('notNow'),
             style: 'cancel',
           },
           {
-            text: 'Enable',
+            text: t('enable'),
             onPress: async () => {
               // Credentials already stored, just enable biometric
               const success = await enableBiometricLogin();
               if (success) {
                 Alert.alert(
-                  'Success',
-                  `${capabilities.biometricName} login is now enabled. You can manage this in Settings.`
+                  t('successTitle'),
+                  t('biometricEnabledMessage', { biometricName: capabilities.biometricName })
                 );
               }
             },
@@ -215,13 +214,7 @@ export function LoginScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={['#0C0A09', '#1C1917', '#0C0A09']}
-      locations={[0, 0.5, 1]}
-      start={{ x: 0.5, y: 0 }}
-      end={{ x: 0.5, y: 1 }}
-      style={styles.gradient}
-    >
+    <View style={styles.screenBackground}>
       <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -238,19 +231,14 @@ export function LoginScreen() {
                 source={require('../../assets/rowie-wordmark.png')}
                 style={styles.wordmark}
                 resizeMode="contain"
-                accessibilityLabel="Rowie"
+                accessibilityLabel={t('rowieAccessibilityLabel')}
               />
-              <Text maxFontSizeMultiplier={1.2} style={styles.title}>Sign In</Text>
-              <Text maxFontSizeMultiplier={1.5} style={styles.subtitle}>Access your account to start taking payments</Text>
+              <Text maxFontSizeMultiplier={1.2} style={styles.title}>{t('loginTitle')}</Text>
+              <Text maxFontSizeMultiplier={1.5} style={styles.subtitle}>{t('loginSubtitle')}</Text>
             </View>
 
             {/* Card */}
-            <LinearGradient
-              colors={['#292524', '#1C1917']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.card}
-            >
+            <View style={styles.card}>
               {error && (
                 <View style={styles.errorContainer} accessibilityRole="alert" accessibilityLiveRegion="assertive">
                   <Text maxFontSizeMultiplier={1.5} style={styles.errorText}>{error}</Text>
@@ -259,41 +247,41 @@ export function LoginScreen() {
 
               <View style={styles.form}>
                 <View style={styles.inputGroup}>
-                  <Text maxFontSizeMultiplier={1.5} style={styles.label}>Email</Text>
+                  <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('emailLabel')}</Text>
                   <Input
                     icon="mail-outline"
                     value={email}
                     onChangeText={setEmail}
-                    placeholder="you@example.com"
+                    placeholder={t('emailPlaceholder')}
                     keyboardType="email-address"
                     autoCapitalize="none"
                     autoCorrect={false}
                     autoComplete="email"
-                    accessibilityLabel="Email address"
+                    accessibilityLabel={t('emailAccessibilityLabel')}
                   />
                 </View>
 
                 <View style={styles.inputGroup}>
-                  <Text maxFontSizeMultiplier={1.5} style={styles.label}>Password</Text>
+                  <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('passwordLabel')}</Text>
                   <Input
                     icon="lock-closed-outline"
                     value={password}
                     onChangeText={setPassword}
-                    placeholder="Enter your password"
+                    placeholder={t('passwordPlaceholder')}
                     secureTextEntry={!showPassword}
                     autoComplete="password"
-                    accessibilityLabel="Password"
+                    accessibilityLabel={t('passwordAccessibilityLabel')}
                     rightIcon={
                       <TouchableOpacity
                         onPress={() => setShowPassword(!showPassword)}
                         style={styles.showHideButton}
                         accessibilityRole="button"
-                        accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                        accessibilityLabel={showPassword ? t('hidePassword') : t('showPassword')}
                       >
                         <Ionicons
                           name={showPassword ? 'eye-off-outline' : 'eye-outline'}
                           size={20}
-                          color={colors.gray400}
+                          color={themeColors.textSecondary}
                         />
                       </TouchableOpacity>
                     }
@@ -305,9 +293,9 @@ export function LoginScreen() {
                   onPress={handleForgotPassword}
                   style={styles.forgotPasswordButton}
                   accessibilityRole="link"
-                  accessibilityLabel="Forgot password"
+                  accessibilityLabel={t('forgotPasswordAccessibilityLabel')}
                 >
-                  <Text maxFontSizeMultiplier={1.3} style={styles.forgotPassword}>Forgot password?</Text>
+                  <Text maxFontSizeMultiplier={1.3} style={styles.forgotPassword}>{t('forgotPasswordLink')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -316,16 +304,16 @@ export function LoginScreen() {
                   disabled={loading}
                   activeOpacity={0.8}
                   accessibilityRole="button"
-                  accessibilityLabel={loading ? 'Signing in' : 'Sign in'}
+                  accessibilityLabel={loading ? t('signingInAccessibilityLabel') : t('signInAccessibilityLabel')}
                   accessibilityState={{ disabled: loading, busy: loading }}
                 >
                   {loading ? (
                     <View style={styles.buttonContent}>
-                      <ActivityIndicator color={colors.text} size="small" accessibilityLabel="Signing in" />
-                      <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>Signing in...</Text>
+                      <ActivityIndicator color={themeColors.text} size="small" accessibilityLabel={t('signingInAccessibilityLabel')} />
+                      <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>{t('signingInButton')}</Text>
                     </View>
                   ) : (
-                    <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>Sign in</Text>
+                    <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>{t('signInButton')}</Text>
                   )}
                 </TouchableOpacity>
 
@@ -334,7 +322,7 @@ export function LoginScreen() {
                   <>
                     <View style={styles.dividerContainer}>
                       <View style={styles.dividerLine} />
-                      <Text maxFontSizeMultiplier={1.5} style={styles.dividerText}>or</Text>
+                      <Text maxFontSizeMultiplier={1.5} style={styles.dividerText}>{t('dividerOr')}</Text>
                       <View style={styles.dividerLine} />
                     </View>
 
@@ -344,11 +332,11 @@ export function LoginScreen() {
                       disabled={biometricLoading}
                       activeOpacity={0.8}
                       accessibilityRole="button"
-                      accessibilityLabel={biometricLoading ? 'Authenticating with biometrics' : `Sign in with ${biometricCapabilities?.biometricName}`}
+                      accessibilityLabel={biometricLoading ? t('biometricAuthenticatingAccessibilityLabel') : t('signInWithBiometricAccessibilityLabel', { biometricName: biometricCapabilities?.biometricName })}
                       accessibilityState={{ disabled: biometricLoading, busy: biometricLoading }}
                     >
                       {biometricLoading ? (
-                        <ActivityIndicator color={colors.primary} size="small" accessibilityLabel="Authenticating" />
+                        <ActivityIndicator color={themeColors.primary} size="small" accessibilityLabel={t('authenticatingAccessibilityLabel')} />
                       ) : (
                         <>
                           <Ionicons
@@ -358,10 +346,10 @@ export function LoginScreen() {
                                 : 'finger-print-outline'
                             }
                             size={24}
-                            color={colors.primary}
+                            color={themeColors.primary}
                           />
                           <Text maxFontSizeMultiplier={1.3} style={styles.biometricButtonText}>
-                            Sign in with {biometricCapabilities.biometricName}
+                            {t('signInWithBiometric', { biometricName: biometricCapabilities.biometricName })}
                           </Text>
                         </>
                       )}
@@ -369,31 +357,32 @@ export function LoginScreen() {
 
                     {storedEmail && (
                       <Text maxFontSizeMultiplier={1.5} style={styles.storedEmailText}>
-                        Signed in as {storedEmail}
+                        {t('signedInAs', { email: storedEmail })}
                       </Text>
                     )}
                   </>
                 )}
               </View>
-            </LinearGradient>
+            </View>
 
             {/* Footer */}
             <View style={styles.footer}>
-              <Text maxFontSizeMultiplier={1.5} style={styles.footerText}>Don't have an account? </Text>
-              <TouchableOpacity onPress={handleCreateAccount} accessibilityRole="link" accessibilityLabel="Create an account">
-                <Text maxFontSizeMultiplier={1.3} style={styles.footerLink}>Create One</Text>
+              <Text maxFontSizeMultiplier={1.5} style={styles.footerText}>{t('dontHaveAccount')}</Text>
+              <TouchableOpacity onPress={handleCreateAccount} accessibilityRole="link" accessibilityLabel={t('createAccountAccessibilityLabel')}>
+                <Text maxFontSizeMultiplier={1.3} style={styles.footerLink}>{t('createOne')}</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
-const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
-  gradient: {
+const createStyles = (c: { [key: string]: any }) => StyleSheet.create({
+  screenBackground: {
     flex: 1,
+    backgroundColor: c.background,
   },
   container: {
     flex: 1,
@@ -426,29 +415,28 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
   title: {
     fontSize: 28,
     fontFamily: fonts.bold,
-    color: colors.text,
+    color: c.text,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 15,
     fontFamily: fonts.regular,
-    color: colors.gray400,
+    color: c.textSecondary,
     marginTop: 6,
     textAlign: 'center',
   },
   card: {
-    borderRadius: 24,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: glassColors.border,
+    borderColor: c.border,
     padding: 24,
     maxWidth: 400,
     width: '100%',
     alignSelf: 'center',
-    backgroundColor: glassColors.backgroundElevated,
-    ...shadows.lg,
+    backgroundColor: c.card,
   },
   errorContainer: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    backgroundColor: c.errorBg,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.2)',
     borderRadius: 16,
@@ -458,7 +446,7 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
   errorText: {
     fontSize: 14,
     fontFamily: fonts.medium,
-    color: colors.error,
+    color: c.error,
   },
   form: {
     gap: 20,
@@ -469,7 +457,7 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
   label: {
     fontSize: 14,
     fontFamily: fonts.medium,
-    color: colors.gray300,
+    color: c.textSecondary,
     marginLeft: 4,
   },
   showHideButton: {
@@ -484,17 +472,14 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
   forgotPassword: {
     fontSize: 14,
     fontFamily: fonts.medium,
-    color: colors.primary,
+    color: c.primary,
   },
   button: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
     borderRadius: 20,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 8,
-    ...shadows.md,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.3,
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -517,12 +502,12 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
   footerText: {
     fontSize: 14,
     fontFamily: fonts.regular,
-    color: colors.gray500,
+    color: c.textMuted,
   },
   footerLink: {
     fontSize: 14,
     fontFamily: fonts.semiBold,
-    color: colors.primary,
+    color: c.primary,
   },
   // Apple TTPOi 1.7: Biometric login styles
   dividerContainer: {
@@ -533,12 +518,12 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: glassColors.border,
+    backgroundColor: c.border,
   },
   dividerText: {
     fontSize: 13,
     fontFamily: fonts.medium,
-    color: colors.gray500,
+    color: c.textMuted,
     paddingHorizontal: 16,
   },
   biometricButton: {
@@ -546,21 +531,21 @@ const createStyles = (glassColors: typeof glass.dark) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: glassColors.background,
+    backgroundColor: c.background,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: glassColors.border,
+    borderColor: c.border,
     paddingVertical: 16,
   },
   biometricButtonText: {
     fontSize: 16,
     fontFamily: fonts.semiBold,
-    color: colors.primary,
+    color: c.primary,
   },
   storedEmailText: {
     fontSize: 13,
     fontFamily: fonts.regular,
-    color: colors.gray500,
+    color: c.textMuted,
     textAlign: 'center',
     marginTop: 8,
   },
