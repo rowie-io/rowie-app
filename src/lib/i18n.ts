@@ -59,6 +59,39 @@ function getMessages(locale: SupportedLanguage): Messages {
   return deepMerge(en, messagesByLocale[locale] || {});
 }
 
+/**
+ * Module-level active language, used by the non-hook `translate()` helper
+ * below. Providers that can't use the React context (e.g. AuthContext, which
+ * sits above LanguageProvider in the tree) read from this instead.
+ *
+ * Kept in sync by LanguageProvider via `setI18nLanguage()`.
+ */
+let activeLanguage: SupportedLanguage = 'en';
+
+export function setI18nLanguage(lang: SupportedLanguage) {
+  activeLanguage = lang;
+}
+
+/**
+ * Non-hook translator. Use only from places that cannot call `useTranslations`
+ * (imperative callbacks outside the LanguageProvider tree, module-level code).
+ * Inside components, always prefer `useTranslations`.
+ */
+export function translate(
+  key: string,
+  params?: Record<string, string | number>
+): string {
+  const messages = getMessages(activeLanguage);
+  let value = resolve(messages, key);
+  if (value === undefined) return key;
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      value = value.replace(new RegExp(`\\{${k}\\}`, 'g'), String(v));
+    }
+  }
+  return value;
+}
+
 /** Resolve a dot-path key from a nested object */
 function resolve(obj: Messages, path: string): string | undefined {
   const parts = path.split('.');

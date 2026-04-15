@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTranslations } from '../lib/i18n';
+import { translate } from '../lib/i18n';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -45,10 +45,9 @@ class ErrorCatcher extends React.Component<
   }
 }
 
-// Functional fallback UI with i18n support
+// Functional fallback UI. Uses the non-hook `translate()` because the
+// boundary sits above LanguageProvider in the tree.
 function ErrorFallback({ onReset }: { onReset: () => void }) {
-  const t = useTranslations('components.errorBoundary');
-
   return (
     <View style={styles.container} accessibilityRole="alert">
       <View style={styles.content}>
@@ -56,21 +55,21 @@ function ErrorFallback({ onReset }: { onReset: () => void }) {
           <Ionicons name="warning-outline" size={48} color="#ef4444" />
         </View>
         <Text style={styles.title} maxFontSizeMultiplier={1.3} accessibilityRole="header">
-          {t('title')}
+          {translate('components.errorBoundary.title')}
         </Text>
         <Text style={styles.message} maxFontSizeMultiplier={1.5}>
-          {t('message')}
+          {translate('components.errorBoundary.message')}
         </Text>
         <TouchableOpacity
           style={styles.button}
           onPress={onReset}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel={t('tryAgainLabel')}
-          accessibilityHint={t('tryAgainHint')}
+          accessibilityLabel={translate('components.errorBoundary.tryAgainLabel')}
+          accessibilityHint={translate('components.errorBoundary.tryAgainHint')}
         >
           <Ionicons name="refresh-outline" size={20} color="#FFFFFF" />
-          <Text style={styles.buttonText} maxFontSizeMultiplier={1.3}>{t('tryAgainButton')}</Text>
+          <Text style={styles.buttonText} maxFontSizeMultiplier={1.3}>{translate('components.errorBoundary.tryAgainButton')}</Text>
         </TouchableOpacity>
       </View>
     </View>

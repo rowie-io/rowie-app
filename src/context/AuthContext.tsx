@@ -9,7 +9,7 @@ import {
   isBiometricLoginEnabled,
   BiometricCapabilities,
 } from '../lib/biometricAuth';
-import { useTranslations } from '../lib/i18n';
+import { translate } from '../lib/i18n';
 import logger from '../lib/logger';
 
 /** When set, LoginScreen should skip the auto biometric prompt on mount. */
@@ -50,7 +50,6 @@ interface AuthContextType extends AuthState {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const t = useTranslations('auth');
   const [state, setState] = useState<AuthState>({
     user: null,
     organization: null,
@@ -105,11 +104,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Show alert to user (translated to current locale)
     Alert.alert(
-      t('sessionEndedTitle'),
-      t('sessionEndedMessage'),
-      [{ text: t('sessionEndedOk'), onPress: () => { sessionKickedAlertShown.current = false; } }]
+      translate('auth.sessionEndedTitle'),
+      translate('auth.sessionEndedMessage'),
+      [{ text: translate('auth.sessionEndedOk'), onPress: () => { sessionKickedAlertShown.current = false; } }]
     );
-  }, [t]);
+  }, []);
 
   // Set up the session kicked callbacks for both API client and socket
   useEffect(() => {

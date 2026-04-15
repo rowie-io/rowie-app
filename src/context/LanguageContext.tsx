@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiClient } from '../lib/api/client';
 import { LANGUAGE_NAMES, type SupportedLanguage } from '../lib/languages';
 import { setCurrencyLocale } from '../utils/currency';
+import { setI18nLanguage } from '../lib/i18n';
 import logger from '../lib/logger';
 
 /**
@@ -90,6 +91,7 @@ export function LanguageProvider({ children, userLanguage, orgLanguage: orgLangP
   // monetary amounts use the right thousand/decimal separators.
   useEffect(() => {
     setCurrencyLocale(LOCALE_MAP[language] || 'en-US');
+    setI18nLanguage(language);
   }, [language]);
 
   const setLanguage = useCallback(async (lang: SupportedLanguage) => {
