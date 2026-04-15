@@ -1373,6 +1373,7 @@
     },
     "floatingTabBar": {
       "menuLabel": "Menu",
+      "tabsLabel": "Additions",
       "ordersLabel": "Commandes",
       "historyLabel": "Historique",
       "eventsLabel": "Événements",

@@ -24,6 +24,7 @@ const TAB_MARGIN_BOTTOM = 4;
 
 const ROUTE_ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap; labelKey: string }> = {
   Menu: { active: 'storefront', inactive: 'storefront-outline', labelKey: 'menuLabel' },
+  TabsTab: { active: 'receipt', inactive: 'receipt-outline', labelKey: 'tabsLabel' },
   Preorders: { active: 'bag-handle', inactive: 'bag-handle-outline', labelKey: 'ordersLabel' },
   History: { active: 'time', inactive: 'time-outline', labelKey: 'historyLabel' },
   Events: { active: 'ticket', inactive: 'ticket-outline', labelKey: 'eventsLabel' },

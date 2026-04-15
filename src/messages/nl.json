@@ -1374,6 +1374,7 @@
     },
     "floatingTabBar": {
       "menuLabel": "Menu",
+      "tabsLabel": "Rekeningen",
       "ordersLabel": "Bestellingen",
       "historyLabel": "Geschiedenis",
       "eventsLabel": "Evenementen",

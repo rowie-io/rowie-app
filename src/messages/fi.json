@@ -1374,6 +1374,7 @@
     },
     "floatingTabBar": {
       "menuLabel": "Menu",
+      "tabsLabel": "Laskut",
       "ordersLabel": "Tilaukset",
       "historyLabel": "Historia",
       "eventsLabel": "Tapahtumat",

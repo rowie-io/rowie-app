@@ -1374,6 +1374,7 @@
     },
     "floatingTabBar": {
       "menuLabel": "Menu",
+      "tabsLabel": "Účty",
       "ordersLabel": "Objednávky",
       "historyLabel": "Historie",
       "eventsLabel": "Akce",

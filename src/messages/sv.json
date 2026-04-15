@@ -1374,6 +1374,7 @@
     },
     "floatingTabBar": {
       "menuLabel": "Meny",
+      "tabsLabel": "Notor",
       "ordersLabel": "Beställningar",
       "historyLabel": "Historik",
       "eventsLabel": "Evenemang",

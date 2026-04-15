@@ -183,29 +183,24 @@ function TabNavigator() {
       <Tab.Screen
         name="Menu"
         component={MenuStackNavigator}
-        options={{ tabBarLabel: 'Menu' }}
       />
       {showTabsTab && (
         <Tab.Screen
           name="TabsTab"
           component={TabsScreen}
-          options={{ tabBarLabel: 'Tabs' }}
         />
       )}
       <Tab.Screen
         name="History"
         component={HistoryStackNavigator}
-        options={{ tabBarLabel: 'History' }}
       />
       <Tab.Screen
         name="Events"
         component={EventsScannerScreen}
-        options={{ tabBarLabel: 'Events' }}
       />
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}
-        options={{ tabBarLabel: 'Settings' }}
       />
     </Tab.Navigator>
   );
