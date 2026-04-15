@@ -79,11 +79,17 @@ export const FloatingTabBar = memo(function FloatingTabBar({
 
   const tabWidth = containerWidth > 0 ? containerWidth / state.routes.length : 0;
 
+  // Sit closer to the home indicator than `insets.bottom` would suggest —
+  // full safe-area padding pushes the floating bar too high on notched
+  // iPhones compared to what most iOS apps do. Keeps a minimum 8pt gap on
+  // devices without a home indicator (insets.bottom === 0).
+  const bottomOffset = Math.max(insets.bottom - 18, 8);
+
   return (
     <View
       style={[
         styles.outerContainer,
-        { bottom: insets.bottom + 4 },
+        { bottom: bottomOffset },
       ]}
     >
       <View

@@ -874,11 +874,21 @@ export function CheckoutScreen() {
                 accessibilityLabel={Platform.OS === 'ios' ? t('tapToPayAccessibilityLabel') : t('cardAccessibilityLabel')}
                 accessibilityState={{ selected: paymentMethod === 'tap_to_pay' }}
               >
-                <Ionicons
-                  name="phone-portrait-outline"
-                  size={20}
-                  color={paymentMethod === 'tap_to_pay' ? '#fff' : colors.text}
-                />
+                {Platform.OS === 'ios' ? (
+                  <SymbolView
+                    name="wave.3.right.circle.fill"
+                    size={22}
+                    tintColor={paymentMethod === 'tap_to_pay' ? '#fff' : colors.text}
+                    resizeMode="scaleAspectFit"
+                    style={styles.paymentMethodIcon}
+                  />
+                ) : (
+                  <Ionicons
+                    name="phone-portrait-outline"
+                    size={20}
+                    color={paymentMethod === 'tap_to_pay' ? '#fff' : colors.text}
+                  />
+                )}
                 <Text
                   style={[
                     styles.paymentMethodButtonText,
@@ -1710,6 +1720,10 @@ const createStyles = (colors: any, isDark: boolean) => {
       fontSize: 14,
       fontWeight: '500',
       color: colors.text,
+    },
+    paymentMethodIcon: {
+      width: 22,
+      height: 22,
     },
     paymentMethodButtonTextSelected: {
       color: '#fff',
