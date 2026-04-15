@@ -36,7 +36,6 @@ import { CatalogProvider, useCatalog } from './src/context/CatalogContext';
 import { CartProvider } from './src/context/CartContext';
 import { DeviceProvider, useDevice } from './src/context/DeviceContext';
 import { SocketProvider } from './src/context/SocketContext';
-import { PreordersProvider } from './src/context/PreordersContext';
 import { SocketEventHandlers } from './src/components/SocketEventHandlers';
 import { StripeTerminalContextProvider, useTerminal } from './src/context/StripeTerminalContext';
 import { NetworkStatus } from './src/components/NetworkStatus';
@@ -53,6 +52,7 @@ import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 
 // Main screens
 import { CatalogSelectScreen } from './src/screens/CatalogSelectScreen';
+import { LocationPickerScreen } from './src/screens/LocationPickerScreen';
 import { MenuScreen } from './src/screens/MenuScreen';
 // ChargeScreen functionality moved to QuickChargeBottomSheet in MenuScreen
 import { TransactionsScreen } from './src/screens/TransactionsScreen';
@@ -73,8 +73,11 @@ import { SplitPaymentScreen } from './src/screens/SplitPaymentScreen';
 import { EventsScannerScreen } from './src/screens/EventsScannerScreen';
 
 // Preorder screens
-import { PreordersScreen } from './src/screens/PreordersScreen';
-import { PreorderDetailScreen } from './src/screens/PreorderDetailScreen';
+import { FloorPlanScreen } from './src/screens/FloorPlanScreen';
+import { SessionDetailScreen } from './src/screens/SessionDetailScreen';
+import { TabsScreen } from './src/screens/TabsScreen';
+import { OpenTabScreen } from './src/screens/OpenTabScreen';
+import { AddItemsToSessionScreen } from './src/screens/AddItemsToSessionScreen';
 
 // Education screens
 import { TapToPayEducationScreen } from './src/screens/TapToPayEducationScreen';
@@ -163,13 +166,11 @@ function TabNavigatorWithOnboarding() {
 function TabNavigator() {
   const { colors } = useTheme();
   const { subscription } = useAuth();
-  const { selectedCatalog } = useCatalog();
 
-  // Only show Events tab for Pro/Enterprise users
+  // Tabs are a Pro feature but are not tied to QR ordering (unlike the old
+  // preorders system). Any Pro vendor can open/close tabs on any catalog.
   const isPro = subscription?.tier === 'pro' || subscription?.tier === 'enterprise';
-
-  // Only show Preorders tab for Pro/Enterprise users with preorders enabled
-  const showPreordersTab = isPro && selectedCatalog?.preorderEnabled === true;
+  const showTabsTab = isPro;
 
   return (
     <Tab.Navigator
@@ -184,11 +185,11 @@ function TabNavigator() {
         component={MenuStackNavigator}
         options={{ tabBarLabel: 'Menu' }}
       />
-      {showPreordersTab && (
+      {showTabsTab && (
         <Tab.Screen
-          name="Preorders"
-          component={PreordersScreen}
-          options={{ tabBarLabel: 'Orders' }}
+          name="TabsTab"
+          component={TabsScreen}
+          options={{ tabBarLabel: 'Tabs' }}
         />
       )}
       <Tab.Screen
@@ -320,6 +321,11 @@ function AuthenticatedNavigator() {
         options={{ presentation: 'modal' }}
       />
       <Stack.Screen
+        name="LocationPicker"
+        component={LocationPickerScreen}
+        options={{ presentation: 'modal' }}
+      />
+      <Stack.Screen
         name="TapToPaySettings"
         component={TapToPaySettingsScreen}
         options={{ presentation: 'card' }}
@@ -387,19 +393,42 @@ function AuthenticatedNavigator() {
         }}
       />
 
-      {/* Preorder screens */}
+      {/* Tables, Sessions & Tabs */}
       <Stack.Screen
-        name="Preorders"
-        component={PreordersScreen}
+        name="FloorPlan"
+        component={FloorPlanScreen}
         options={{
           presentation: 'card',
         }}
       />
       <Stack.Screen
-        name="PreorderDetail"
-        component={PreorderDetailScreen}
+        name="SessionDetail"
+        component={SessionDetailScreen}
         options={{
           presentation: 'card',
+        }}
+      />
+      <Stack.Screen
+        name="Tabs"
+        component={TabsScreen}
+        options={{
+          presentation: 'card',
+        }}
+      />
+      <Stack.Screen
+        name="OpenTab"
+        component={OpenTabScreen}
+        options={{
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
+        }}
+      />
+      <Stack.Screen
+        name="AddItemsToSession"
+        component={AddItemsToSessionScreen}
+        options={{
+          presentation: 'modal',
+          animation: 'slide_from_bottom',
         }}
       />
     </Stack.Navigator>
@@ -529,12 +558,10 @@ export default function App() {
                       <SocketEventHandlers />
                       <DeviceProvider>
                         <CatalogProvider>
-                          <PreordersProvider>
-                            <CartProvider>
-                              <NetworkStatus />
-                              <AppNavigator />
-                            </CartProvider>
-                          </PreordersProvider>
+                          <CartProvider>
+                            <NetworkStatus />
+                            <AppNavigator />
+                          </CartProvider>
                         </CatalogProvider>
                       </DeviceProvider>
                     </SocketProvider>

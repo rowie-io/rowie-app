@@ -166,6 +166,21 @@
     "countryCzechia": "Tjeckien",
     "countrySingapore": "Singapore",
     "countryMalaysia": "Malaysia",
+    "countryBulgaria": "Bulgarien",
+    "countryCroatia": "Kroatien",
+    "countryCyprus": "Cypern",
+    "countryEstonia": "Estland",
+    "countryGreece": "Grekland",
+    "countryHungary": "Ungern",
+    "countryIceland": "Island",
+    "countryLatvia": "Lettland",
+    "countryLiechtenstein": "Liechtenstein",
+    "countryLithuania": "Litauen",
+    "countryMalta": "Malta",
+    "countryPoland": "Polen",
+    "countryRomania": "Rumänien",
+    "countrySlovakia": "Slovakien",
+    "countrySlovenia": "Slovenien",
     "chooseYourPlan": "Välj ditt abonnemang",
     "chooseYourPlanSubtitle": "Börja gratis eller lås upp alla funktioner med Pro",
     "starterPlanName": "Starter",
@@ -188,6 +203,8 @@
     "starterFeaturePayoutSummary": "Daglig utbetalningssammanfattning",
     "starterFeatureOneUser": "1 användare",
     "starterNotIncludedOnlineOrdering": "Onlinebeställning och förbeställningar",
+    "starterNotIncludedTeamPay": "Teamlön (timmar, dricks och utbetalningar)",
+    "starterNotIncludedAnalytics": "Analyspanel",
     "starterNotIncludedTipReports": "Dricksrapporter och spårning",
     "starterNotIncludedRevenueSplits": "Intäktsdelning",
     "starterNotIncludedAdditionalStaff": "Ytterligare personalkonton",
@@ -195,6 +212,7 @@
     "proFeatureUnlimitedMenus": "Obegränsade anpassade menyer",
     "proFeatureUnlimitedUsers": "Obegränsade användare och enheter",
     "proFeatureStaffManagement": "Personalhantering",
+    "proFeatureTeamPay": "Teamlön (timmar, dricks och utbetalningar)",
     "proFeatureRevenueSplits": "Intäktsdelning",
     "proFeatureTipReports": "Dricksrapporter och spårning",
     "proFeatureTipPooling": "Drickspool och utdelningsregler",
@@ -242,7 +260,7 @@
     "resetPasswordAccessibilityLabel": "Återställ lösenord",
     "backToLogin": "Tillbaka till inloggning",
     "backToLoginAccessibilityLabel": "Tillbaka till inloggning",
-    "backToLoginArrow": "\u2190 Tillbaka till inloggning",
+    "backToLoginArrow": "← Tillbaka till inloggning",
     "checkYourEmail": "Kolla din e-post",
     "resetLinkSent": "Vi har skickat en länk för att återställa ditt lösenord till",
     "checkSpamFolder": "Om du inte ser mejlet, kontrollera din skräppostmapp.",
@@ -268,7 +286,11 @@
     "passwordResetSuccessTitle": "Lösenordet har återställts!",
     "passwordResetSuccessMessage": "Ditt lösenord har återställts. Du kan nu logga in med ditt nya lösenord.",
     "rememberPassword": "Kommer du ihåg ditt lösenord? ",
-    "backToLoginLink": "Tillbaka till inloggning"
+    "backToLoginLink": "Tillbaka till inloggning",
+    "sessionEndedTitle": "Sessionen avslutad",
+    "sessionEndedMessage": "Du har loggats ut eftersom ditt konto loggades in på en annan enhet.",
+    "sessionEndedOk": "OK",
+    "businessNameTooShort": "Företagsnamnet måste innehålla minst 2 tecken"
   },
   "catalogs": {
     "noMenusAvailable": "Inga menyer tillgängliga",
@@ -590,7 +612,12 @@
     "goBackToPaymentResult": "Gå tillbaka till betalningsresultat",
     "retryPaymentHint": "Försök betalningen igen",
     "belowMinimumUnavailable": ", ej tillgänglig, under minimum",
-    "processingPaymentIndicator": "Bearbetar betalning"
+    "processingPaymentIndicator": "Bearbetar betalning",
+    "tapComplete": "Betalning slutförd",
+    "cashReceived": "Kontanter mottagna",
+    "splitComplete": "Delad betalning slutförd",
+    "cardPaymentComplete": "Kortbetalning slutförd",
+    "splitMethodsBadge": "Betald med flera metoder"
   },
   "settings": {
     "title": "Inställningar",
@@ -704,6 +731,7 @@
     "paymentMethodCardLast4": "Kort ****{last4}",
     "paymentMethodCard": "Kortbetalning",
     "preorderLabel": "Förbeställning",
+    "bookingLabel": "Bokning",
     "preorderWithNumber": "Förbeställning #{dailyNumber}",
     "itemCount": "{count} artikel",
     "itemCountPlural": "{count} artiklar",
@@ -929,7 +957,9 @@
   },
   "upgrade": {
     "featureUnlimitedMenus": "Obegränsade anpassade menyer",
+    "featureMultiLocation": "Hantera obegränsade platser",
     "featureUnlimitedUsers": "Obegränsade användare och enheter",
+    "featureFloorPlans": "Planritningar & bordsservice",
     "featureStaffManagement": "Personalhantering",
     "featureRevenueSplits": "Intäktsdelning (lokal/arrangör)",
     "featureTipReports": "Dricksrapporter och spårning",
@@ -965,6 +995,15 @@
     "noSubscriptionFoundTitle": "Inget abonnemang hittades",
     "noSubscriptionFoundMessage": "Inget aktivt abonnemang hittades att återställa.",
     "errorRestorePurchasesDefaultMessage": "Kunde inte återställa köp."
+  },
+  "locations": {
+    "pickerTitle": "Välj din plats",
+    "pickerSubtitle": "Vilken plats arbetar du på idag?",
+    "switchLocation": "Byt plats",
+    "currentLocation": "Nuvarande plats",
+    "noAccessibleLocations": "Inga tillgängliga platser. Kontakta din administratör för att bli tilldelad.",
+    "continueButton": "Fortsätt",
+    "defaultBadge": "Standard"
   },
   "onboarding": {
     "closeAccessibilityLabel": "Stäng",
@@ -1137,7 +1176,8 @@
       "cancelEditingTip": "Avbryt redigering av dricks",
       "editTipOption": "Redigera {percentage}% dricksalternativ",
       "removeTipOption": "Ta bort {percentage}% dricksalternativ",
-      "layoutAccessibilityLabel": "{label}-layout"
+      "layoutAccessibilityLabel": "{label}-layout",
+      "layoutSplitView": "Delad vy"
     },
     "setupRequired": {
       "paymentSetupTitle": "Betalningskonfiguration krävs",

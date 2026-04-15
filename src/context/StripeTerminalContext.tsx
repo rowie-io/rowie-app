@@ -183,6 +183,7 @@ interface StripeTerminalContextValue {
   disconnectReader: () => Promise<void>;
   scanForBluetoothReaders: () => Promise<any[]>;
   processPayment: (clientSecret: string) => Promise<{ status: string; paymentIntent: any }>;
+  processSetupIntent: (clientSecret: string) => Promise<{ status: string; paymentMethodId: string; setupIntentId: string }>;
   processServerDrivenPayment: (readerId: string, paymentIntentId: string) => Promise<void>;
   cancelPayment: () => Promise<void>;
   warmTerminal: () => Promise<void>;
@@ -302,7 +303,11 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
     retrievePaymentIntent,
     collectPaymentMethod,
     confirmPaymentIntent,
+    retrieveSetupIntent,
+    collectSetupIntentPaymentMethod,
+    confirmSetupIntent,
     cancelCollectPaymentMethod,
+    cancelCollectSetupIntent,
     cancelDiscovering,
     connectedReader: sdkConnectedReader,
   } = useStripeTerminal({
@@ -944,6 +949,58 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
     }
   }, [retrievePaymentIntent, collectPaymentMethod, confirmPaymentIntent]);
 
+  const processSetupIntent = useCallback(async (clientSecret: string) => {
+    setIsProcessing(true);
+    setError(null);
+    try {
+      logger.log('[StripeTerminal] ========== SETUP INTENT START ==========');
+
+      // 1. Retrieve the setup intent
+      const { setupIntent, error: retrieveError } = await retrieveSetupIntent(clientSecret);
+      if (retrieveError || !setupIntent) {
+        throw new Error(retrieveError?.message || 'Failed to retrieve setup intent');
+      }
+      logger.log('[StripeTerminal] SetupIntent retrieved:', setupIntent.id);
+
+      // 2. Collect payment method via Tap to Pay
+      const { setupIntent: collectedIntent, error: collectError } = await collectSetupIntentPaymentMethod({
+        setupIntent,
+        customerConsentCollected: true,
+      });
+      if (collectError || !collectedIntent) {
+        throw new Error(collectError?.message || 'Failed to collect payment method');
+      }
+      logger.log('[StripeTerminal] Payment method collected');
+
+      // 3. Confirm the setup intent
+      const { setupIntent: confirmedIntent, error: confirmError } = await confirmSetupIntent({
+        setupIntent: collectedIntent,
+      });
+      if (confirmError || !confirmedIntent) {
+        throw new Error(confirmError?.message || 'Failed to confirm setup intent');
+      }
+      logger.log('[StripeTerminal] SetupIntent confirmed:', confirmedIntent.id);
+
+      const paymentMethodId = (confirmedIntent as any).paymentMethodId || (confirmedIntent as any).payment_method || '';
+      if (!paymentMethodId) {
+        throw new Error('No payment method ID returned from setup intent');
+      }
+
+      return {
+        status: confirmedIntent.status || 'succeeded',
+        paymentMethodId,
+        setupIntentId: confirmedIntent.id,
+      };
+    } catch (err: any) {
+      logger.error('[StripeTerminal] ========== SETUP INTENT FAILED ==========');
+      logger.error('[StripeTerminal] Error:', err.message);
+      setError(err.message || 'Tab setup failed');
+      throw err;
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [retrieveSetupIntent, collectSetupIntentPaymentMethod, confirmSetupIntent]);
+
   const cancelPayment = useCallback(async () => {
     try {
       logger.log('[StripeTerminal] Cancelling payment...');
@@ -984,6 +1041,7 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
     disconnectReader,
     scanForBluetoothReaders,
     processPayment,
+    processSetupIntent,
     processServerDrivenPayment,
     cancelPayment,
     warmTerminal,
@@ -993,7 +1051,7 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
     clearPreferredReader,
     clearTerminalPaymentResult,
     setTerminalPaymentResult,
-  }), [isInitialized, isConnected, isProcessing, isWarming, error, deviceCompatibility, configurationStage, configurationProgress, readerUpdateProgress, termsAcceptance, connectedReaderType, connectedReaderLabel, bluetoothReaders, isScanning, preferredReader, terminalPaymentResult, initializeTerminal, connectReader, disconnectReader, scanForBluetoothReaders, processPayment, processServerDrivenPayment, cancelPayment, warmTerminal, waitForWarm, checkDeviceCompatibility, setPreferredReader, clearPreferredReader, clearTerminalPaymentResult]);
+  }), [isInitialized, isConnected, isProcessing, isWarming, error, deviceCompatibility, configurationStage, configurationProgress, readerUpdateProgress, termsAcceptance, connectedReaderType, connectedReaderLabel, bluetoothReaders, isScanning, preferredReader, terminalPaymentResult, initializeTerminal, connectReader, disconnectReader, scanForBluetoothReaders, processPayment, processSetupIntent, processServerDrivenPayment, cancelPayment, warmTerminal, waitForWarm, checkDeviceCompatibility, setPreferredReader, clearPreferredReader, clearTerminalPaymentResult]);
 
   return (
     <StripeTerminalContext.Provider value={value}>
@@ -1083,6 +1141,9 @@ export function StripeTerminalContextProvider({ children }: { children: React.Re
       disconnectReader: async () => {},
       scanForBluetoothReaders: async () => [],
       processPayment: async () => {
+        throw new Error(errorMessage);
+      },
+      processSetupIntent: async () => {
         throw new Error(errorMessage);
       },
       processServerDrivenPayment: async () => {},

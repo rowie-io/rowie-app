@@ -166,6 +166,21 @@
     "countryCzechia": "Tšekki",
     "countrySingapore": "Singapore",
     "countryMalaysia": "Malesia",
+    "countryBulgaria": "Bulgaria",
+    "countryCroatia": "Kroatia",
+    "countryCyprus": "Kypros",
+    "countryEstonia": "Viro",
+    "countryGreece": "Kreikka",
+    "countryHungary": "Unkari",
+    "countryIceland": "Islanti",
+    "countryLatvia": "Latvia",
+    "countryLiechtenstein": "Liechtenstein",
+    "countryLithuania": "Liettua",
+    "countryMalta": "Malta",
+    "countryPoland": "Puola",
+    "countryRomania": "Romania",
+    "countrySlovakia": "Slovakia",
+    "countrySlovenia": "Slovenia",
     "chooseYourPlan": "Valitse pakettisi",
     "chooseYourPlanSubtitle": "Aloita ilmaiseksi tai avaa kaikki ominaisuudet Pro-paketilla",
     "starterPlanName": "Starter",
@@ -188,6 +203,8 @@
     "starterFeaturePayoutSummary": "Päivittäinen maksukooste",
     "starterFeatureOneUser": "1 käyttäjä",
     "starterNotIncludedOnlineOrdering": "Verkkomyynti ja ennakkotilaukset",
+    "starterNotIncludedTeamPay": "Tiimin palkka (työtunnit, tipit ja maksut)",
+    "starterNotIncludedAnalytics": "Analytiikkanäkymä",
     "starterNotIncludedTipReports": "Tippiraportit ja seuranta",
     "starterNotIncludedRevenueSplits": "Tulonjako",
     "starterNotIncludedAdditionalStaff": "Lisähenkilökunnan tilit",
@@ -195,6 +212,7 @@
     "proFeatureUnlimitedMenus": "Rajattomat mukautetut menut",
     "proFeatureUnlimitedUsers": "Rajattomat käyttäjät ja laitteet",
     "proFeatureStaffManagement": "Henkilökunnan hallinta",
+    "proFeatureTeamPay": "Tiimin palkka (työtunnit, tipit ja maksut)",
     "proFeatureRevenueSplits": "Tulonjako",
     "proFeatureTipReports": "Tippiraportit ja seuranta",
     "proFeatureTipPooling": "Tippien yhdistäminen ja jakosäännöt",
@@ -242,7 +260,7 @@
     "resetPasswordAccessibilityLabel": "Palauta salasana",
     "backToLogin": "Takaisin kirjautumiseen",
     "backToLoginAccessibilityLabel": "Takaisin kirjautumiseen",
-    "backToLoginArrow": "\u2190 Takaisin kirjautumiseen",
+    "backToLoginArrow": "← Takaisin kirjautumiseen",
     "checkYourEmail": "Tarkista sähköpostisi",
     "resetLinkSent": "Olemme lähettäneet salasanan palautuslinkin osoitteeseen",
     "checkSpamFolder": "Jos et näe sähköpostia, tarkista roskapostikansio.",
@@ -268,7 +286,11 @@
     "passwordResetSuccessTitle": "Salasana palautettu!",
     "passwordResetSuccessMessage": "Salasanasi on palautettu onnistuneesti. Voit nyt kirjautua uudella salasanallasi.",
     "rememberPassword": "Muistatko salasanasi? ",
-    "backToLoginLink": "Takaisin kirjautumiseen"
+    "backToLoginLink": "Takaisin kirjautumiseen",
+    "sessionEndedTitle": "Istunto päättyi",
+    "sessionEndedMessage": "Sinut on kirjattu ulos, koska tilillesi kirjauduttiin toisella laitteella.",
+    "sessionEndedOk": "OK",
+    "businessNameTooShort": "Yrityksen nimen on oltava vähintään 2 merkkiä pitkä"
   },
   "catalogs": {
     "noMenusAvailable": "Ei menuita saatavilla",
@@ -590,7 +612,12 @@
     "goBackToPaymentResult": "Palaa maksutulokseen",
     "retryPaymentHint": "Yritä maksua uudelleen",
     "belowMinimumUnavailable": ", ei saatavilla, alle minimiarvon",
-    "processingPaymentIndicator": "Käsitellään maksua"
+    "processingPaymentIndicator": "Käsitellään maksua",
+    "tapComplete": "Maksu valmis",
+    "cashReceived": "Käteinen vastaanotettu",
+    "splitComplete": "Jaettu maksu valmis",
+    "cardPaymentComplete": "Korttimaksu valmis",
+    "splitMethodsBadge": "Maksettu useilla menetelmillä"
   },
   "settings": {
     "title": "Asetukset",
@@ -704,6 +731,7 @@
     "paymentMethodCardLast4": "Kortti ****{last4}",
     "paymentMethodCard": "Korttimaksu",
     "preorderLabel": "Ennakkotilaus",
+    "bookingLabel": "Varaus",
     "preorderWithNumber": "Ennakkotilaus #{dailyNumber}",
     "itemCount": "{count} tuote",
     "itemCountPlural": "{count} tuotetta",
@@ -929,7 +957,9 @@
   },
   "upgrade": {
     "featureUnlimitedMenus": "Rajattomat mukautetut menut",
+    "featureMultiLocation": "Hallitse rajattomia toimipisteitä",
     "featureUnlimitedUsers": "Rajattomat käyttäjät ja laitteet",
+    "featureFloorPlans": "Pohjapiirrokset ja pöytäpalvelu",
     "featureStaffManagement": "Henkilökunnan hallinta",
     "featureRevenueSplits": "Tulonjako (paikka/promoottori)",
     "featureTipReports": "Tippiraportit ja seuranta",
@@ -965,6 +995,15 @@
     "noSubscriptionFoundTitle": "Tilausta ei löytynyt",
     "noSubscriptionFoundMessage": "Palautettavaa aktiivista tilausta ei löytynyt.",
     "errorRestorePurchasesDefaultMessage": "Ostosten palautus epäonnistui."
+  },
+  "locations": {
+    "pickerTitle": "Valitse toimipisteesi",
+    "pickerSubtitle": "Missä toimipisteessä työskentelet tänään?",
+    "switchLocation": "Vaihda toimipistettä",
+    "currentLocation": "Nykyinen toimipiste",
+    "noAccessibleLocations": "Ei saavutettavia toimipisteitä. Ota yhteyttä järjestelmänvalvojaan päästäksesi toimipisteeseen.",
+    "continueButton": "Jatka",
+    "defaultBadge": "Oletus"
   },
   "onboarding": {
     "closeAccessibilityLabel": "Sulje",
@@ -1137,7 +1176,8 @@
       "cancelEditingTip": "Peruuta tipin muokkaus",
       "editTipOption": "Muokkaa {percentage} % tippivaihtoehtoa",
       "removeTipOption": "Poista {percentage} % tippivaihtoehto",
-      "layoutAccessibilityLabel": "{label}-asettelu"
+      "layoutAccessibilityLabel": "{label}-asettelu",
+      "layoutSplitView": "Jaettu näkymä"
     },
     "setupRequired": {
       "paymentSetupTitle": "Maksuasetukset vaaditaan",

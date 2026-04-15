@@ -30,6 +30,19 @@ export interface PaymentIntent {
   stripeAccountId: string;
 }
 
+export interface SetupIntentResponse {
+  id: string;
+  clientSecret: string;
+  status: string;
+  stripeAccountId: string;
+}
+
+export interface CreateSetupIntentParams {
+  customerName?: string;
+  description?: string;
+  metadata?: Record<string, string>;
+}
+
 export interface TerminalReader {
   id: string;
   label: string | null;
@@ -59,6 +72,13 @@ export const stripeTerminalApi = {
    */
   createPaymentIntent: (params: CreatePaymentIntentParams) =>
     apiClient.post<PaymentIntent>('/stripe/terminal/payment-intent', params),
+
+  /**
+   * Create a SetupIntent for tab pre-authorization (bar tab flow).
+   * Used with collectSetupIntentPaymentMethod to save a card for later charging.
+   */
+  createSetupIntent: (params: CreateSetupIntentParams) =>
+    apiClient.post<SetupIntentResponse>('/stripe/terminal/setup-intent', params),
 
   /**
    * Cancel a payment intent

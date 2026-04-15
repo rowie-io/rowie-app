@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -58,7 +59,8 @@ export function SettingsScreen() {
       });
     }
   }, [isDark]);
-  const { user, organization, subscription, signOut, connectStatus, connectLoading, isPaymentReady, refreshAuth, biometricCapabilities, biometricEnabled, setBiometricEnabled, refreshBiometricStatus, currency } = useAuth();
+  const { user, organization, subscription, signOut, connectStatus, connectLoading, isPaymentReady, refreshAuth, biometricCapabilities, biometricEnabled, setBiometricEnabled, refreshBiometricStatus, currency, accessibleLocations } = useAuth();
+  const tLocations = useTranslations('locations');
   const { selectedCatalog, catalogs, clearCatalog } = useCatalog();
   const {
     deviceCompatibility,
@@ -116,10 +118,17 @@ export function SettingsScreen() {
 
   const needsBankingSetup = !connectLoading && !connectStatus?.chargesEnabled && (user?.role === 'owner' || user?.role === 'admin');
 
+  // Current location id (persisted in AsyncStorage, read on focus so switching
+  // via LocationPicker is reflected when we return to Settings).
+  const [currentLocationId, setCurrentLocationId] = useState<string | null>(null);
+  const currentLocation = accessibleLocations.find((l) => l.id === currentLocationId) || null;
+  const showLocationRow = accessibleLocations.length > 1;
+
   // Refresh biometric status when screen is focused
   useFocusEffect(
     useCallback(() => {
       refreshBiometricStatus();
+      AsyncStorage.getItem('currentLocationId').then((id) => setCurrentLocationId(id));
     }, [refreshBiometricStatus])
   );
 
@@ -198,6 +207,10 @@ export function SettingsScreen() {
 
   const handleSwitchCatalog = () => {
     navigation.navigate('CatalogSelect');
+  };
+
+  const handleSwitchLocation = () => {
+    navigation.navigate('LocationPicker');
   };
 
   const handleOpenVendorPortal = async () => {
@@ -364,6 +377,38 @@ export function SettingsScreen() {
               </TouchableOpacity>
             </View>
 
+
+            {/* Location Section (multi-location vendors only) */}
+            {showLocationRow && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>{tLocations('currentLocation')}</Text>
+                <View style={styles.card}>
+                  <View style={styles.row}>
+                    <View style={styles.rowLeft}>
+                      <Ionicons name="location-outline" size={20} color={colors.textSecondary} style={styles.rowIcon} />
+                      <View style={styles.labelContainer}>
+                        <Text style={styles.label} numberOfLines={1} maxFontSizeMultiplier={1.3}>
+                          {currentLocation?.name || tLocations('noAccessibleLocations')}
+                        </Text>
+                        {currentLocation?.city || currentLocation?.state ? (
+                          <Text style={styles.sublabel} numberOfLines={1} maxFontSizeMultiplier={1.5}>
+                            {[currentLocation?.city, currentLocation?.state].filter(Boolean).join(', ')}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.switchButton}
+                      onPress={handleSwitchLocation}
+                      accessibilityRole="button"
+                      accessibilityLabel={tLocations('switchLocation')}
+                    >
+                      <Text style={styles.switchButtonText} maxFontSizeMultiplier={1.3}>{t('switch')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
 
             {/* Menu Section */}
             <View style={styles.section}>

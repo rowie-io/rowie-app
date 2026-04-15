@@ -123,6 +123,7 @@ export function SplitPaymentScreen() {
       // Create payment intent via API
       const piResponse = await stripeTerminalApi.createPaymentIntent({
         amount: fromSmallestUnit(amount, currency), // Convert smallest unit to base unit for API
+        currency, // Multi-currency support — never assume USD
       });
 
       if (isServerDriven) {
@@ -190,6 +191,7 @@ export function SplitPaymentScreen() {
     try {
       const paymentIntent = await stripeTerminalApi.createPaymentIntent({
         amount: fromSmallestUnit(amount, currency),
+        currency, // Multi-currency support — never assume USD
         orderId,
         isQuickCharge: false,
         captureMethod: 'automatic',

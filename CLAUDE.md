@@ -415,6 +415,20 @@ Root Navigator (native-stack)
 
 ---
 
+## Single Session Enforcement (this app only)
+
+**Single-session enforcement is rowie-app only.** A stolen or compromised phone running the POS must be kickable, so this client sends `X-Session-Version` on every request. The vendor web dashboard (rowie-vendor) intentionally does NOT participate — web users keep multiple tabs open and there's no security benefit to forcing one session there.
+
+**How it works in this app:**
+1. Login response includes `sessionVersion`. Store it via `authService.saveSessionVersion()`.
+2. `lib/api/client.ts` reads it and sends as `X-Session-Version` header on every request.
+3. If the API returns 401 with `code: 'SESSION_KICKED'`, the user has signed in elsewhere — log out and show the kick alert.
+4. The Socket.IO `SESSION_KICKED` event fires too (real-time kick without waiting for the next API call).
+
+If you ever see the audit say "vendor portal is missing X-Session-Version" — that's a false positive. The API middleware checks the header **only if it's present**, so omitting it cleanly opts out.
+
+---
+
 ## Contexts & State Management
 
 ### AuthContext

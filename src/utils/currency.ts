@@ -14,6 +14,26 @@ export function isZeroDecimal(currency: string): boolean {
   return ZERO_DECIMAL_CURRENCIES.includes(currency.toLowerCase());
 }
 
+/**
+ * Active formatting locale. Set by LanguageProvider on mount and on language
+ * change so currency formatting uses the user's language for thousand/decimal
+ * separators (German users see "1.234,56 €", US users see "$1,234.56").
+ *
+ * Module-level state instead of a hook so the pure formatCurrency() function
+ * can be called from anywhere (not just React components).
+ */
+let activeLocale = 'en-US';
+
+export function setCurrencyLocale(locale: string): void {
+  if (locale && typeof locale === 'string') {
+    activeLocale = locale;
+  }
+}
+
+export function getCurrencyLocale(): string {
+  return activeLocale;
+}
+
 export function fromSmallestUnit(amount: number, currency: string): number {
   return isZeroDecimal(currency) ? amount : amount / 100;
 }
@@ -32,7 +52,7 @@ export function formatCurrency(amount: number, currency: string = 'usd'): string
   const code = (currency || 'usd').toUpperCase();
   const zd = isZeroDecimal(code.toLowerCase());
   try {
-    const result = new Intl.NumberFormat('en-US', {
+    const result = new Intl.NumberFormat(activeLocale, {
       style: 'currency',
       currency: code,
       minimumFractionDigits: zd ? 0 : 2,
@@ -40,6 +60,8 @@ export function formatCurrency(amount: number, currency: string = 'usd'): string
     }).format(amount);
     return result;
   } catch (err) {
+    // Hermes/older RN may fail on uncommon currencies — fall back to a simple
+    // symbol + fixed-decimal format.
     const symbol = CURRENCY_SYMBOLS[code] || code;
     return `${symbol}${zd ? amount.toFixed(0) : amount.toFixed(2)}`;
   }

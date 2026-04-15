@@ -14,7 +14,7 @@ export const PRICING = {
     period: '/mo',
     transactionFeeRate: 0.028,
     transactionFeeFixedCents: 16,
-    transactionFeeDisplay: '2.8% + $0.16 per tap',
+    transactionFeeDisplay: '', // Computed dynamically per country — see stripe-rates.ts
     trialDays: 7,
   },
   starter: {
@@ -23,7 +23,7 @@ export const PRICING = {
     period: '',
     transactionFeeRate: 0.029,
     transactionFeeFixedCents: 18,
-    transactionFeeDisplay: '2.9% + $0.18 per tap',
+    transactionFeeDisplay: '', // Computed dynamically per country — see stripe-rates.ts
     trialDays: 0,
   },
   referral: {

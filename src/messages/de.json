@@ -166,6 +166,21 @@
     "countryCzechia": "Tschechien",
     "countrySingapore": "Singapur",
     "countryMalaysia": "Malaysia",
+    "countryBulgaria": "Bulgarien",
+    "countryCroatia": "Kroatien",
+    "countryCyprus": "Zypern",
+    "countryEstonia": "Estland",
+    "countryGreece": "Griechenland",
+    "countryHungary": "Ungarn",
+    "countryIceland": "Island",
+    "countryLatvia": "Lettland",
+    "countryLiechtenstein": "Liechtenstein",
+    "countryLithuania": "Litauen",
+    "countryMalta": "Malta",
+    "countryPoland": "Polen",
+    "countryRomania": "Rumänien",
+    "countrySlovakia": "Slowakei",
+    "countrySlovenia": "Slowenien",
     "chooseYourPlan": "Wählen Sie Ihren Plan",
     "chooseYourPlanSubtitle": "Starten Sie kostenlos oder schalten Sie alle Funktionen mit Pro frei",
     "starterPlanName": "Starter",
@@ -188,6 +203,8 @@
     "starterFeaturePayoutSummary": "Tägliche Auszahlungsübersicht",
     "starterFeatureOneUser": "1 Benutzer",
     "starterNotIncludedOnlineOrdering": "Online-Bestellungen & Vorbestellungen",
+    "starterNotIncludedTeamPay": "Team-Lohn (Arbeitsstunden, Trinkgelder & Auszahlungen)",
+    "starterNotIncludedAnalytics": "Analyse-Dashboard",
     "starterNotIncludedTipReports": "Trinkgeldberichte & -verfolgung",
     "starterNotIncludedRevenueSplits": "Umsatzaufteilung",
     "starterNotIncludedAdditionalStaff": "Zusätzliche Mitarbeiterkonten",
@@ -195,6 +212,7 @@
     "proFeatureUnlimitedMenus": "Unbegrenzte individuelle Menüs",
     "proFeatureUnlimitedUsers": "Unbegrenzte Benutzer & Geräte",
     "proFeatureStaffManagement": "Mitarbeiterverwaltung",
+    "proFeatureTeamPay": "Team-Lohn (Arbeitsstunden, Trinkgelder & Auszahlungen)",
     "proFeatureRevenueSplits": "Umsatzaufteilung",
     "proFeatureTipReports": "Trinkgeldberichte & -verfolgung",
     "proFeatureTipPooling": "Trinkgeldpool & Auszahlungsregeln",
@@ -242,7 +260,7 @@
     "resetPasswordAccessibilityLabel": "Passwort zurücksetzen",
     "backToLogin": "Zurück zur Anmeldung",
     "backToLoginAccessibilityLabel": "Zurück zur Anmeldung",
-    "backToLoginArrow": "\u2190 Zurück zur Anmeldung",
+    "backToLoginArrow": "← Zurück zur Anmeldung",
     "checkYourEmail": "Prüfen Sie Ihre E-Mail",
     "resetLinkSent": "Wir haben einen Link zum Zurücksetzen des Passworts gesendet an",
     "checkSpamFolder": "Wenn Sie die E-Mail nicht finden, prüfen Sie Ihren Spam-Ordner.",
@@ -268,7 +286,11 @@
     "passwordResetSuccessTitle": "Passwort erfolgreich zurückgesetzt!",
     "passwordResetSuccessMessage": "Ihr Passwort wurde erfolgreich zurückgesetzt. Sie können sich jetzt mit Ihrem neuen Passwort anmelden.",
     "rememberPassword": "Passwort doch bekannt? ",
-    "backToLoginLink": "Zurück zur Anmeldung"
+    "backToLoginLink": "Zurück zur Anmeldung",
+    "sessionEndedTitle": "Sitzung beendet",
+    "sessionEndedMessage": "Sie wurden abgemeldet, weil Ihr Konto auf einem anderen Gerät angemeldet wurde.",
+    "sessionEndedOk": "OK",
+    "businessNameTooShort": "Der Firmenname muss mindestens 2 Zeichen lang sein"
   },
   "catalogs": {
     "noMenusAvailable": "Keine Menüs verfügbar",
@@ -590,7 +612,12 @@
     "goBackToPaymentResult": "Zurück zum Zahlungsergebnis",
     "retryPaymentHint": "Zahlung erneut versuchen",
     "belowMinimumUnavailable": ", nicht verfügbar, unter Mindestbetrag",
-    "processingPaymentIndicator": "Zahlung wird verarbeitet"
+    "processingPaymentIndicator": "Zahlung wird verarbeitet",
+    "tapComplete": "Zahlung abgeschlossen",
+    "cashReceived": "Bargeld erhalten",
+    "splitComplete": "Geteilte Zahlung abgeschlossen",
+    "cardPaymentComplete": "Kartenzahlung abgeschlossen",
+    "splitMethodsBadge": "Mit mehreren Methoden bezahlt"
   },
   "settings": {
     "title": "Einstellungen",
@@ -704,6 +731,7 @@
     "paymentMethodCardLast4": "Karte ****{last4}",
     "paymentMethodCard": "Kartenzahlung",
     "preorderLabel": "Vorbestellung",
+    "bookingLabel": "Buchung",
     "preorderWithNumber": "Vorbestellung #{dailyNumber}",
     "itemCount": "{count} Artikel",
     "itemCountPlural": "{count} Artikel",
@@ -929,7 +957,9 @@
   },
   "upgrade": {
     "featureUnlimitedMenus": "Unbegrenzte individuelle Menüs",
+    "featureMultiLocation": "Verwalten Sie unbegrenzte Standorte",
     "featureUnlimitedUsers": "Unbegrenzte Benutzer & Geräte",
+    "featureFloorPlans": "Tischplan & Tischservice",
     "featureStaffManagement": "Mitarbeiterverwaltung",
     "featureRevenueSplits": "Umsatzaufteilung (Veranstaltungsort/Promoter)",
     "featureTipReports": "Trinkgeldberichte & -verfolgung",
@@ -965,6 +995,15 @@
     "noSubscriptionFoundTitle": "Kein Abonnement gefunden",
     "noSubscriptionFoundMessage": "Kein aktives Abonnement zur Wiederherstellung gefunden.",
     "errorRestorePurchasesDefaultMessage": "Käufe konnten nicht wiederhergestellt werden."
+  },
+  "locations": {
+    "pickerTitle": "Wählen Sie Ihren Standort",
+    "pickerSubtitle": "An welchem Standort arbeiten Sie heute?",
+    "switchLocation": "Standort wechseln",
+    "currentLocation": "Aktueller Standort",
+    "noAccessibleLocations": "Keine zugänglichen Standorte. Kontaktieren Sie Ihren Administrator, um zugewiesen zu werden.",
+    "continueButton": "Weiter",
+    "defaultBadge": "Standard"
   },
   "onboarding": {
     "closeAccessibilityLabel": "Schließen",
@@ -1137,7 +1176,8 @@
       "cancelEditingTip": "Trinkgeld-Bearbeitung abbrechen",
       "editTipOption": "{percentage}%-Trinkgeldoption bearbeiten",
       "removeTipOption": "{percentage}%-Trinkgeldoption entfernen",
-      "layoutAccessibilityLabel": "{label}-Layout"
+      "layoutAccessibilityLabel": "{label}-Layout",
+      "layoutSplitView": "Geteilte Ansicht"
     },
     "setupRequired": {
       "paymentSetupTitle": "Zahlungseinrichtung erforderlich",

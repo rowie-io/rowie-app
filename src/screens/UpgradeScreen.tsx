@@ -21,11 +21,14 @@ import { shadows } from '../lib/shadows';
 import { config } from '../lib/config';
 import logger from '../lib/logger';
 import { PRICING } from '../lib/pricing';
+import { getTTPDisplayRate } from '../lib/countries';
 import { useTranslations } from '../lib/i18n';
 
 const PRO_FEATURE_KEYS = [
+  { icon: 'business-outline', key: 'featureMultiLocation' },
   { icon: 'infinite-outline', key: 'featureUnlimitedMenus' },
   { icon: 'people-outline', key: 'featureUnlimitedUsers' },
+  { icon: 'grid-outline', key: 'featureFloorPlans' },
   { icon: 'person-add-outline', key: 'featureStaffManagement' },
   { icon: 'git-branch-outline', key: 'featureRevenueSplits' },
   { icon: 'cash-outline', key: 'featureTipReports' },
@@ -196,7 +199,7 @@ export function UpgradeScreen() {
           <Ionicons name="card-outline" size={20} color={colors.success} />
           <View style={styles.feeTextContainer}>
             <Text style={styles.feeTitle} maxFontSizeMultiplier={1.5}>{t('lowerTransactionFeesTitle')}</Text>
-            <Text style={styles.feeSubtitle} maxFontSizeMultiplier={1.5}>{t('lowerTransactionFeesSubtitle', { proRate: user?.rates?.tapToPay.pro || PRICING.pro.transactionFeeDisplay, starterRate: user?.rates?.tapToPay.starter || PRICING.starter.transactionFeeDisplay })}</Text>
+            <Text style={styles.feeSubtitle} maxFontSizeMultiplier={1.5}>{t('lowerTransactionFeesSubtitle', { proRate: user?.rates?.tapToPay.pro || getTTPDisplayRate(user?.country || 'US', 'pro'), starterRate: user?.rates?.tapToPay.starter || getTTPDisplayRate(user?.country || 'US', 'starter') })}</Text>
           </View>
         </View>
 

@@ -9,15 +9,24 @@ import {
   isBiometricLoginEnabled,
   BiometricCapabilities,
 } from '../lib/biometricAuth';
+import { useTranslations } from '../lib/i18n';
 import logger from '../lib/logger';
 
 /** When set, LoginScreen should skip the auto biometric prompt on mount. */
 export const SKIP_BIOMETRIC_KEY = 'rowie_skip_biometric_on_mount';
 
+interface AccessibleLocation {
+  id: string;
+  name: string;
+  isDefault?: boolean;
+  [key: string]: any;
+}
+
 interface AuthState {
   user: User | null;
   organization: Organization | null;
   subscription: Subscription | null;
+  accessibleLocations: AccessibleLocation[];
   isLoading: boolean;
   isAuthenticated: boolean;
   connectStatus: ConnectStatus | null;
@@ -41,10 +50,12 @@ interface AuthContextType extends AuthState {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const t = useTranslations('auth');
   const [state, setState] = useState<AuthState>({
     user: null,
     organization: null,
     subscription: null,
+    accessibleLocations: [],
     isLoading: true,
     isAuthenticated: false,
     connectStatus: null,
@@ -80,6 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user: null,
       organization: null,
       subscription: null,
+      accessibleLocations: [],
       isLoading: false,
       isAuthenticated: false,
       connectStatus: null,
@@ -89,14 +101,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       biometricEnabled: false,
       currency: 'usd',
     });
+    AsyncStorage.removeItem('currentLocationId').catch(() => {});
 
-    // Show alert to user
+    // Show alert to user (translated to current locale)
     Alert.alert(
-      'Session Ended',
-      'You have been signed out because your account was signed in on another device.',
-      [{ text: 'OK', onPress: () => { sessionKickedAlertShown.current = false; } }]
+      t('sessionEndedTitle'),
+      t('sessionEndedMessage'),
+      [{ text: t('sessionEndedOk'), onPress: () => { sessionKickedAlertShown.current = false; } }]
     );
-  }, []);
+  }, [t]);
 
   // Set up the session kicked callbacks for both API client and socket
   useEffect(() => {
@@ -168,10 +181,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await authService.saveOrganization(profile.organization);
 
         // Update state with fresh data
+        const profileLocations: AccessibleLocation[] = (profile as any).accessibleLocations || [];
         setState(prev => ({
           ...prev,
           user: profile.user,
           organization: profile.organization,
+          accessibleLocations: profileLocations.length > 0 ? profileLocations : prev.accessibleLocations,
           isLoading: false,
           isAuthenticated: true,
           currency: profile.user.currency || 'usd',
@@ -186,6 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             user: null,
             organization: null,
             subscription: null,
+            accessibleLocations: [],
             isLoading: false,
             isAuthenticated: false,
             connectStatus: null,
@@ -224,11 +240,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     apiClient.resetSessionKicked();
     const response = await authService.login({ email, password });
 
+    // Persist the selected location to AsyncStorage so the API client injects
+    // X-Location-Id on every request. Single-location users auto-select; multi-
+    // location users keep whatever's already stored (LocationPickerScreen will
+    // prompt them to pick if the stored id is missing or stale).
+    const accessibleLocations: any[] = (response as any).accessibleLocations || [];
+    if (accessibleLocations.length === 1) {
+      await AsyncStorage.setItem('currentLocationId', accessibleLocations[0].id);
+    } else if (accessibleLocations.length > 1) {
+      const existing = await AsyncStorage.getItem('currentLocationId');
+      const stillValid = existing && accessibleLocations.some((l: any) => l.id === existing);
+      if (!stillValid) {
+        const def = accessibleLocations.find((l: any) => l.isDefault) || accessibleLocations[0];
+        await AsyncStorage.setItem('currentLocationId', def.id);
+      }
+    } else {
+      await AsyncStorage.removeItem('currentLocationId');
+    }
+
     setState(prev => ({
       ...prev,
       user: response.user,
       organization: response.organization,
       subscription: response.subscription || null,
+      accessibleLocations,
       isLoading: false,
       isAuthenticated: true,
       connectLoading: true, // Reset to loading state for connect status
@@ -246,6 +281,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user: null,
       organization: null,
       subscription: null,
+      accessibleLocations: [],
       isLoading: false,
       isAuthenticated: false,
       connectStatus: null,
@@ -255,6 +291,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       biometricEnabled: false,
       currency: 'usd',
     });
+    // Clear the location selection so the next login starts fresh
+    await AsyncStorage.removeItem('currentLocationId').catch(() => {});
     // Clear local tokens + invalidate on server in background
     authService.logout().catch((error) => {
       logger.error('Logout error:', error);

@@ -166,6 +166,21 @@
     "countryCzechia": "Tsjekkia",
     "countrySingapore": "Singapore",
     "countryMalaysia": "Malaysia",
+    "countryBulgaria": "Bulgaria",
+    "countryCroatia": "Kroatia",
+    "countryCyprus": "Kypros",
+    "countryEstonia": "Estland",
+    "countryGreece": "Hellas",
+    "countryHungary": "Ungarn",
+    "countryIceland": "Island",
+    "countryLatvia": "Latvia",
+    "countryLiechtenstein": "Liechtenstein",
+    "countryLithuania": "Litauen",
+    "countryMalta": "Malta",
+    "countryPoland": "Polen",
+    "countryRomania": "Romania",
+    "countrySlovakia": "Slovakia",
+    "countrySlovenia": "Slovenia",
     "chooseYourPlan": "Velg abonnementet ditt",
     "chooseYourPlanSubtitle": "Start gratis eller lås opp alle funksjoner med Pro",
     "starterPlanName": "Starter",
@@ -188,6 +203,8 @@
     "starterFeaturePayoutSummary": "Daglig utbetalingsoversikt",
     "starterFeatureOneUser": "1 bruker",
     "starterNotIncludedOnlineOrdering": "Nettbestilling og forhåndsbestillinger",
+    "starterNotIncludedTeamPay": "Teamlønn (timer, tips og utbetalinger)",
+    "starterNotIncludedAnalytics": "Analysepanel",
     "starterNotIncludedTipReports": "Tipsrapporter og sporing",
     "starterNotIncludedRevenueSplits": "Inntektsdeling",
     "starterNotIncludedAdditionalStaff": "Ekstra personalkontoer",
@@ -195,6 +212,7 @@
     "proFeatureUnlimitedMenus": "Ubegrensede tilpassede menyer",
     "proFeatureUnlimitedUsers": "Ubegrensede brukere og enheter",
     "proFeatureStaffManagement": "Personaladministrasjon",
+    "proFeatureTeamPay": "Teamlønn (timer, tips og utbetalinger)",
     "proFeatureRevenueSplits": "Inntektsdeling",
     "proFeatureTipReports": "Tipsrapporter og sporing",
     "proFeatureTipPooling": "Tipspott og utdelingsregler",
@@ -242,7 +260,7 @@
     "resetPasswordAccessibilityLabel": "Tilbakestill passord",
     "backToLogin": "Tilbake til innlogging",
     "backToLoginAccessibilityLabel": "Tilbake til innlogging",
-    "backToLoginArrow": "\u2190 Tilbake til innlogging",
+    "backToLoginArrow": "← Tilbake til innlogging",
     "checkYourEmail": "Sjekk e-posten din",
     "resetLinkSent": "Vi har sendt en lenke for å tilbakestille passordet ditt til",
     "checkSpamFolder": "Hvis du ikke finner e-posten, sjekk søppelpostmappen.",
@@ -268,7 +286,11 @@
     "passwordResetSuccessTitle": "Passordet er tilbakestilt!",
     "passwordResetSuccessMessage": "Passordet ditt er tilbakestilt. Du kan nå logge inn med det nye passordet ditt.",
     "rememberPassword": "Husker du passordet ditt? ",
-    "backToLoginLink": "Tilbake til innlogging"
+    "backToLoginLink": "Tilbake til innlogging",
+    "sessionEndedTitle": "Økten avsluttet",
+    "sessionEndedMessage": "Du er blitt logget ut fordi kontoen din ble logget inn på en annen enhet.",
+    "sessionEndedOk": "OK",
+    "businessNameTooShort": "Firmanavnet må inneholde minst 2 tegn"
   },
   "catalogs": {
     "noMenusAvailable": "Ingen menyer tilgjengelige",
@@ -590,7 +612,12 @@
     "goBackToPaymentResult": "Gå tilbake til betalingsresultat",
     "retryPaymentHint": "Prøv betalingen på nytt",
     "belowMinimumUnavailable": ", utilgjengelig, under minimum",
-    "processingPaymentIndicator": "Behandler betaling"
+    "processingPaymentIndicator": "Behandler betaling",
+    "tapComplete": "Betaling fullført",
+    "cashReceived": "Kontanter mottatt",
+    "splitComplete": "Delt betaling fullført",
+    "cardPaymentComplete": "Kortbetaling fullført",
+    "splitMethodsBadge": "Betalt med flere metoder"
   },
   "settings": {
     "title": "Innstillinger",
@@ -704,6 +731,7 @@
     "paymentMethodCardLast4": "Kort ****{last4}",
     "paymentMethodCard": "Kortbetaling",
     "preorderLabel": "Forhåndsbestilling",
+    "bookingLabel": "Booking",
     "preorderWithNumber": "Forhåndsbestilling #{dailyNumber}",
     "itemCount": "{count} vare",
     "itemCountPlural": "{count} varer",
@@ -929,7 +957,9 @@
   },
   "upgrade": {
     "featureUnlimitedMenus": "Ubegrensede tilpassede menyer",
+    "featureMultiLocation": "Administrer ubegrensede lokasjoner",
     "featureUnlimitedUsers": "Ubegrensede brukere og enheter",
+    "featureFloorPlans": "Planløsninger & bordservering",
     "featureStaffManagement": "Personaladministrasjon",
     "featureRevenueSplits": "Inntektsdeling (venue/arrangør)",
     "featureTipReports": "Tipsrapporter og sporing",
@@ -965,6 +995,15 @@
     "noSubscriptionFoundTitle": "Ingen abonnement funnet",
     "noSubscriptionFoundMessage": "Ingen aktivt abonnement ble funnet å gjenopprette.",
     "errorRestorePurchasesDefaultMessage": "Kunne ikke gjenopprette kjøp."
+  },
+  "locations": {
+    "pickerTitle": "Velg lokasjonen din",
+    "pickerSubtitle": "Hvilken lokasjon jobber du på i dag?",
+    "switchLocation": "Bytt lokasjon",
+    "currentLocation": "Gjeldende lokasjon",
+    "noAccessibleLocations": "Ingen tilgjengelige lokasjoner. Kontakt administrator for å bli tildelt.",
+    "continueButton": "Fortsett",
+    "defaultBadge": "Standard"
   },
   "onboarding": {
     "closeAccessibilityLabel": "Lukk",
@@ -1137,7 +1176,8 @@
       "cancelEditingTip": "Avbryt redigering av tips",
       "editTipOption": "Rediger {percentage}% tipsalternativ",
       "removeTipOption": "Fjern {percentage}% tipsalternativ",
-      "layoutAccessibilityLabel": "{label}-layout"
+      "layoutAccessibilityLabel": "{label}-layout",
+      "layoutSplitView": "Delt visning"
     },
     "setupRequired": {
       "paymentSetupTitle": "Betalingsoppsett påkrevd",

@@ -26,7 +26,7 @@ import { formatCents, fromSmallestUnit } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { useQueryClient } from '@tanstack/react-query';
-import { stripeTerminalApi, ordersApi, preordersApi } from '../lib/api';
+import { stripeTerminalApi, ordersApi } from '../lib/api';
 import logger from '../lib/logger';
 import { isValidEmail } from '../lib/validation';
 import { useTranslations } from '../lib/i18n';
@@ -157,21 +157,14 @@ export function PaymentResultScreen() {
     }
   }, [success, customerEmail, paymentIntentId, receiptSent]);
 
-  // Complete preorder after successful payment (pay_at_pickup flow)
+  // Legacy preorder completion flow — preorders were replaced by table_sessions.
+  // The session system handles its own settlement via /sessions/{id}/settle.
+  // This effect is preserved only to invalidate the transactions cache if the
+  // caller still passes preorderId; the actual completion is now done via the
+  // session settle endpoint upstream.
   useEffect(() => {
     if (success && preorderId && paymentIntentId) {
-      const completePreorder = async () => {
-        try {
-          await preordersApi.complete(preorderId, paymentIntentId);
-          logger.log('[PaymentResult] Preorder completed:', preorderId);
-          // Directly invalidate transactions cache so the History tab shows updated data
-          // (don't rely solely on the socket event which may be delayed)
-          queryClient.invalidateQueries({ queryKey: ['transactions'] });
-        } catch (error) {
-          logger.error('[PaymentResult] Failed to complete preorder:', error);
-        }
-      };
-      completePreorder();
+      queryClient.invalidateQueries({ queryKey: ['transactions'] });
     }
   }, [success, preorderId, paymentIntentId, queryClient]);
 
@@ -360,6 +353,7 @@ export function PaymentResultScreen() {
       // Create a new payment intent for card payment (direct charge on connected account)
       const paymentIntent = await stripeTerminalApi.createPaymentIntent({
         amount: fromSmallestUnit(amount, currency), // API expects base currency unit
+        currency, // Multi-currency support — never assume USD
         description: preorderId ? t('preorderPaymentDescription') : t('orderPaymentDescription', { orderNumber: orderNumber || 'Payment' }),
         metadata: {
           orderId: orderId || '',

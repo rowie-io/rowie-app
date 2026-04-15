@@ -166,6 +166,21 @@
     "countryCzechia": "Tjekkiet",
     "countrySingapore": "Singapore",
     "countryMalaysia": "Malaysia",
+    "countryBulgaria": "Bulgarien",
+    "countryCroatia": "Kroatien",
+    "countryCyprus": "Cypern",
+    "countryEstonia": "Estland",
+    "countryGreece": "Grækenland",
+    "countryHungary": "Ungarn",
+    "countryIceland": "Island",
+    "countryLatvia": "Letland",
+    "countryLiechtenstein": "Liechtenstein",
+    "countryLithuania": "Litauen",
+    "countryMalta": "Malta",
+    "countryPoland": "Polen",
+    "countryRomania": "Rumænien",
+    "countrySlovakia": "Slovakiet",
+    "countrySlovenia": "Slovenien",
     "chooseYourPlan": "Vælg dit abonnement",
     "chooseYourPlanSubtitle": "Start gratis eller lås alle funktioner op med Pro",
     "starterPlanName": "Starter",
@@ -188,6 +203,8 @@
     "starterFeaturePayoutSummary": "Daglig udbetalingsoversigt",
     "starterFeatureOneUser": "1 bruger",
     "starterNotIncludedOnlineOrdering": "Onlinebestilling og forudbestillinger",
+    "starterNotIncludedTeamPay": "Teamløn (timer, drikkepenge og udbetalinger)",
+    "starterNotIncludedAnalytics": "Analysepanel",
     "starterNotIncludedTipReports": "Drikkepengerapporter og sporing",
     "starterNotIncludedRevenueSplits": "Indtægtsdeling",
     "starterNotIncludedAdditionalStaff": "Ekstra medarbejderkonti",
@@ -195,6 +212,7 @@
     "proFeatureUnlimitedMenus": "Ubegrænsede tilpassede menuer",
     "proFeatureUnlimitedUsers": "Ubegrænsede brugere og enheder",
     "proFeatureStaffManagement": "Medarbejderadministration",
+    "proFeatureTeamPay": "Teamløn (timer, drikkepenge og udbetalinger)",
     "proFeatureRevenueSplits": "Indtægtsdeling",
     "proFeatureTipReports": "Drikkepengerapporter og sporing",
     "proFeatureTipPooling": "Drikkepengepulje og uddelingsregler",
@@ -242,7 +260,7 @@
     "resetPasswordAccessibilityLabel": "Nulstil adgangskode",
     "backToLogin": "Tilbage til login",
     "backToLoginAccessibilityLabel": "Tilbage til login",
-    "backToLoginArrow": "\u2190 Tilbage til login",
+    "backToLoginArrow": "← Tilbage til login",
     "checkYourEmail": "Tjek din e-mail",
     "resetLinkSent": "Vi har sendt et link til nulstilling af din adgangskode til",
     "checkSpamFolder": "Hvis du ikke kan se mailen, tjek din spammappe.",
@@ -268,7 +286,11 @@
     "passwordResetSuccessTitle": "Adgangskode nulstillet!",
     "passwordResetSuccessMessage": "Din adgangskode er blevet nulstillet. Du kan nu logge ind med din nye adgangskode.",
     "rememberPassword": "Husker du din adgangskode? ",
-    "backToLoginLink": "Tilbage til login"
+    "backToLoginLink": "Tilbage til login",
+    "sessionEndedTitle": "Session afsluttet",
+    "sessionEndedMessage": "Du er blevet logget ud, fordi din konto blev logget ind på en anden enhed.",
+    "sessionEndedOk": "OK",
+    "businessNameTooShort": "Virksomhedsnavnet skal indeholde mindst 2 tegn"
   },
   "catalogs": {
     "noMenusAvailable": "Ingen menuer tilgængelige",
@@ -590,7 +612,12 @@
     "goBackToPaymentResult": "Gå tilbage til betalingsresultat",
     "retryPaymentHint": "Prøv betalingen igen",
     "belowMinimumUnavailable": ", utilgængelig, under minimum",
-    "processingPaymentIndicator": "Behandler betaling"
+    "processingPaymentIndicator": "Behandler betaling",
+    "tapComplete": "Betaling gennemført",
+    "cashReceived": "Kontanter modtaget",
+    "splitComplete": "Delt betaling gennemført",
+    "cardPaymentComplete": "Kortbetaling gennemført",
+    "splitMethodsBadge": "Betalt med flere metoder"
   },
   "settings": {
     "title": "Indstillinger",
@@ -704,6 +731,7 @@
     "paymentMethodCardLast4": "Kort ****{last4}",
     "paymentMethodCard": "Kortbetaling",
     "preorderLabel": "Forudbestilling",
+    "bookingLabel": "Booking",
     "preorderWithNumber": "Forudbestilling #{dailyNumber}",
     "itemCount": "{count} vare",
     "itemCountPlural": "{count} varer",
@@ -929,7 +957,9 @@
   },
   "upgrade": {
     "featureUnlimitedMenus": "Ubegrænsede tilpassede menuer",
+    "featureMultiLocation": "Administrer ubegrænsede lokationer",
     "featureUnlimitedUsers": "Ubegrænsede brugere og enheder",
+    "featureFloorPlans": "Plantegninger & bordservice",
     "featureStaffManagement": "Medarbejderadministration",
     "featureRevenueSplits": "Indtægtsdeling (venue/arrangør)",
     "featureTipReports": "Drikkepengerapporter og sporing",
@@ -965,6 +995,15 @@
     "noSubscriptionFoundTitle": "Intet abonnement fundet",
     "noSubscriptionFoundMessage": "Intet aktivt abonnement blev fundet at gendanne.",
     "errorRestorePurchasesDefaultMessage": "Kunne ikke gendanne køb."
+  },
+  "locations": {
+    "pickerTitle": "Vælg din lokation",
+    "pickerSubtitle": "Hvilken lokation arbejder du på i dag?",
+    "switchLocation": "Skift lokation",
+    "currentLocation": "Nuværende lokation",
+    "noAccessibleLocations": "Ingen tilgængelige lokationer. Kontakt din administrator for at blive tildelt.",
+    "continueButton": "Fortsæt",
+    "defaultBadge": "Standard"
   },
   "onboarding": {
     "closeAccessibilityLabel": "Luk",
@@ -1137,7 +1176,8 @@
       "cancelEditingTip": "Annuller redigering af drikkepenge",
       "editTipOption": "Rediger {percentage}% drikkepengemulighed",
       "removeTipOption": "Fjern {percentage}% drikkepengemulighed",
-      "layoutAccessibilityLabel": "{label}-layout"
+      "layoutAccessibilityLabel": "{label}-layout",
+      "layoutSplitView": "Delt visning"
     },
     "setupRequired": {
       "paymentSetupTitle": "Betalingsopsætning påkrævet",

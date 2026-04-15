@@ -1,6 +1,6 @@
 import { apiClient } from './client';
 
-export type SourceType = 'order' | 'preorder' | 'ticket';
+export type SourceType = 'order' | 'preorder' | 'ticket' | 'booking' | 'invoice' | 'subscription';
 
 export interface PaymentMethod {
   type?: string;       // 'card' | 'card_present' | 'cash' | 'split' | 'tap_to_pay'

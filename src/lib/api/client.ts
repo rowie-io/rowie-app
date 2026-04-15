@@ -196,16 +196,25 @@ class ApiClient {
     return AsyncStorage.getItem('sessionVersion');
   }
 
+  private async getCurrentLocationId(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem('currentLocationId');
+    } catch {
+      return null;
+    }
+  }
+
   private async getHeaders(customHeaders?: HeadersInit): Promise<HeadersInit> {
     const headers: Record<string, string> = {
       ...this.defaultHeaders as Record<string, string>,
       ...customHeaders as Record<string, string>,
     };
 
-    // Read token and session version in parallel to avoid sequential AsyncStorage delays
-    const [token, sessionVersion] = await Promise.all([
+    // Read token, session version, and location id in parallel to avoid sequential AsyncStorage delays
+    const [token, sessionVersion, locationId] = await Promise.all([
       this.getAuthToken(),
       this.getSessionVersion(),
+      this.getCurrentLocationId(),
     ]);
 
     if (token) {
@@ -214,6 +223,10 @@ class ApiClient {
 
     if (sessionVersion) {
       headers['X-Session-Version'] = sessionVersion;
+    }
+
+    if (locationId) {
+      headers['X-Location-Id'] = locationId;
     }
 
     return headers;
@@ -277,6 +290,7 @@ class ApiClient {
 
     const token = await this.getAuthToken();
     const sessionVersion = await this.getSessionVersion();
+    const locationId = await this.getCurrentLocationId();
 
     const headers: Record<string, string> = {};
     if (token) {
@@ -284,6 +298,9 @@ class ApiClient {
     }
     if (sessionVersion) {
       headers['X-Session-Version'] = sessionVersion;
+    }
+    if (locationId) {
+      headers['X-Location-Id'] = locationId;
     }
 
     const response = await fetch(`${this.baseURL}${endpoint}`, {

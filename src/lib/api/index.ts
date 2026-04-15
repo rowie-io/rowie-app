@@ -78,13 +78,20 @@ export type { ConnectStatus } from './stripe-connect';
 export { eventsApi } from './events';
 export type { EventScanResult, OrgEvent, RecentScan } from './events';
 
+// Preorders replaced by sessions — see ./sessions
+export { sessionsApi, floorPlansApi } from './sessions';
+
+// Legacy preorders compat shim — only used by TransactionDetailScreen for
+// historical order display. Proxies to /preorders/{id} which is a compat
+// endpoint on the API that maps table_sessions to the legacy shape.
 export { preordersApi } from './preorders';
+export type { Preorder, PreorderItem, PreorderStatus, PreorderPaymentType } from './preorders';
 export type {
-  Preorder,
-  PreorderItem,
-  PreorderStatus,
-  PreorderPaymentType,
-  PreordersListParams,
-  PreordersListResponse,
-  PreorderStatsResponse,
-} from './preorders';
+  Session,
+  SessionItem,
+  SessionStatus,
+  SessionSource,
+  ItemStatus,
+  FloorPlan,
+  Table,
+} from './sessions';

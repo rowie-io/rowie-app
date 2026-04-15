@@ -58,8 +58,8 @@ export function SocketEventHandlers() {
   useSocketEvent(SocketEvents.ORDER_COMPLETED, handleTransactionEvent);
   useSocketEvent(SocketEvents.PAYMENT_RECEIVED, handleTransactionEvent);
   useSocketEvent(SocketEvents.ORDER_REFUNDED, handleTransactionEvent);
-  useSocketEvent(SocketEvents.PREORDER_COMPLETED, handleTransactionEvent);
-  useSocketEvent(SocketEvents.PREORDER_CANCELLED, handleTransactionEvent);
+  useSocketEvent(SocketEvents.SESSION_SETTLED, handleTransactionEvent);
+  useSocketEvent(SocketEvents.SESSION_CANCELLED, handleTransactionEvent);
 
   // Terminal reader payment events (server-driven payments via smart readers)
   const handleTerminalPaymentSucceeded = useCallback((data: any) => {

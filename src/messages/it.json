@@ -166,6 +166,21 @@
     "countryCzechia": "Cechia",
     "countrySingapore": "Singapore",
     "countryMalaysia": "Malesia",
+    "countryBulgaria": "Bulgaria",
+    "countryCroatia": "Croazia",
+    "countryCyprus": "Cipro",
+    "countryEstonia": "Estonia",
+    "countryGreece": "Grecia",
+    "countryHungary": "Ungheria",
+    "countryIceland": "Islanda",
+    "countryLatvia": "Lettonia",
+    "countryLiechtenstein": "Liechtenstein",
+    "countryLithuania": "Lituania",
+    "countryMalta": "Malta",
+    "countryPoland": "Polonia",
+    "countryRomania": "Romania",
+    "countrySlovakia": "Slovacchia",
+    "countrySlovenia": "Slovenia",
     "chooseYourPlan": "Scegli il tuo piano",
     "chooseYourPlanSubtitle": "Inizia gratis o sblocca tutte le funzionalità con Pro",
     "starterPlanName": "Starter",
@@ -188,6 +203,8 @@
     "starterFeaturePayoutSummary": "Riepilogo pagamenti giornaliero",
     "starterFeatureOneUser": "1 Utente",
     "starterNotIncludedOnlineOrdering": "Ordini online e preordini",
+    "starterNotIncludedTeamPay": "Paga del Team (ore, mance e pagamenti)",
+    "starterNotIncludedAnalytics": "Dashboard analisi",
     "starterNotIncludedTipReports": "Report e monitoraggio mance",
     "starterNotIncludedRevenueSplits": "Suddivisione ricavi",
     "starterNotIncludedAdditionalStaff": "Account staff aggiuntivi",
@@ -195,6 +212,7 @@
     "proFeatureUnlimitedMenus": "Menù personalizzati illimitati",
     "proFeatureUnlimitedUsers": "Utenti e dispositivi illimitati",
     "proFeatureStaffManagement": "Gestione del personale",
+    "proFeatureTeamPay": "Paga del Team (ore, mance e pagamenti)",
     "proFeatureRevenueSplits": "Suddivisione ricavi",
     "proFeatureTipReports": "Report e monitoraggio mance",
     "proFeatureTipPooling": "Pool mance e regole di distribuzione",
@@ -242,7 +260,7 @@
     "resetPasswordAccessibilityLabel": "Reimposta password",
     "backToLogin": "Torna al login",
     "backToLoginAccessibilityLabel": "Torna al login",
-    "backToLoginArrow": "\u2190 Torna al login",
+    "backToLoginArrow": "← Torna al login",
     "checkYourEmail": "Controlla la tua email",
     "resetLinkSent": "Abbiamo inviato un link per reimpostare la password a",
     "checkSpamFolder": "Se non trovi l'email, controlla la cartella spam.",
@@ -268,7 +286,11 @@
     "passwordResetSuccessTitle": "Password reimpostata con successo!",
     "passwordResetSuccessMessage": "La password è stata reimpostata con successo. Ora puoi accedere con la nuova password.",
     "rememberPassword": "Ricordi la password? ",
-    "backToLoginLink": "Torna al login"
+    "backToLoginLink": "Torna al login",
+    "sessionEndedTitle": "Sessione terminata",
+    "sessionEndedMessage": "Sei stato disconnesso perché il tuo account è stato connesso su un altro dispositivo.",
+    "sessionEndedOk": "OK",
+    "businessNameTooShort": "Il nome dell'attività deve contenere almeno 2 caratteri"
   },
   "catalogs": {
     "noMenusAvailable": "Nessun menù disponibile",
@@ -590,7 +612,12 @@
     "goBackToPaymentResult": "Torna al risultato del pagamento",
     "retryPaymentHint": "Riprova il pagamento",
     "belowMinimumUnavailable": ", non disponibile, sotto il minimo",
-    "processingPaymentIndicator": "Elaborazione pagamento"
+    "processingPaymentIndicator": "Elaborazione pagamento",
+    "tapComplete": "Pagamento completato",
+    "cashReceived": "Contanti ricevuti",
+    "splitComplete": "Pagamento diviso completato",
+    "cardPaymentComplete": "Pagamento con carta completato",
+    "splitMethodsBadge": "Pagato con più metodi"
   },
   "settings": {
     "title": "Impostazioni",
@@ -704,6 +731,7 @@
     "paymentMethodCardLast4": "Carta ****{last4}",
     "paymentMethodCard": "Pagamento con carta",
     "preorderLabel": "Preordine",
+    "bookingLabel": "Prenotazione",
     "preorderWithNumber": "Preordine #{dailyNumber}",
     "itemCount": "{count} articolo",
     "itemCountPlural": "{count} articoli",
@@ -929,7 +957,9 @@
   },
   "upgrade": {
     "featureUnlimitedMenus": "Menù personalizzati illimitati",
+    "featureMultiLocation": "Gestisci sedi illimitate",
     "featureUnlimitedUsers": "Utenti e dispositivi illimitati",
+    "featureFloorPlans": "Planimetrie e servizio al tavolo",
     "featureStaffManagement": "Gestione del personale",
     "featureRevenueSplits": "Suddivisione ricavi (locale/promoter)",
     "featureTipReports": "Report e monitoraggio mance",
@@ -965,6 +995,15 @@
     "noSubscriptionFoundTitle": "Nessun abbonamento trovato",
     "noSubscriptionFoundMessage": "Nessun abbonamento attivo trovato da ripristinare.",
     "errorRestorePurchasesDefaultMessage": "Ripristino acquisti fallito."
+  },
+  "locations": {
+    "pickerTitle": "Seleziona la tua sede",
+    "pickerSubtitle": "In quale sede lavori oggi?",
+    "switchLocation": "Cambia sede",
+    "currentLocation": "Sede attuale",
+    "noAccessibleLocations": "Nessuna sede accessibile. Contatta l'amministratore per essere assegnato.",
+    "continueButton": "Continua",
+    "defaultBadge": "Predefinita"
   },
   "onboarding": {
     "closeAccessibilityLabel": "Chiudi",
@@ -1137,7 +1176,8 @@
       "cancelEditingTip": "Annulla modifica mancia",
       "editTipOption": "Modifica opzione mancia {percentage}%",
       "removeTipOption": "Rimuovi opzione mancia {percentage}%",
-      "layoutAccessibilityLabel": "Layout {label}"
+      "layoutAccessibilityLabel": "Layout {label}",
+      "layoutSplitView": "Vista divisa"
     },
     "setupRequired": {
       "paymentSetupTitle": "Configurazione pagamento richiesta",

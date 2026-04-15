@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCatalog } from '../context/CatalogContext';
 import { useDevice } from '../context/DeviceContext';
 import { useAuth } from '../context/AuthContext';
-import { productsApi, categoriesApi, transactionsApi, ordersApi, preordersApi, eventsApi } from '../lib/api';
+import { productsApi, categoriesApi, transactionsApi, ordersApi, sessionsApi, eventsApi } from '../lib/api';
 import { billingService } from '../lib/api/billing';
 import logger from '../lib/logger';
 
@@ -62,13 +62,15 @@ export function DataPrefetcher() {
       queryFn: () => ordersApi.listHeld(deviceId),
     });
 
-    // Preorders: Pro/Enterprise only
+    // Sessions: Pro/Enterprise only — prefetch open sessions + tabs
     if (isPro) {
-      (['pending', 'preparing', 'ready'] as const).forEach((status) => {
-        queryClient.prefetchQuery({
-          queryKey: ['preorders', status],
-          queryFn: () => preordersApi.list({ status: [status], catalogId: selectedCatalog.id }),
-        });
+      queryClient.prefetchQuery({
+        queryKey: ['sessions', { status: 'open' }],
+        queryFn: () => sessionsApi.list({ status: 'open', catalogId: selectedCatalog.id }),
+      });
+      queryClient.prefetchQuery({
+        queryKey: ['sessions', 'tabs'],
+        queryFn: () => sessionsApi.listTabs(),
       });
     }
 

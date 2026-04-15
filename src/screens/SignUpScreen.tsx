@@ -31,6 +31,7 @@ import { config } from '../lib/config';
 import logger from '../lib/logger';
 import { isValidEmail } from '../lib/validation';
 import { PRICING } from '../lib/pricing';
+import { COUNTRIES, COUNTRY_CODES, getTTPDisplayRate } from '../lib/countries';
 import { useTranslations } from '../lib/i18n';
 
 // Types
@@ -66,50 +67,24 @@ const BUSINESS_TYPE_KEYS = [
   'businessTypeOther',
 ] as const;
 
-const SUPPORTED_COUNTRY_CODES = new Set([
-  'US', 'CA', 'GB', 'AU', 'NZ', 'IE', 'FR', 'DE', 'ES', 'IT',
-  'NL', 'BE', 'AT', 'PT', 'FI', 'SE', 'DK', 'NO', 'CH', 'LU',
-  'CZ', 'SG', 'MY',
-]);
-
 function getDeviceCountry(): string {
   try {
     const locale = Intl.DateTimeFormat().resolvedOptions().locale || '';
     const parts = locale.split('-');
     const region = parts[parts.length - 1]?.toUpperCase();
-    if (region && region.length === 2 && SUPPORTED_COUNTRY_CODES.has(region)) {
+    if (region && region.length === 2 && COUNTRY_CODES.has(region)) {
       return region;
     }
   } catch {}
   return 'US';
 }
 
-// Countries where Stripe Terminal is generally available — i18nKey maps to auth.country* translation keys
-const SUPPORTED_COUNTRIES = [
-  { code: 'US', i18nKey: 'countryUnitedStates' },
-  { code: 'CA', i18nKey: 'countryCanada' },
-  { code: 'GB', i18nKey: 'countryUnitedKingdom' },
-  { code: 'AU', i18nKey: 'countryAustralia' },
-  { code: 'NZ', i18nKey: 'countryNewZealand' },
-  { code: 'IE', i18nKey: 'countryIreland' },
-  { code: 'FR', i18nKey: 'countryFrance' },
-  { code: 'DE', i18nKey: 'countryGermany' },
-  { code: 'ES', i18nKey: 'countrySpain' },
-  { code: 'IT', i18nKey: 'countryItaly' },
-  { code: 'NL', i18nKey: 'countryNetherlands' },
-  { code: 'BE', i18nKey: 'countryBelgium' },
-  { code: 'AT', i18nKey: 'countryAustria' },
-  { code: 'PT', i18nKey: 'countryPortugal' },
-  { code: 'FI', i18nKey: 'countryFinland' },
-  { code: 'SE', i18nKey: 'countrySweden' },
-  { code: 'DK', i18nKey: 'countryDenmark' },
-  { code: 'NO', i18nKey: 'countryNorway' },
-  { code: 'CH', i18nKey: 'countrySwitzerland' },
-  { code: 'LU', i18nKey: 'countryLuxembourg' },
-  { code: 'CZ', i18nKey: 'countryCzechia' },
-  { code: 'SG', i18nKey: 'countrySingapore' },
-  { code: 'MY', i18nKey: 'countryMalaysia' },
-] as const;
+// Build i18n-keyed country list from centralized config (lib/countries.ts)
+// i18nKey convention: "country" + name with spaces removed, e.g. "countryNewZealand"
+const SUPPORTED_COUNTRIES = COUNTRIES.map(c => ({
+  code: c.code,
+  i18nKey: `country${c.name.replace(/\s+/g, '')}` as const,
+}));
 
 // Static constants — hoisted out of component to avoid re-creation on every render
 const STEPS: Step[] = ['account', 'business', 'plan', 'confirmation'];
@@ -131,8 +106,8 @@ const STARTER_FEATURE_KEYS = [
 
 const STARTER_NOT_INCLUDED_KEYS = [
   'starterNotIncludedOnlineOrdering',
-  'starterNotIncludedTipReports',
-  'starterNotIncludedRevenueSplits',
+  'starterNotIncludedTeamPay',
+  'starterNotIncludedAnalytics',
   'starterNotIncludedAdditionalStaff',
 ] as const;
 
@@ -141,9 +116,7 @@ const PRO_FEATURE_KEYS = [
   'proFeatureUnlimitedMenus',
   'proFeatureUnlimitedUsers',
   'proFeatureStaffManagement',
-  'proFeatureRevenueSplits',
-  'proFeatureTipReports',
-  'proFeatureTipPooling',
+  'proFeatureTeamPay',
   'proFeatureInvoicing',
   'proFeatureAnalytics',
   'proFeatureExport',
@@ -1012,7 +985,7 @@ export function SignUpScreen() {
           onPress={() => updateField('selectedPlan', 'starter')}
           disabled={isFormDisabled}
           accessibilityRole="radio"
-          accessibilityLabel={t('starterPlanAccessibilityLabel', { price: t('starterPlanPrice'), transactionFee: PRICING.starter.transactionFeeDisplay })}
+          accessibilityLabel={t('starterPlanAccessibilityLabel', { price: t('starterPlanPrice'), transactionFee: getTTPDisplayRate(formData.country, 'starter') })}
           accessibilityState={{ selected: formData.selectedPlan === 'starter', disabled: isFormDisabled }}
         >
           <View style={styles.planHeader}>
@@ -1025,7 +998,7 @@ export function SignUpScreen() {
 
           <View style={styles.planFee}>
             <Text maxFontSizeMultiplier={1.3} style={styles.planFeeLabel}>{t('transactionFeeLabel')}</Text>
-            <Text maxFontSizeMultiplier={1.3} style={styles.planFeeValue}>{PRICING.starter.transactionFeeDisplay}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.planFeeValue}>{getTTPDisplayRate(formData.country, 'starter')}</Text>
           </View>
 
           <View style={styles.planFeatures}>
@@ -1062,7 +1035,7 @@ export function SignUpScreen() {
           onPress={() => updateField('selectedPlan', 'pro')}
           disabled={isFormDisabled}
           accessibilityRole="radio"
-          accessibilityLabel={t('proPlanAccessibilityLabel', { price: iapProduct?.localizedPrice || PRICING.pro.monthlyPriceDisplay, transactionFee: PRICING.pro.transactionFeeDisplay })}
+          accessibilityLabel={t('proPlanAccessibilityLabel', { price: iapProduct?.localizedPrice || PRICING.pro.monthlyPriceDisplay, transactionFee: getTTPDisplayRate(formData.country, 'pro') })}
           accessibilityState={{ selected: formData.selectedPlan === 'pro', disabled: isFormDisabled }}
         >
           <View style={styles.popularBadge}>
@@ -1081,7 +1054,7 @@ export function SignUpScreen() {
 
           <View style={styles.planFee}>
             <Text maxFontSizeMultiplier={1.3} style={styles.planFeeLabel}>{t('transactionFeeLabel')}</Text>
-            <Text maxFontSizeMultiplier={1.3} style={styles.planFeeValue}>{PRICING.pro.transactionFeeDisplay}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.planFeeValue}>{getTTPDisplayRate(formData.country, 'pro')}</Text>
           </View>
 
           <View style={styles.planFeatures}>

@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { SymbolView } from 'expo-symbols';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useTheme } from '../context/ThemeContext';
 import { useCart, CartItem, PaymentMethodType } from '../context/CartContext';
@@ -32,7 +33,7 @@ import { PayoutsSetupBanner } from '../components/PayoutsSetupBanner';
 import { SetupRequiredBanner } from '../components/SetupRequiredBanner';
 import logger from '../lib/logger';
 import { isValidEmailOrEmpty } from '../lib/validation';
-import { formatCents, getCurrencySymbol, toSmallestUnit, fromSmallestUnit } from '../utils/currency';
+import { formatCents, getCurrencySymbol, toSmallestUnit, fromSmallestUnit, isZeroDecimal } from '../utils/currency';
 import { useTranslations } from '../lib/i18n';
 
 
@@ -283,8 +284,10 @@ export function CheckoutScreen() {
     }
     const selectedOption = tipOptions[selectedTipIndex];
     if (selectedOption?.isCustom) {
-      const customTip = parseInt(customTipAmount, 10) || 0;
-      // Custom tip is entered in base unit, convert to smallest unit
+      // Custom tip is entered in base currency unit (e.g. "10.50" for $10.50).
+      // parseFloat preserves decimals; parseInt drops everything after the dot
+      // and would silently lose cents on values like "10.50".
+      const customTip = parseFloat(customTipAmount) || 0;
       const tipCents = toSmallestUnit(customTip, currency);
       // Calculate percentage for custom tip
       const calcTipPct = subtotal > 0 ? Math.round((tipCents / subtotal) * 100) : 0;
@@ -596,6 +599,7 @@ export function CheckoutScreen() {
       // 2. Create payment intent with tip included
       const paymentIntent = await stripeTerminalApi.createPaymentIntent({
         amount: fromSmallestUnit(grandTotal, currency), // Convert smallest unit to base unit for API
+        currency, // Multi-currency support — never assume USD
         description,
         metadata: {
           orderId: order.id,
@@ -767,8 +771,27 @@ export function CheckoutScreen() {
                     placeholder={t('customTipPlaceholder')}
                     placeholderTextColor={colors.inputPlaceholder}
                     value={customTipAmount}
-                    onChangeText={setCustomTipAmount}
-                    keyboardType="number-pad"
+                    onChangeText={(text) => {
+                      // Sanitize per currency: zero-decimal currencies (JPY,
+                      // KRW, etc.) only accept whole numbers; everything else
+                      // accepts up to one decimal point with up to 2 fractional
+                      // digits. This prevents users from entering "1000.50" yen
+                      // and getting silently rounded to 1001 yen.
+                      if (isZeroDecimal(currency)) {
+                        setCustomTipAmount(text.replace(/[^0-9]/g, ''));
+                      } else {
+                        // Allow digits + at most one dot + at most 2 decimals
+                        const cleaned = text.replace(/[^0-9.]/g, '');
+                        const parts = cleaned.split('.');
+                        if (parts.length <= 2) {
+                          setCustomTipAmount(parts.length === 2 ? `${parts[0]}.${parts[1].slice(0, 2)}` : parts[0]);
+                        } else {
+                          // Multiple dots — keep first, drop the rest
+                          setCustomTipAmount(`${parts[0]}.${parts.slice(1).join('').slice(0, 2)}`);
+                        }
+                      }
+                    }}
+                    keyboardType={isZeroDecimal(currency) ? "number-pad" : "decimal-pad"}
                     autoFocus
                     accessibilityLabel={t('customTipAccessibilityLabelInput', { currency: currency.toUpperCase() })}
                   />
@@ -1118,8 +1141,20 @@ export function CheckoutScreen() {
         </View>
       </ScrollView>
 
-      {/* Footer with Pay Button */}
+      {/* Footer with Add to Table + Pay Button */}
       <View style={styles.footer}>
+        {/* Add to Table button — shown when org has floor plans (future: check floorPlans.length > 0) */}
+        {/* TODO: Add floor plan check and table picker modal
+        <TouchableOpacity
+          onPress={() => navigation.navigate('FloorPlan', { mode: 'assign', items, catalogId: selectedCatalog?.id })}
+          style={[styles.addToTableButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
+          accessibilityRole="button"
+          accessibilityLabel="Add to table"
+        >
+          <Ionicons name="grid-outline" size={20} color={colors.primary} />
+          <Text style={[styles.addToTableButtonText, { color: colors.text }]} maxFontSizeMultiplier={1.3}>Add to Table</Text>
+        </TouchableOpacity>
+        */}
         <TouchableOpacity
           onPress={handlePayment}
           disabled={isProcessing}
@@ -1141,11 +1176,21 @@ export function CheckoutScreen() {
             <>
               {paymentMethod === 'tap_to_pay' ? (
                 <>
-                  {/* Apple TTPOi 5.5: Contactless payment icon (wave symbol) */}
-                  <View style={styles.tapToPayIcon}>
-                    <Ionicons name="wifi" size={22} color={isDark ? '#1C1917' : '#fff'} style={styles.tapToPayIconRotated} />
-                  </View>
-                  {/* Apple TTPOi 5.4: Region-correct copy */}
+                  {/* Apple HIG: SF Symbol wave.3.right.circle.fill for Tap to Pay on iPhone */}
+                  {Platform.OS === 'ios' ? (
+                    <SymbolView
+                      name="wave.3.right.circle.fill"
+                      size={24}
+                      tintColor={isDark ? '#1C1917' : '#fff'}
+                      resizeMode="scaleAspectFit"
+                      style={styles.tapToPayIcon}
+                    />
+                  ) : (
+                    <View style={styles.tapToPayIcon}>
+                      <Ionicons name="wifi" size={22} color={isDark ? '#1C1917' : '#fff'} style={styles.tapToPayIconRotated} />
+                    </View>
+                  )}
+                  {/* Apple HIG: "Tap to Pay on iPhone" copy on final checkout button */}
                   <Text style={[styles.payButtonText, { color: isDark ? '#1C1917' : '#fff' }]} maxFontSizeMultiplier={1.3}>{tapToPayLabel}</Text>
                 </>
               ) : paymentMethod === 'cash' ? (

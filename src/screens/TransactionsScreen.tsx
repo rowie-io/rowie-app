@@ -148,6 +148,9 @@ const AnimatedTransactionItem = memo(function AnimatedTransactionItem({
     if (item.sourceType === 'preorder') {
       return { label: item.dailyNumber ? t('preorderWithNumber', { dailyNumber: item.dailyNumber }) : t('preorderLabel'), color: '#a855f7' };
     }
+    if (item.sourceType === 'booking') {
+      return { label: t('bookingLabel'), color: '#3B82F6' };
+    }
     return null;
   };
 
@@ -285,8 +288,8 @@ export function TransactionsScreen() {
   useSocketEvent(SocketEvents.ORDER_COMPLETED, handlePaymentEvent);
   useSocketEvent(SocketEvents.PAYMENT_RECEIVED, handlePaymentEvent);
   useSocketEvent(SocketEvents.ORDER_REFUNDED, handlePaymentEvent);
-  useSocketEvent(SocketEvents.PREORDER_COMPLETED, handlePaymentEvent);
-  useSocketEvent(SocketEvents.PREORDER_CANCELLED, handlePaymentEvent);
+  useSocketEvent(SocketEvents.SESSION_SETTLED, handlePaymentEvent);
+  useSocketEvent(SocketEvents.SESSION_CANCELLED, handlePaymentEvent);
 
   // Listen for held order updates via socket
   const handleHeldOrderUpdated = useCallback((data: any) => {

@@ -49,12 +49,15 @@ export const SocketEvents = {
   TICKET_PURCHASED: 'ticket:purchased',
   TICKET_SCANNED: 'ticket:scanned',
   TICKET_REFUNDED: 'ticket:refunded',
-  // Preorder events
-  PREORDER_CREATED: 'preorder:created',
-  PREORDER_UPDATED: 'preorder:updated',
-  PREORDER_READY: 'preorder:ready',
-  PREORDER_COMPLETED: 'preorder:completed',
-  PREORDER_CANCELLED: 'preorder:cancelled',
+  // Session events (replaces preorders)
+  SESSION_CREATED: 'session:created',
+  SESSION_UPDATED: 'session:updated',
+  SESSION_ITEMS_ADDED: 'session:items_added',
+  SESSION_SETTLED: 'session:settled',
+  SESSION_CANCELLED: 'session:cancelled',
+  // Table/floor plan events
+  TABLE_STATUS_CHANGED: 'table:status_changed',
+  FLOOR_PLAN_UPDATED: 'floor_plan:updated',
   // Terminal reader events (server-driven payments)
   TERMINAL_PAYMENT_SUCCEEDED: 'terminal:payment_succeeded',
   TERMINAL_PAYMENT_FAILED: 'terminal:payment_failed',
@@ -304,13 +307,15 @@ export function SocketProvider({ children }: SocketProviderProps) {
         });
       });
 
-      // Debug: Log ALL preorder-related events
-      const preorderEvents = [
-        SocketEvents.PREORDER_CREATED,
-        SocketEvents.PREORDER_UPDATED,
-        SocketEvents.PREORDER_READY,
+      // Debug: Log session-related events
+      const sessionEvents = [
+        SocketEvents.SESSION_CREATED,
+        SocketEvents.SESSION_UPDATED,
+        SocketEvents.SESSION_ITEMS_ADDED,
+        SocketEvents.SESSION_SETTLED,
+        SocketEvents.SESSION_CANCELLED,
       ];
-      preorderEvents.forEach((eventName) => {
+      sessionEvents.forEach((eventName) => {
         socketRef.current?.on(eventName, (data: any) => {
           logger.log(`[Socket DEBUG] Received ${eventName}:`, JSON.stringify(data, null, 2));
         });

@@ -166,6 +166,21 @@
     "countryCzechia": "Česko",
     "countrySingapore": "Singapur",
     "countryMalaysia": "Malajsie",
+    "countryBulgaria": "Bulharsko",
+    "countryCroatia": "Chorvatsko",
+    "countryCyprus": "Kypr",
+    "countryEstonia": "Estonsko",
+    "countryGreece": "Řecko",
+    "countryHungary": "Maďarsko",
+    "countryIceland": "Island",
+    "countryLatvia": "Lotyšsko",
+    "countryLiechtenstein": "Lichtenštejnsko",
+    "countryLithuania": "Litva",
+    "countryMalta": "Malta",
+    "countryPoland": "Polsko",
+    "countryRomania": "Rumunsko",
+    "countrySlovakia": "Slovensko",
+    "countrySlovenia": "Slovinsko",
     "chooseYourPlan": "Vyberte si plán",
     "chooseYourPlanSubtitle": "Začněte zdarma nebo si odemkněte všechny funkce s Pro",
     "starterPlanName": "Starter",
@@ -188,6 +203,8 @@
     "starterFeaturePayoutSummary": "Denní souhrn výplat",
     "starterFeatureOneUser": "1 uživatel",
     "starterNotIncludedOnlineOrdering": "Online objednávky a předobjednávky",
+    "starterNotIncludedTeamPay": "Mzda týmu (hodiny, spropitné a výplaty)",
+    "starterNotIncludedAnalytics": "Analytický přehled",
     "starterNotIncludedTipReports": "Reporty spropitného a sledování",
     "starterNotIncludedRevenueSplits": "Rozdělení příjmů",
     "starterNotIncludedAdditionalStaff": "Další účty zaměstnanců",
@@ -195,6 +212,7 @@
     "proFeatureUnlimitedMenus": "Neomezená vlastní menu",
     "proFeatureUnlimitedUsers": "Neomezení uživatelé a zařízení",
     "proFeatureStaffManagement": "Správa zaměstnanců",
+    "proFeatureTeamPay": "Mzda týmu (hodiny, spropitné a výplaty)",
     "proFeatureRevenueSplits": "Rozdělení příjmů",
     "proFeatureTipReports": "Reporty spropitného a sledování",
     "proFeatureTipPooling": "Sdílení spropitného a pravidla rozdělení",
@@ -242,7 +260,7 @@
     "resetPasswordAccessibilityLabel": "Obnovit heslo",
     "backToLogin": "Zpět na přihlášení",
     "backToLoginAccessibilityLabel": "Zpět na přihlášení",
-    "backToLoginArrow": "\u2190 Zpět na přihlášení",
+    "backToLoginArrow": "← Zpět na přihlášení",
     "checkYourEmail": "Zkontrolujte svůj e-mail",
     "resetLinkSent": "Odeslali jsme odkaz pro obnovení hesla na",
     "checkSpamFolder": "Pokud e-mail nevidíte, zkontrolujte složku spam.",
@@ -268,7 +286,11 @@
     "passwordResetSuccessTitle": "Heslo úspěšně obnoveno!",
     "passwordResetSuccessMessage": "Vaše heslo bylo úspěšně obnoveno. Nyní se můžete přihlásit s novým heslem.",
     "rememberPassword": "Pamatujete si heslo? ",
-    "backToLoginLink": "Zpět na přihlášení"
+    "backToLoginLink": "Zpět na přihlášení",
+    "sessionEndedTitle": "Relace ukončena",
+    "sessionEndedMessage": "Byli jste odhlášeni, protože váš účet byl přihlášen na jiném zařízení.",
+    "sessionEndedOk": "OK",
+    "businessNameTooShort": "Název firmy musí mít alespoň 2 znaky"
   },
   "catalogs": {
     "noMenusAvailable": "Žádná menu nejsou k dispozici",
@@ -590,7 +612,12 @@
     "goBackToPaymentResult": "Zpět k výsledku platby",
     "retryPaymentHint": "Opakovat platbu",
     "belowMinimumUnavailable": ", nedostupné, pod minimem",
-    "processingPaymentIndicator": "Zpracování platby"
+    "processingPaymentIndicator": "Zpracování platby",
+    "tapComplete": "Platba dokončena",
+    "cashReceived": "Hotovost přijata",
+    "splitComplete": "Rozdělená platba dokončena",
+    "cardPaymentComplete": "Platba kartou dokončena",
+    "splitMethodsBadge": "Zaplaceno několika způsoby"
   },
   "settings": {
     "title": "Nastavení",
@@ -704,6 +731,7 @@
     "paymentMethodCardLast4": "Karta ****{last4}",
     "paymentMethodCard": "Platba kartou",
     "preorderLabel": "Předobjednávka",
+    "bookingLabel": "Rezervace",
     "preorderWithNumber": "Předobjednávka #{dailyNumber}",
     "itemCount": "{count} položka",
     "itemCountPlural": "{count} položek",
@@ -929,7 +957,9 @@
   },
   "upgrade": {
     "featureUnlimitedMenus": "Neomezená vlastní menu",
+    "featureMultiLocation": "Spravujte neomezené pobočky",
     "featureUnlimitedUsers": "Neomezení uživatelé a zařízení",
+    "featureFloorPlans": "Půdorysy a obsluha u stolu",
     "featureStaffManagement": "Správa zaměstnanců",
     "featureRevenueSplits": "Rozdělení příjmů (místo/promotér)",
     "featureTipReports": "Reporty spropitného a sledování",
@@ -965,6 +995,15 @@
     "noSubscriptionFoundTitle": "Předplatné nenalezeno",
     "noSubscriptionFoundMessage": "Nebylo nalezeno žádné aktivní předplatné k obnovení.",
     "errorRestorePurchasesDefaultMessage": "Obnovení nákupů selhalo."
+  },
+  "locations": {
+    "pickerTitle": "Vyberte svou pobočku",
+    "pickerSubtitle": "Ve které pobočce dnes pracujete?",
+    "switchLocation": "Přepnout pobočku",
+    "currentLocation": "Aktuální pobočka",
+    "noAccessibleLocations": "Žádné přístupné pobočky. Kontaktujte administrátora pro přiřazení.",
+    "continueButton": "Pokračovat",
+    "defaultBadge": "Výchozí"
   },
   "onboarding": {
     "closeAccessibilityLabel": "Zavřít",
@@ -1137,7 +1176,8 @@
       "cancelEditingTip": "Zrušit úpravu spropitného",
       "editTipOption": "Upravit možnost {percentage} % spropitného",
       "removeTipOption": "Odebrat možnost {percentage} % spropitného",
-      "layoutAccessibilityLabel": "Rozložení {label}"
+      "layoutAccessibilityLabel": "Rozložení {label}",
+      "layoutSplitView": "Rozdělené zobrazení"
     },
     "setupRequired": {
       "paymentSetupTitle": "Vyžadováno nastavení plateb",
