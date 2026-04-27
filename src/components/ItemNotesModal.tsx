@@ -86,6 +86,8 @@ export function ItemNotesModal({
           <Pressable
             style={[styles.container, { backgroundColor: colors.card }]}
             onPress={(e) => e.stopPropagation()}
+            accessible={false}
+            accessibilityRole="none"
           >
             {/* Header */}
             <View style={styles.header}>

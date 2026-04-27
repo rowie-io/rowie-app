@@ -49,6 +49,9 @@ export function StripeOnboardingScreen() {
     try {
       setIsFetchingUrl(true);
       setError(null);
+      // Reset WebView loading state so retry shows the loading overlay again
+      // rather than instantly resolving to a stale white frame.
+      setIsWebViewLoading(true);
       logger.log('[StripeOnboarding] Fetching onboarding URL...');
       const response = await stripeConnectApi.getOnboardingLink();
       logger.log('[StripeOnboarding] Got onboarding URL:', response.onboardingUrl);
@@ -64,12 +67,14 @@ export function StripeOnboardingScreen() {
           return;
         } catch (createErr: any) {
           logger.error('[StripeOnboarding] Failed to create account:', createErr);
-          setError(createErr.message || t('errorCreateAccountDefault'));
+          // stripeConnectApi throws ApiError {error, ...} — prefer `.error`.
+          setError(createErr?.error || createErr?.message || t('errorCreateAccountDefault'));
           return;
         }
       }
       logger.error('[StripeOnboarding] Failed to get onboarding URL:', err);
-      setError(err.message || t('errorLoadOnboardingDefault'));
+      // stripeConnectApi throws ApiError {error, ...} — prefer `.error`.
+      setError(err?.error || err?.message || t('errorLoadOnboardingDefault'));
     } finally {
       setIsFetchingUrl(false);
     }
@@ -172,6 +177,26 @@ export function StripeOnboardingScreen() {
             onLoadEnd={(event) => {
               logger.log('[StripeOnboarding] onLoadEnd, url:', event.nativeEvent.url);
               setIsWebViewLoading(false);
+            }}
+            // Network/SSL/DNS failures during WebView load → swap to error state
+            // so the user sees a friendly retry instead of an infinite spinner.
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              logger.error('[StripeOnboarding] WebView onError:', nativeEvent);
+              setIsWebViewLoading(false);
+              setError(nativeEvent.description || t('errorLoadOnboardingDefault'));
+            }}
+            // 4xx/5xx from the Stripe-hosted page (e.g. expired session).
+            onHttpError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              logger.error('[StripeOnboarding] WebView onHttpError:', nativeEvent);
+              // Only treat top-level failures as fatal — Stripe loads many
+              // third-party iframes that occasionally 4xx without breaking the
+              // primary flow.
+              if (nativeEvent.url === onboardingUrl) {
+                setIsWebViewLoading(false);
+                setError(t('errorLoadOnboardingDefault'));
+              }
             }}
             javaScriptEnabled={true}
             domStorageEnabled={true}

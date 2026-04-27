@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,24 +18,39 @@ import { useSocketEvent, SocketEvents } from '../context/SocketContext';
 import { sessionsApi, type Session } from '../lib/api/sessions';
 import { formatCurrency } from '../utils/currency';
 import { fonts } from '../lib/fonts';
+import { useTranslations } from '../lib/i18n';
 
 export function TabsScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation<any>();
-  const { currency } = useAuth();
+  const { currency, organization } = useAuth();
   const queryClient = useQueryClient();
+  const t = useTranslations('tabs');
 
-  const { data, isLoading, refetch, isRefetching } = useQuery({
+  const { data, isLoading, refetch, isRefetching, isError } = useQuery({
     queryKey: ['sessions', 'tabs'],
     queryFn: sessionsApi.listTabs,
   });
 
   const tabs = data?.tabs || [];
 
+  // Defense-in-depth: ignore SESSION_* emits for other orgs so a future
+  // room-scoping regression can't silently invalidate this device's open
+  // tabs cache with another org's session payload.
+  const orgIdRef = useRef(organization?.id);
+  useEffect(() => {
+    orgIdRef.current = organization?.id;
+  }, [organization?.id]);
+  const isMyOrg = useCallback((data: any): boolean => {
+    if (!data?.organizationId) return true;
+    return !!orgIdRef.current && data.organizationId === orgIdRef.current;
+  }, []);
+
   // Invalidate on session events
-  const handleSessionChange = useCallback(() => {
+  const handleSessionChange = useCallback((data: any) => {
+    if (!isMyOrg(data)) return;
     queryClient.invalidateQueries({ queryKey: ['sessions', 'tabs'] });
-  }, [queryClient]);
+  }, [queryClient, isMyOrg]);
 
   useSocketEvent(SocketEvents.SESSION_CREATED, handleSessionChange);
   useSocketEvent(SocketEvents.SESSION_UPDATED, handleSessionChange);
@@ -62,31 +77,54 @@ export function TabsScreen() {
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('goBack')}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-          Tabs
+          {t('headerTitle')}
         </Text>
         <TouchableOpacity
           onPress={handleOpenTab}
           style={[styles.newButton, { backgroundColor: colors.primary }]}
           accessibilityRole="button"
-          accessibilityLabel="Open a new tab"
+          accessibilityLabel={t('openTabAccessibilityLabel')}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons name="add" size={18} color="#1C1917" />
           <Text style={styles.newButtonText} maxFontSizeMultiplier={1.3}>
-            New
+            {t('newButton')}
           </Text>
         </TouchableOpacity>
       </View>
 
       {isLoading ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel="Loading tabs" />
+          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('loadingTabs')} />
+        </View>
+      ) : isError ? (
+        <View style={styles.center}>
+          <View style={[styles.emptyIcon, { backgroundColor: '#EF444420' }]}>
+            <Ionicons name="cloud-offline-outline" size={32} color="#EF4444" />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3} accessibilityRole="alert">
+            {t('errorTitle')}
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
+            {t('errorSubtitle')}
+          </Text>
+          <TouchableOpacity
+            onPress={() => refetch()}
+            style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+            accessibilityRole="button"
+            accessibilityLabel={t('retryAccessibilityLabel')}
+          >
+            <Ionicons name="refresh" size={18} color="#1C1917" />
+            <Text style={styles.emptyButtonText} maxFontSizeMultiplier={1.3}>
+              {t('retryButton')}
+            </Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -109,20 +147,20 @@ export function TabsScreen() {
                 <Ionicons name="wallet-outline" size={32} color={colors.primary} />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-                No open tabs
+                {t('emptyTitle')}
               </Text>
               <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                Tap "New" to start a tab. The guest taps their card and it's saved for later.
+                {t('emptySubtitle')}
               </Text>
               <TouchableOpacity
                 onPress={handleOpenTab}
                 style={[styles.emptyButton, { backgroundColor: colors.primary }]}
                 accessibilityRole="button"
-                accessibilityLabel="Open a new tab"
+                accessibilityLabel={t('openTabAccessibilityLabel')}
               >
                 <Ionicons name="add" size={18} color="#1C1917" />
                 <Text style={styles.emptyButtonText} maxFontSizeMultiplier={1.3}>
-                  Open a Tab
+                  {t('emptyButton')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -141,15 +179,27 @@ interface TabCardProps {
 
 const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabCardProps) {
   const { colors } = useTheme();
-  const elapsed = useMemo(() => getElapsed(session.openedAt), [session.openedAt]);
+  const t = useTranslations('tabs');
+  const elapsed = useMemo(() => getElapsed(session.openedAt, t), [session.openedAt, t]);
   const displayName = session.holdName || session.customerName || session.sessionNumber;
+  const itemWord = session.itemCount === 1 ? t('itemSingular') : t('itemPlural');
+  const amount = formatCurrency(session.subtotal, currency);
+  const itemCountText =
+    session.itemCount === 1
+      ? t('itemCountSingular', { count: session.itemCount })
+      : t('itemCountPlural', { count: session.itemCount });
 
   return (
     <TouchableOpacity
       onPress={onPress}
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
       accessibilityRole="button"
-      accessibilityLabel={`Tab ${displayName}, ${session.itemCount} items, ${formatCurrency(session.subtotal, currency)}`}
+      accessibilityLabel={t('tabCardAccessibilityLabel', {
+        displayName,
+        count: session.itemCount,
+        itemWord,
+        amount,
+      })}
     >
       <View style={styles.cardLeft}>
         <View style={[styles.cardIcon, { backgroundColor: colors.primary + '20' }]}>
@@ -168,7 +218,7 @@ const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabC
             maxFontSizeMultiplier={1.5}
             numberOfLines={1}
           >
-            {session.itemCount} {session.itemCount === 1 ? 'item' : 'items'} · {elapsed}
+            {itemCountText} · {elapsed}
           </Text>
         </View>
       </View>
@@ -177,7 +227,7 @@ const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabC
           style={[styles.cardAmount, { color: colors.text }]}
           maxFontSizeMultiplier={1.2}
         >
-          {formatCurrency(session.subtotal, currency)}
+          {amount}
         </Text>
         <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
       </View>
@@ -185,14 +235,14 @@ const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabC
   );
 });
 
-function getElapsed(dateString: string): string {
+function getElapsed(dateString: string, t: (key: string, params?: Record<string, string | number>) => string): string {
   const now = new Date();
   const date = new Date(dateString);
   const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
-  if (diff < 60) return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 60) return t('timeSecondsAgo', { count: diff });
+  if (diff < 3600) return t('timeMinutesAgo', { count: Math.floor(diff / 60) });
+  if (diff < 86400) return t('timeHoursAgo', { count: Math.floor(diff / 3600) });
+  return t('timeDaysAgo', { count: Math.floor(diff / 86400) });
 }
 
 const styles = StyleSheet.create({

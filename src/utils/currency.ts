@@ -98,3 +98,20 @@ export function getCurrencySymbol(currency: string = 'usd'): string {
   const code = (currency || 'usd').toUpperCase();
   return CURRENCY_SYMBOLS[code] || code;
 }
+
+/**
+ * Stripe's minimum charge amount in smallest currency unit.
+ * Source: https://docs.stripe.com/currencies#minimum-and-maximum-charge-amounts
+ * Defaults to 50 (≈$0.50 equivalent) for currencies not listed.
+ */
+const STRIPE_MIN_CHARGE_SMALLEST_UNIT: Record<string, number> = {
+  USD: 50, EUR: 50, GBP: 30, JPY: 50, CAD: 50, AUD: 50,
+  NZD: 50, CHF: 50, SGD: 50, HKD: 400, SEK: 300, DKK: 250,
+  NOK: 300, CZK: 1500, MXN: 1000, MYR: 200, PLN: 200, HUF: 17500,
+  BRL: 50, INR: 50, AED: 200, RON: 200, BGN: 100, HRK: 300,
+};
+
+export function getStripeMinimumAmount(currency: string = 'usd'): number {
+  const code = (currency || 'usd').toUpperCase();
+  return STRIPE_MIN_CHARGE_SMALLEST_UNIT[code] ?? 50;
+}

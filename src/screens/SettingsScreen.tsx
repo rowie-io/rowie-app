@@ -41,6 +41,7 @@ import { createVendorDashboardUrl } from '../lib/auth-handoff';
 import { config } from '../lib/config';
 import { Toggle } from '../components/Toggle';
 import { ProfileEditModal } from '../components/ProfileEditModal';
+import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { fonts } from '../lib/fonts';
 import logger from '../lib/logger';
 
@@ -74,14 +75,27 @@ export function SettingsScreen() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
 
+  // Defense-in-depth: ignore SUBSCRIPTION_UPDATED emits for other orgs so a
+  // future room-scoping regression can't silently flip this device's tier
+  // via refreshAuth() with another org's payload.
+  const orgIdRef = useRef(organization?.id);
+  useEffect(() => {
+    orgIdRef.current = organization?.id;
+  }, [organization?.id]);
+  const isMyOrg = useCallback((data: any): boolean => {
+    if (!data?.organizationId) return true;
+    return !!orgIdRef.current && data.organizationId === orgIdRef.current;
+  }, []);
+
   // Listen for subscription updates via socket and refresh data
   const handleSubscriptionUpdated = useCallback((data: any) => {
+    if (!isMyOrg(data)) return;
     logger.log('[SettingsScreen] Received SUBSCRIPTION_UPDATED event:', data);
     // Invalidate and refetch subscription info
     queryClient.invalidateQueries({ queryKey: ['subscription-info'] });
     // Also refresh auth to update subscription in AuthContext
     refreshAuth();
-  }, [queryClient, refreshAuth]);
+  }, [queryClient, refreshAuth, isMyOrg]);
 
   useSocketEvent(SocketEvents.SUBSCRIPTION_UPDATED, handleSubscriptionUpdated);
 
@@ -109,6 +123,9 @@ export function SettingsScreen() {
   // Profile edit modal
   const [showProfileEdit, setShowProfileEdit] = useState(false);
 
+  // Change password modal
+  const [showChangePassword, setShowChangePassword] = useState(false);
+
   // Language picker modal
   const [showLanguagePicker, setShowLanguagePicker] = useState(false);
   const { languageName } = useLanguage();
@@ -122,7 +139,10 @@ export function SettingsScreen() {
   // via LocationPicker is reflected when we return to Settings).
   const [currentLocationId, setCurrentLocationId] = useState<string | null>(null);
   const currentLocation = accessibleLocations.find((l) => l.id === currentLocationId) || null;
-  const showLocationRow = accessibleLocations.length > 1;
+  // Per root CLAUDE.md: owner/admin view the org-wide; only non-owner staff
+  // (and pos_user kiosks) are scoped to a specific location via the switcher.
+  const isOrgWideRole = user?.role === 'owner' || user?.role === 'admin';
+  const showLocationRow = !isOrgWideRole && accessibleLocations.length > 1;
 
   // Refresh biometric status when screen is focused
   useFocusEffect(
@@ -163,12 +183,28 @@ export function SettingsScreen() {
     }
   };
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-    } catch (error) {
-      logger.error('[SettingsScreen] Sign out error:', error);
-    }
+  const handleSignOut = () => {
+    // Confirm before signing out — destructive op that nukes the session
+    // (and any in-progress cart, held orders this device kept locally,
+    // active Stripe Terminal connection, queued queries).
+    Alert.alert(
+      t('signOutConfirmTitle'),
+      t('signOutConfirmMessage'),
+      [
+        { text: tc('cancel'), style: 'cancel' },
+        {
+          text: t('signOut'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await signOut();
+            } catch (error) {
+              logger.error('[SettingsScreen] Sign out error:', error);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDeleteAccount = () => {
@@ -784,6 +820,26 @@ export function SettingsScreen() {
             </View>
 
 
+            {/* Security Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>{t('sectionSecurity')}</Text>
+              <View style={styles.card}>
+                <TouchableOpacity
+                  style={styles.row}
+                  onPress={() => setShowChangePassword(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('changePassword')}
+                  accessibilityHint={t('changePasswordAccessibilityHint')}
+                >
+                  <View style={styles.rowLeft}>
+                    <Ionicons name="lock-closed-outline" size={20} color={colors.textSecondary} style={styles.rowIcon} />
+                    <Text style={styles.label} maxFontSizeMultiplier={1.3}>{t('changePassword')}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+            </View>
+
             {/* About Section */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>{t('sectionAbout')}</Text>
@@ -879,6 +935,12 @@ export function SettingsScreen() {
       <ProfileEditModal
         visible={showProfileEdit}
         onClose={() => setShowProfileEdit(false)}
+      />
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        visible={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
       />
 
       {/* Language Picker Modal */}

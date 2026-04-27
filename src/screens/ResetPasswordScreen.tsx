@@ -120,6 +120,17 @@ export function ResetPasswordScreen() {
             showsVerticalScrollIndicator={false}
           >
             <View style={styles.contentWrapper}>
+              {/* Back button */}
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Login')}
+                style={styles.backButton}
+                accessibilityRole="link"
+                accessibilityLabel={t('backToLoginAccessibilityLabel')}
+              >
+                <Ionicons name="arrow-back" size={20} color={themeColors.textSecondary} />
+                <Text maxFontSizeMultiplier={1.3} style={styles.backButtonText}>{t('backToLoginLink')}</Text>
+              </TouchableOpacity>
+
               {/* Header */}
               <View style={styles.header}>
                 <Text maxFontSizeMultiplier={1.2} style={styles.title}>{t('resetYourPassword')}</Text>
@@ -237,6 +248,19 @@ const createStyles = (themeColors: { background: string; card: string; border: s
     maxWidth: 400,
     width: '100%',
     alignSelf: 'center',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  backButtonText: {
+    fontSize: 14,
+    fontFamily: fonts.medium,
+    color: themeColors.textSecondary,
   },
   header: {
     alignItems: 'center',

@@ -59,19 +59,6 @@ export interface CreateOrderParams {
   holdName?: string; // for creating held orders
 }
 
-export interface OrdersListParams {
-  limit?: number;
-  offset?: number;
-  status?: string;
-  deviceId?: string;
-  userId?: string;
-}
-
-export interface OrdersListResponse {
-  orders: Order[];
-  total: number;
-}
-
 export interface HeldOrdersResponse {
   orders: Order[];
 }
@@ -147,22 +134,6 @@ export const ordersApi = {
    */
   get: (orderId: string) =>
     apiClient.get<Order>(`/orders/${orderId}`),
-
-  /**
-   * List orders for the organization
-   * Optionally filter by deviceId or userId
-   */
-  list: (params?: OrdersListParams) => {
-    const searchParams = new URLSearchParams();
-    if (params?.limit) searchParams.append('limit', params.limit.toString());
-    if (params?.offset) searchParams.append('offset', params.offset.toString());
-    if (params?.status) searchParams.append('status', params.status);
-    if (params?.deviceId) searchParams.append('deviceId', params.deviceId);
-    if (params?.userId) searchParams.append('userId', params.userId);
-
-    const query = searchParams.toString();
-    return apiClient.get<OrdersListResponse>(`/orders${query ? `?${query}` : ''}`);
-  },
 
   // ============================================
   // Held Orders (Open Tabs)

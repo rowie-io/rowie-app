@@ -148,7 +148,10 @@ export function LoginScreen() {
       // After successful login, prompt for biometric setup if available
       promptForBiometricSetup();
     } catch (err: any) {
-      setError(err.message || t('invalidCredentials'));
+      // authService.login goes through apiClient.post('/auth/login') which
+      // throws ApiError {error, ...} — prefer `.error` so the API's reason
+      // (e.g. "user is disabled") isn't masked by the generic fallback.
+      setError(err?.error || err?.message || t('invalidCredentials'));
     } finally {
       setLoading(false);
     }

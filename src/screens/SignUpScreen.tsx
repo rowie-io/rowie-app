@@ -134,6 +134,11 @@ export function SignUpScreen() {
 
   // Form state
   const [currentStep, setCurrentStep] = useState<Step>('account');
+  // Tracks whether the account has already been created server-side. Prevents
+  // duplicate-signup errors if the user backs out of the plan step (account is
+  // created at the end of the business step) and then retries Continue —
+  // without this guard the second createAccount() call returns "email already in use".
+  const accountCreatedRef = useRef(false);
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: '',
@@ -363,12 +368,22 @@ export function SignUpScreen() {
     if (currentStep === 'account') {
       setCurrentStep('business');
     } else if (currentStep === 'business') {
+      // If the user already created the account in a previous pass through this
+      // step (then backed out of the plan step), skip the API call — re-calling
+      // /auth/signup with the same email throws "email already in use" which we
+      // would mis-surface to the user as a fatal error instead of just advancing.
+      if (accountCreatedRef.current) {
+        logger.log('[SignUp] Account already created previously, skipping recreate');
+        setCurrentStep('plan');
+        return;
+      }
       // Create the account BEFORE showing plan selection
       // This ensures we don't have orphaned payments if account creation fails
       setIsLoading(true);
       try {
         logger.log('[SignUp] Creating account before plan selection...');
         await createAccount('starter');
+        accountCreatedRef.current = true;
         logger.log('[SignUp] Account created successfully, proceeding to plan selection');
         setCurrentStep('plan');
       } catch (error: any) {
@@ -459,8 +474,10 @@ export function SignUpScreen() {
     logger.log('[SignUp] Signup response:', JSON.stringify(data, null, 2));
 
     if (!response.ok) {
-      logger.error('[SignUp] Signup failed:', data.message || data.error);
-      throw new Error(data.message || t('failedToCreateAccount'));
+      logger.error('[SignUp] Signup failed:', data.error || data.message);
+      // API returns {error} (see src/routes/auth/index.ts) — prefer it over
+      // `data.message` which is only sent on success responses.
+      throw new Error(data.error || data.message || t('failedToCreateAccount'));
     }
 
     logger.log('[SignUp] ========== ACCOUNT CREATED SUCCESSFULLY ==========');
@@ -535,7 +552,10 @@ export function SignUpScreen() {
             }
           } catch (error: any) {
             setIsLoading(false);
-            Alert.alert(t('errorAlertTitle'), error.message || t('failedToSignIn'));
+            // signIn → authService.login → apiClient.post throws ApiError
+            // {error, ...} — prefer `.error` so the API's reason isn't
+            // masked by the generic fallback.
+            Alert.alert(t('errorAlertTitle'), error?.error || error?.message || t('failedToSignIn'));
           }
         } else {
           if (result.error !== 'Purchase cancelled') {
@@ -572,7 +592,9 @@ export function SignUpScreen() {
 
     } catch (error: any) {
       logger.error('Sign up error:', error);
-      Alert.alert(t('errorAlertTitle'), error.message || t('failedToSignIn'));
+      // signIn → authService.login → apiClient.post throws ApiError
+      // {error, ...} — prefer `.error`.
+      Alert.alert(t('errorAlertTitle'), error?.error || error?.message || t('failedToSignIn'));
     } finally {
       setIsLoading(false);
     }
@@ -1050,6 +1072,14 @@ export function SignUpScreen() {
               </Text>
             </View>
             <Text maxFontSizeMultiplier={1.3} style={styles.planPriceSubtext}>{t('proPlanPriceSubtext')}</Text>
+            {PRICING.pro.trialDays > 0 && (
+              <View style={styles.trialBadge}>
+                <Ionicons name="gift-outline" size={14} color={colors.primary} />
+                <Text maxFontSizeMultiplier={1.3} style={styles.trialBadgeText}>
+                  {t('proPlanTrialBadge', { days: PRICING.pro.trialDays })}
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={styles.planFee}>

@@ -130,7 +130,9 @@ function NoCatalogsWelcome({ colors, isDark, isManager, onQuickCharge }: { color
       setPromptForEmail(false);
     },
     onError: (error: any) => {
-      Alert.alert(tc('error'), error.message || t('errorFailedToCreate'));
+      // catalogsApi.create throws ApiError {error, ...} from apiClient —
+      // prefer `.error` so the API's reason isn't masked.
+      Alert.alert(tc('error'), error?.error || error?.message || t('errorFailedToCreate'));
     },
   });
 

@@ -19,7 +19,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       backgroundColor: '#000000',
     },
     ios: {
-      supportsTablet: true,
+      supportsTablet: false,
       bundleIdentifier: 'com.rowie.app',
       icon: './assets/logo-dark.png',
       entitlements: {

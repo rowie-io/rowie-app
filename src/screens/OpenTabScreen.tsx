@@ -24,6 +24,7 @@ import { getDeviceId } from '../lib/device';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import logger from '../lib/logger';
+import { useTranslations } from '../lib/i18n';
 
 export function OpenTabScreen() {
   const { colors, isDark } = useTheme();
@@ -31,6 +32,7 @@ export function OpenTabScreen() {
   const { user } = useAuth();
   const { selectedCatalog } = useCatalog();
   const { isConnected, processSetupIntent, isProcessing } = useTerminal();
+  const t = useTranslations('openTab');
 
   const [customerName, setCustomerName] = useState('');
   const [stage, setStage] = useState<'idle' | 'creating' | 'tapping' | 'opening' | 'done'>('idle');
@@ -38,18 +40,18 @@ export function OpenTabScreen() {
 
   const handleOpenTab = useCallback(async () => {
     if (!selectedCatalog) {
-      Alert.alert('No menu selected', 'Please select a menu before opening a tab.');
+      Alert.alert(t('noMenuTitle'), t('noMenuMessage'));
       return;
     }
 
     const trimmedName = customerName.trim();
     if (!trimmedName) {
-      Alert.alert('Name required', 'Please enter a name for this tab so staff can identify it.');
+      Alert.alert(t('nameRequiredTitle'), t('nameRequiredMessage'));
       return;
     }
 
     if (!isConnected) {
-      Alert.alert('Tap to Pay not ready', 'Connect the Tap to Pay reader before opening a tab.');
+      Alert.alert(t('readerNotReadyTitle'), t('readerNotReadyMessage'));
       return;
     }
 
@@ -75,7 +77,7 @@ export function OpenTabScreen() {
       // 2. Create a SetupIntent on the connected account
       const setupIntent = await stripeTerminalApi.createSetupIntent({
         customerName: trimmedName,
-        description: `Tab: ${trimmedName}`,
+        description: t('tabDescriptionPrefix', { name: trimmedName }),
       });
       logger.log('[OpenTab] SetupIntent created', setupIntent.id);
 
@@ -106,21 +108,26 @@ export function OpenTabScreen() {
           logger.warn('[OpenTab] Cleanup failed', cleanupErr);
         }
       }
-      setError(err?.message || 'Failed to open tab');
+      // Bug fix: the mobile apiClient throws { error, statusCode, code, details }
+      // (see lib/api/client.ts:120-127), NOT an Error instance. `err?.message`
+      // is undefined for API failures so users saw the generic translation
+      // (`failedToOpen`) for declined cards, "Pro subscription required",
+      // "Payments not enabled", etc. Prefer the server-supplied error string.
+      setError(err?.error || err?.message || t('failedToOpen'));
       setStage('idle');
     }
-  }, [customerName, selectedCatalog, isConnected, processSetupIntent, navigation]);
+  }, [customerName, selectedCatalog, isConnected, processSetupIntent, navigation, t]);
 
   const getStageText = () => {
     switch (stage) {
       case 'creating':
-        return 'Creating tab...';
+        return t('stageCreating');
       case 'tapping':
-        return 'Ready — ask guest to tap card';
+        return t('stageTapping');
       case 'opening':
-        return 'Saving card...';
+        return t('stageOpening');
       case 'done':
-        return 'Tab opened';
+        return t('stageDone');
       default:
         return null;
     }
@@ -135,7 +142,7 @@ export function OpenTabScreen() {
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
-          accessibilityLabel="Cancel and close"
+          accessibilityLabel={t('closeLabel')}
           // Disable close once the flow has started — we have a session on
           // the backend that would leak if the user bails mid-setup. Only
           // 'idle' (not started) and 'done' (already navigated) are safe.
@@ -145,7 +152,7 @@ export function OpenTabScreen() {
           <Ionicons name="close" size={26} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-          Open a Tab
+          {t('headerTitle')}
         </Text>
         <View style={{ width: 26 }} />
       </View>
@@ -163,20 +170,20 @@ export function OpenTabScreen() {
           </View>
 
           <Text style={[styles.title, { color: colors.text }]} maxFontSizeMultiplier={1.2}>
-            Start a tab
+            {t('title')}
           </Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-            The card will be saved for later charging. The guest won't be charged until you close the tab.
+            {t('subtitle')}
           </Text>
 
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-              Tab name
+              {t('tabNameLabel')}
             </Text>
             <TextInput
               value={customerName}
               onChangeText={setCustomerName}
-              placeholder="e.g. John's Tab"
+              placeholder={t('tabNamePlaceholder')}
               placeholderTextColor={colors.textMuted}
               style={[
                 styles.input,
@@ -185,7 +192,7 @@ export function OpenTabScreen() {
               maxLength={100}
               autoCapitalize="words"
               editable={stage === 'idle'}
-              accessibilityLabel="Tab name"
+              accessibilityLabel={t('tabNameAccessibilityLabel')}
               returnKeyType="done"
               onSubmitEditing={handleOpenTab}
             />
@@ -196,7 +203,7 @@ export function OpenTabScreen() {
               <ActivityIndicator
                 size="small"
                 color={colors.primary}
-                accessibilityLabel={getStageText() || 'Processing'}
+                accessibilityLabel={getStageText() || t('processing')}
               />
               <Text style={[styles.statusText, { color: colors.text }]} maxFontSizeMultiplier={1.5}>
                 {getStageText()}
@@ -223,7 +230,7 @@ export function OpenTabScreen() {
             >
               <Ionicons name="wifi-outline" size={18} color="#F59E0B" />
               <Text style={styles.warnText} maxFontSizeMultiplier={1.5}>
-                Tap to Pay reader not connected.
+                {t('readerNotConnected')}
               </Text>
             </View>
           )}
@@ -239,12 +246,12 @@ export function OpenTabScreen() {
               (!isConnected || isProcessing || !customerName.trim() || stage !== 'idle') && styles.payButtonDisabled,
             ]}
             accessibilityRole="button"
-            accessibilityLabel="Tap to open tab"
+            accessibilityLabel={t('payButtonAccessibility')}
           >
             {isProcessing || stage !== 'idle' ? (
               <ActivityIndicator
                 color={isDark ? '#1C1917' : '#fff'}
-                accessibilityLabel="Processing"
+                accessibilityLabel={t('processing')}
               />
             ) : (
               <>
@@ -253,7 +260,7 @@ export function OpenTabScreen() {
                   style={[styles.payButtonText, { color: isDark ? '#1C1917' : '#fff' }]}
                   maxFontSizeMultiplier={1.3}
                 >
-                  Tap Card to Open
+                  {t('payButton')}
                 </Text>
               </>
             )}

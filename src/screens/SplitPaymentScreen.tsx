@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useTerminal } from '../context/StripeTerminalContext';
 import { ordersApi, OrderPayment, stripeTerminalApi } from '../lib/api';
-import { formatCents, getCurrencySymbol, isZeroDecimal, fromSmallestUnit, toSmallestUnit } from '../utils/currency';
+import { formatCents, getCurrencySymbol, isZeroDecimal, fromSmallestUnit, toSmallestUnit, getStripeMinimumAmount } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { CardField, useConfirmPayment, CardFieldInput, initStripe } from '@stripe/stripe-react-native';
@@ -81,10 +81,19 @@ export function SplitPaymentScreen() {
         handleOrderComplete();
       }
     } catch (error: any) {
+      // Surfacing this matters: a silent failure leaves the cashier
+      // staring at "$0.00 / $0.00 remaining" with no idea why nothing
+      // works. Show an alert so they know to check connectivity / retry.
+      // ordersApi.getPayments throws ApiError {error, ...} from apiClient —
+      // prefer `.error` so the API's reason isn't masked.
+      Alert.alert(
+        t('splitPaymentFailedTitle'),
+        error?.error || error?.message || t('paymentFailed')
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, t]);
 
   useEffect(() => {
     fetchPayments();
@@ -174,7 +183,10 @@ export function SplitPaymentScreen() {
       setShowAddPayment(false);
       resetPaymentForm();
     } catch (error: any) {
-      Alert.alert(t('splitPaymentFailedTitle'), error.message || t('paymentFailed'));
+      // Mixed catch: Stripe Terminal SDK errors (Error w/ .message) AND
+      // apiClient ApiError (.error, no .message). Prefer `.error` so the
+      // API's reason surfaces, fall back to `.message` for SDK errors.
+      Alert.alert(t('splitPaymentFailedTitle'), error?.error || error?.message || t('paymentFailed'));
     } finally {
       setIsProcessing(false);
     }
@@ -231,7 +243,9 @@ export function SplitPaymentScreen() {
       setShowAddPayment(false);
       resetPaymentForm();
     } catch (error: any) {
-      Alert.alert(t('splitPaymentFailedTitle'), error.message || t('paymentFailed'));
+      // Mixed catch: Stripe SDK confirmPayment Error (.message) AND apiClient
+      // ApiError (.error, no .message). Prefer `.error`, fall back to `.message`.
+      Alert.alert(t('splitPaymentFailedTitle'), error?.error || error?.message || t('paymentFailed'));
     } finally {
       setIsProcessing(false);
     }
@@ -258,7 +272,9 @@ export function SplitPaymentScreen() {
       setShowAddPayment(false);
       resetPaymentForm();
     } catch (error: any) {
-      Alert.alert(t('splitPaymentFailedTitle'), error.message || t('paymentFailed'));
+      // ordersApi.addPayment throws ApiError {error, ...} from apiClient —
+      // prefer `.error` so the API's reason surfaces.
+      Alert.alert(t('splitPaymentFailedTitle'), error?.error || error?.message || t('paymentFailed'));
     } finally {
       setIsProcessing(false);
     }
@@ -271,18 +287,20 @@ export function SplitPaymentScreen() {
     setSelectedMethod('tap_to_pay');
   };
 
-  const MIN_STRIPE_AMOUNT_CENTS = 50; // $0.50 minimum for Stripe
+  // Stripe's minimum charge varies by currency (e.g. $0.50 USD, £0.30 GBP,
+  // ¥50 JPY). Resolve per-currency instead of hardcoding the USD value.
+  const MIN_STRIPE_AMOUNT = getStripeMinimumAmount(currency);
 
   const amountCents = toSmallestUnit(parseFloat(paymentAmount || '0'), currency);
   const isStripeMethod = selectedMethod === 'tap_to_pay' || selectedMethod === 'card';
-  const isBelowStripeMinimum = isStripeMethod && amountCents > 0 && amountCents < MIN_STRIPE_AMOUNT_CENTS;
+  const isBelowStripeMinimum = isStripeMethod && amountCents > 0 && amountCents < MIN_STRIPE_AMOUNT;
 
   // Auto-switch to cash if remaining balance drops below Stripe minimum
   useEffect(() => {
-    if (remainingBalance > 0 && remainingBalance < MIN_STRIPE_AMOUNT_CENTS && (selectedMethod === 'tap_to_pay' || selectedMethod === 'card')) {
+    if (remainingBalance > 0 && remainingBalance < MIN_STRIPE_AMOUNT && (selectedMethod === 'tap_to_pay' || selectedMethod === 'card')) {
       setSelectedMethod('cash');
     }
-  }, [remainingBalance, selectedMethod]);
+  }, [remainingBalance, selectedMethod, MIN_STRIPE_AMOUNT]);
 
   const handleAddPayment = async () => {
     if (amountCents <= 0) {
@@ -310,7 +328,8 @@ export function SplitPaymentScreen() {
   };
 
   const handlePayRemaining = () => {
-    setPaymentAmount(isZeroDecimal(currency) ? String(remainingBalance) : (remainingBalance / 100).toFixed(2));
+    const base = fromSmallestUnit(remainingBalance, currency);
+    setPaymentAmount(isZeroDecimal(currency) ? String(base) : base.toFixed(2));
   };
 
   const getPaymentMethodIcon = (method: PaymentMethod): ComponentProps<typeof Ionicons>['name'] => {
@@ -440,7 +459,7 @@ export function SplitPaymentScreen() {
                   <View style={styles.methodSelection}>
                     {(['tap_to_pay', 'card', 'cash'] as PaymentMethod[]).map((method) => {
                       const isStripe = method === 'tap_to_pay' || method === 'card';
-                      const belowMin = isStripe && remainingBalance < MIN_STRIPE_AMOUNT_CENTS;
+                      const belowMin = isStripe && remainingBalance < MIN_STRIPE_AMOUNT;
                       return (
                         <TouchableOpacity
                           key={method}
@@ -480,7 +499,7 @@ export function SplitPaymentScreen() {
                     <View style={styles.minimumWarning} accessibilityRole="alert">
                       <Ionicons name="warning" size={16} color={colors.warning} style={styles.minimumWarningIcon} />
                       <Text style={styles.minimumWarningText} maxFontSizeMultiplier={1.5}>
-                        {t('minimumWarningMessage', { method: selectedMethod === 'tap_to_pay' ? t('tapToPayMethodLabel') : t('cardMethodLabel'), amount: formatCents(50, currency) })}
+                        {t('minimumWarningMessage', { method: selectedMethod === 'tap_to_pay' ? t('tapToPayMethodLabel') : t('cardMethodLabel'), amount: formatCents(MIN_STRIPE_AMOUNT, currency) })}
                       </Text>
                     </View>
                   )}

@@ -596,7 +596,16 @@ export function CheckoutScreen() {
         return;
       }
 
-      // 2. Create payment intent with tip included
+      // 2. Create payment intent with tip included.
+      //
+      // Idempotency-Key derived from orderId + grandTotal so a double-tap of
+      // "Pay" — or a transient retry by the API client — returns the same
+      // PaymentIntent rather than charging twice. The API
+      // (`/stripe/terminal/payment-intent`) honors this header and forwards
+      // it to Stripe. If the user genuinely changes the amount (e.g. picks a
+      // different tip and retries), the key changes too so a new PI is
+      // created cleanly.
+      const idempotencyKey = `pi-${order.id}-${grandTotal}`;
       const paymentIntent = await stripeTerminalApi.createPaymentIntent({
         amount: fromSmallestUnit(grandTotal, currency), // Convert smallest unit to base unit for API
         currency, // Multi-currency support — never assume USD
@@ -611,7 +620,7 @@ export function CheckoutScreen() {
           tipAmount: tipAmount.toString(),
         },
         receiptEmail,
-      });
+      }, idempotencyKey);
 
       // 3. Link PaymentIntent to order (with reader tracking info)
       await ordersApi.linkPaymentIntent(order.id, paymentIntent.id, undefined, {
@@ -632,9 +641,30 @@ export function CheckoutScreen() {
       });
     } catch (error: any) {
       logger.error('Payment error:', error);
+
+      // Distinct UX for the fraud-gate path. The API returns 403 with
+      // `code: 'ACCOUNT_UNDER_REVIEW'` (see /admin/account-reviews + the
+      // connect-webhooks fraud counters) — surfacing the API's user-facing
+      // message instead of a generic "Payment Error" prevents vendors from
+      // looping back to Stripe onboarding (which won't fix anything; the
+      // hold is on Rowie's side pending manual approval).
+      const errorCode: string | undefined = error?.code || error?.details?.code;
+      if (errorCode === 'ACCOUNT_UNDER_REVIEW') {
+        const reviewMessage =
+          error?.error ||
+          error?.details?.error ||
+          'Payments are temporarily on hold while your account is under review. Our team is reviewing your account and will be in touch shortly.';
+        Alert.alert(t('accountUnderReviewTitle'), reviewMessage, [{ text: tc('ok') }]);
+        return;
+      }
+
       Alert.alert(
         t('paymentErrorTitle'),
-        error.message || t('paymentErrorMessage')
+        // ordersApi.create / stripeTerminalApi.createPaymentIntent /
+        // ordersApi.linkPaymentIntent all go through apiClient and throw
+        // ApiError {error, ...} — prefer `.error` so the API's reason
+        // (e.g. "insufficient_funds", "subscription_inactive") isn't masked.
+        error?.error || error?.message || t('paymentErrorMessage')
       );
     } finally {
       setIsProcessing(false);
@@ -1238,6 +1268,7 @@ export function CheckoutScreen() {
           <Pressable
             style={[styles.modalContent, { backgroundColor: colors.card }]}
             onPress={(e) => e.stopPropagation()}
+            accessible={false}
             accessibilityRole="none"
           >
             <Text style={styles.modalTitle} maxFontSizeMultiplier={1.3}>{t('holdOrderModalTitle')}</Text>

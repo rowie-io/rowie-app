@@ -333,7 +333,7 @@ export function EventsScannerScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: '#000' }]}>
+    <View style={[styles.container, { backgroundColor: '#0C0A09' }]}>
       {/* Camera */}
       <CameraView
         style={StyleSheet.absoluteFill}

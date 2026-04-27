@@ -70,7 +70,8 @@ export function CashPaymentScreen() {
   // Handle exact amount
   const handleExactAmount = () => {
     Vibration.vibrate(10);
-    setCashTendered(isZeroDecimal(currency) ? String(totalAmount) : (totalAmount / 100).toFixed(2));
+    const base = fromSmallestUnit(totalAmount, currency);
+    setCashTendered(isZeroDecimal(currency) ? String(base) : base.toFixed(2));
   };
 
   // Complete cash payment
@@ -107,7 +108,11 @@ export function CashPaymentScreen() {
         })
       );
     } catch (error: any) {
-      Alert.alert(t('cashPaymentFailedTitle'), error.message || t('cashPaymentFailedMessage'));
+      // ordersApi.completeCash throws ApiError {error, statusCode, code, details}
+      // (see lib/api/client.ts:120-127), NOT an Error instance. Prefer
+      // `error.error` so the API's user-facing reason isn't masked by the
+      // generic fallback.
+      Alert.alert(t('cashPaymentFailedTitle'), error?.error || error?.message || t('cashPaymentFailedMessage'));
     } finally {
       setIsProcessing(false);
     }

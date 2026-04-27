@@ -17,6 +17,7 @@ import { authService } from '../lib/api';
 import { Input } from '../components/Input';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslations } from '../lib/i18n';
+import { isValidEmail } from '../lib/validation';
 
 export function ForgotPasswordScreen() {
   const { colors: themeColors } = useTheme();
@@ -32,6 +33,13 @@ export function ForgotPasswordScreen() {
   const handleSubmit = async () => {
     if (!email) {
       setError(t('enterEmailRequired'));
+      return;
+    }
+    if (!isValidEmail(email)) {
+      // Validate format inline so users don't hit the API with garbage
+      // (Cognito returns a generic UserNotFound which leaks UX) — surface a
+      // clear, actionable message immediately.
+      setError(t('emailInvalid'));
       return;
     }
 

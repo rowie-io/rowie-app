@@ -71,7 +71,9 @@ export function ReaderManagementScreen() {
       Alert.alert(t('readerRegisteredTitle'), t('readerRegisteredMessage'));
     },
     onError: (error: any) => {
-      Alert.alert(t('readerRegistrationFailedTitle'), error.message || t('readerRegistrationFailedMessage'));
+      // stripeTerminalApi.registerReader throws ApiError {error, ...} from
+      // apiClient — not an Error instance — so prefer `.error`.
+      Alert.alert(t('readerRegistrationFailedTitle'), error?.error || error?.message || t('readerRegistrationFailedMessage'));
     },
   });
 
@@ -86,7 +88,9 @@ export function ReaderManagementScreen() {
       }
     },
     onError: (error: any) => {
-      Alert.alert(t('readerDeleteFailedTitle'), error.message || t('readerDeleteFailedMessage'));
+      // stripeTerminalApi.deleteReader throws ApiError {error, ...} from
+      // apiClient — not an Error instance — so prefer `.error`.
+      Alert.alert(t('readerDeleteFailedTitle'), error?.error || error?.message || t('readerDeleteFailedMessage'));
     },
   });
 

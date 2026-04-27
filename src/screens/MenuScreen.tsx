@@ -415,7 +415,7 @@ export function MenuScreen() {
   const navigation = useNavigation<any>();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
-  const { isLoading: authLoading, user, completeOnboarding, subscription, currency, isPaymentReady } = useAuth();
+  const { isLoading: authLoading, user, organization, completeOnboarding, subscription, currency, isPaymentReady } = useAuth();
   const { selectedCatalog, catalogs, isLoading: catalogsLoading, refreshCatalogs, setSelectedCatalog } = useCatalog();
   const { addItem, getItemQuantity, decrementItem, itemCount, subtotal } = useCart();
   const { guardCheckout } = useTapToPayGuard();
@@ -509,28 +509,44 @@ export function MenuScreen() {
     }
   }, [refetch]);
 
+  // Defense-in-depth: ignore PRODUCT_*/CATEGORY_*/CATALOG_UPDATED emits that
+  // belong to a different org. Server scopes emits to org rooms today, but
+  // a future room-scoping regression must not be able to silently refetch
+  // this catalog's products with another org's data.
+  const orgIdRef = useRef<string | undefined>(organization?.id);
+  useEffect(() => {
+    orgIdRef.current = organization?.id;
+  }, [organization?.id]);
+  const isMyOrg = useCallback((data: any): boolean => {
+    if (!data?.organizationId) return true;
+    return !!orgIdRef.current && data.organizationId === orgIdRef.current;
+  }, []);
+
   // Listen for real-time updates to products and categories
   // Use refetchQueries instead of invalidateQueries for immediate updates (bypasses stale time)
-  const handleProductsUpdate = useCallback(() => {
+  const handleProductsUpdate = useCallback((data: any) => {
+    if (!isMyOrg(data)) return;
     if (selectedCatalog) {
       queryClient.refetchQueries({ queryKey: ['products', selectedCatalog.id], type: 'active' });
     }
-  }, [queryClient, selectedCatalog]);
+  }, [queryClient, selectedCatalog, isMyOrg]);
 
-  const handleCategoriesUpdate = useCallback(() => {
+  const handleCategoriesUpdate = useCallback((data: any) => {
+    if (!isMyOrg(data)) return;
     if (selectedCatalog) {
       queryClient.refetchQueries({ queryKey: ['categories', selectedCatalog.id], type: 'active' });
     }
-  }, [queryClient, selectedCatalog]);
+  }, [queryClient, selectedCatalog, isMyOrg]);
 
   // Memoized handler for CATALOG_UPDATED - also refreshes products and categories
   // since catalog-product operations (add/update/remove) emit this event.
   // Note: CatalogContext already handles refreshCatalogs() for this event,
   // so we only need to refetch products and categories here.
-  const handleCatalogUpdatedEvent = useCallback(() => {
-    handleProductsUpdate();
-    handleCategoriesUpdate();
-  }, [handleProductsUpdate, handleCategoriesUpdate]);
+  const handleCatalogUpdatedEvent = useCallback((data: any) => {
+    if (!isMyOrg(data)) return;
+    handleProductsUpdate(data);
+    handleCategoriesUpdate(data);
+  }, [handleProductsUpdate, handleCategoriesUpdate, isMyOrg]);
 
   // Subscribe to socket events for real-time updates
   // CATALOG_UPDATED is also triggered when catalog products are changed (add/update/remove)
@@ -801,7 +817,8 @@ export function MenuScreen() {
                 catalogProductId: product.id,
               });
             } catch (error: any) {
-              Alert.alert(t('errorTitle'), error.message || t('failedToRemoveProduct'));
+              // apiClient throws ApiError {error, ...} — read `.error` first.
+              Alert.alert(t('errorTitle'), error?.error || error?.message || t('failedToRemoveProduct'));
             }
           },
         },
@@ -911,7 +928,8 @@ export function MenuScreen() {
               setSelectedProducts(new Set());
               setIsSelectionMode(false);
             } catch (error: any) {
-              Alert.alert(t('errorTitle'), error.message || t('failedToDeleteProducts'));
+              // apiClient throws ApiError {error, ...} — read `.error` first.
+              Alert.alert(t('errorTitle'), error?.error || error?.message || t('failedToDeleteProducts'));
             }
           },
         },
@@ -937,7 +955,8 @@ export function MenuScreen() {
       setSelectedProducts(new Set());
       setIsSelectionMode(false);
     } catch (error: any) {
-      Alert.alert(t('errorTitle'), error.message || t('failedToUpdateProducts'));
+      // apiClient throws ApiError {error, ...} — read `.error` first.
+      Alert.alert(t('errorTitle'), error?.error || error?.message || t('failedToUpdateProducts'));
     }
   };
 
@@ -963,7 +982,8 @@ export function MenuScreen() {
     } catch (error: any) {
       // Revert on error by refetching
       queryClient.invalidateQueries({ queryKey: ['products', selectedCatalog.id] });
-      Alert.alert(t('errorTitle'), error.message || t('failedToReorderProducts'));
+      // apiClient throws ApiError {error, ...} — read `.error` first.
+      Alert.alert(t('errorTitle'), error?.error || error?.message || t('failedToReorderProducts'));
     }
   }, [selectedCatalog, queryClient, reorderProductsMutation]);
 

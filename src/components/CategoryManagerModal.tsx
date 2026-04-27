@@ -71,7 +71,9 @@ export function CategoryManagerModal({
       await onCreateCategory(name);
       setNewCategoryName('');
     } catch (error: any) {
-      Alert.alert(tc('error'), error.message || t('errorFailedToCreate'));
+      // onCreateCategory re-throws apiClient ApiError {error, ...} — prefer
+      // `.error` so the API's reason (e.g. duplicate name) isn't masked.
+      Alert.alert(tc('error'), error?.error || error?.message || t('errorFailedToCreate'));
     } finally {
       setIsCreating(false);
     }
@@ -97,7 +99,8 @@ export function CategoryManagerModal({
       setEditingCategoryId(null);
       setEditingName('');
     } catch (error: any) {
-      Alert.alert(tc('error'), error.message || t('errorFailedToUpdate'));
+      // onUpdateCategory re-throws apiClient ApiError {error, ...} — prefer `.error`.
+      Alert.alert(tc('error'), error?.error || error?.message || t('errorFailedToUpdate'));
     } finally {
       setSavingIds(prev => {
         const next = new Set(prev);
@@ -112,7 +115,8 @@ export function CategoryManagerModal({
     try {
       await onUpdateCategory(category.id, { isActive: !category.isActive });
     } catch (error: any) {
-      Alert.alert(tc('error'), error.message || t('errorFailedToUpdate'));
+      // onUpdateCategory re-throws apiClient ApiError {error, ...} — prefer `.error`.
+      Alert.alert(tc('error'), error?.error || error?.message || t('errorFailedToUpdate'));
     } finally {
       setSavingIds(prev => {
         const next = new Set(prev);
@@ -136,7 +140,8 @@ export function CategoryManagerModal({
             try {
               await onDeleteCategory(category.id);
             } catch (error: any) {
-              Alert.alert(tc('error'), error.message || t('errorFailedToDelete'));
+              // onDeleteCategory re-throws apiClient ApiError {error, ...} — prefer `.error`.
+              Alert.alert(tc('error'), error?.error || error?.message || t('errorFailedToDelete'));
             } finally {
               setSavingIds(prev => {
                 const next = new Set(prev);

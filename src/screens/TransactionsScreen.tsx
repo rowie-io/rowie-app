@@ -30,6 +30,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Swipeable } from 'react-native-gesture-handler';
 import { useTapToPayGuard } from '../hooks';
 import { useTranslations } from '../lib/i18n';
+import logger from '../lib/logger';
 
 // Held orders shown inline, no tab switching needed
 
@@ -216,7 +217,7 @@ export function TransactionsScreen() {
   const { colors, isDark } = useTheme();
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
-  const { currency } = useAuth();
+  const { currency, organization } = useAuth();
   const { selectedCatalog } = useCatalog();
   const { deviceId } = useDevice();
   const { isConnected } = useSocket();
@@ -257,6 +258,9 @@ export function TransactionsScreen() {
       hasFetchedHeldRef.current = true;
       setHeldOrders(response.orders);
     } catch (error: any) {
+      // Held orders are a soft secondary feature — log but don't disrupt the
+      // main transactions list. The badge simply doesn't appear.
+      logger.error('[TransactionsScreen] Failed to load held orders:', error);
     } finally {
       setIsLoadingHeld(false);
       setIsRefreshingHeld(false);
@@ -280,10 +284,23 @@ export function TransactionsScreen() {
     wasConnectedRef.current = isConnected;
   }, [isConnected, queryClient, fetchHeldOrders]);
 
+  // Defense-in-depth: ignore ORDER_*/SESSION_* emits for other orgs so a
+  // future room-scoping regression can't silently invalidate transactions
+  // or mutate held-orders state with another org's payload.
+  const orgIdRef = useRef(organization?.id);
+  useEffect(() => {
+    orgIdRef.current = organization?.id;
+  }, [organization?.id]);
+  const isMyOrg = useCallback((data: any): boolean => {
+    if (!data?.organizationId) return true;
+    return !!orgIdRef.current && data.organizationId === orgIdRef.current;
+  }, []);
+
   // Auto-refresh transactions when payment events occur
   const handlePaymentEvent = useCallback((data: any) => {
+    if (!isMyOrg(data)) return;
     queryClient.invalidateQueries({ queryKey: ['transactions'] });
-  }, [queryClient]);
+  }, [queryClient, isMyOrg]);
 
   useSocketEvent(SocketEvents.ORDER_COMPLETED, handlePaymentEvent);
   useSocketEvent(SocketEvents.PAYMENT_RECEIVED, handlePaymentEvent);
@@ -293,25 +310,28 @@ export function TransactionsScreen() {
 
   // Listen for held order updates via socket
   const handleHeldOrderUpdated = useCallback((data: any) => {
+    if (!isMyOrg(data)) return;
     // Refresh held orders when any order is held or resumed
     if (data.status === 'held' || data.status === 'pending') {
       fetchHeldOrders();
     }
-  }, [fetchHeldOrders]);
+  }, [fetchHeldOrders, isMyOrg]);
 
   const handleHeldOrderCreated = useCallback((data: any) => {
+    if (!isMyOrg(data)) return;
     // Refresh if a new held order is created
     if (data.status === 'held') {
       fetchHeldOrders();
     }
-  }, [fetchHeldOrders]);
+  }, [fetchHeldOrders, isMyOrg]);
 
   const handleHeldOrderDeleted = useCallback((data: any) => {
+    if (!isMyOrg(data)) return;
     // Remove the deleted order from the list
     if (data.orderId) {
       setHeldOrders(prev => prev.filter(o => o.id !== data.orderId));
     }
-  }, []);
+  }, [isMyOrg]);
 
   useSocketEvent(SocketEvents.ORDER_UPDATED, handleHeldOrderUpdated);
   useSocketEvent(SocketEvents.ORDER_CREATED, handleHeldOrderCreated);
@@ -327,6 +347,7 @@ export function TransactionsScreen() {
   const {
     data,
     isLoading,
+    isError,
     refetch,
     fetchNextPage,
     hasNextPage,
@@ -486,7 +507,8 @@ export function TransactionsScreen() {
               await ordersApi.cancel(order.id);
               setHeldOrders(prev => prev.filter(o => o.id !== order.id));
             } catch (error: any) {
-              Alert.alert(t('errorTitle'), error.message || t('errorCancelOrder'));
+              // ordersApi.cancel throws ApiError {error, ...} — prefer `.error`.
+              Alert.alert(t('errorTitle'), error?.error || error?.message || t('errorCancelOrder'));
             }
           },
         },
@@ -642,6 +664,14 @@ export function TransactionsScreen() {
         <>
             {isLoading ? (
               <LoadingTransactionsContent colors={colors} isDark={isDark} />
+            ) : isError ? (
+              <EmptyState
+                icon="cloud-offline-outline"
+                title={t('errorTitle')}
+                subtitle={t('errorSubtitle')}
+                actionLabel={t('retryButton')}
+                onAction={() => refetch()}
+              />
             ) : transactions.length === 0 ? (
               <EmptyState
                 icon="receipt-outline"

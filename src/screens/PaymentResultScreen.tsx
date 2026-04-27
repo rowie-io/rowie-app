@@ -26,7 +26,7 @@ import { formatCents, fromSmallestUnit } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { useQueryClient } from '@tanstack/react-query';
-import { stripeTerminalApi, ordersApi } from '../lib/api';
+import { stripeTerminalApi, ordersApi, transactionsApi } from '../lib/api';
 import logger from '../lib/logger';
 import { isValidEmail } from '../lib/validation';
 import { useTranslations } from '../lib/i18n';
@@ -140,22 +140,33 @@ export function PaymentResultScreen() {
     }
   }, [success, queryClient]);
 
-  // Auto-send receipt if customer email was provided during checkout
+  // Auto-send receipt if customer email was provided during checkout.
+  // Terminal-backed payments (tap_to_pay / card) go through the Terminal
+  // receipt endpoint which needs a real paymentIntentId; cash/split have no
+  // PI and must go through the unified transactions endpoint keyed on orderId.
   useEffect(() => {
-    if (success && customerEmail && paymentIntentId && !receiptSent) {
-      const autoSendReceipt = async () => {
-        try {
-          await stripeTerminalApi.sendReceipt(paymentIntentId, customerEmail.trim());
-          setReceiptSent(true);
-          logger.log('[PaymentResult] Auto-sent receipt to:', customerEmail);
-        } catch (error) {
-          logger.error('[PaymentResult] Failed to auto-send receipt:', error);
-          // Don't show error to user - they can manually send later
+    if (!success || !customerEmail || receiptSent) return;
+    const email = customerEmail.trim();
+    const hasPI = typeof paymentIntentId === 'string' && paymentIntentId.length > 0;
+    const isTerminalMethod = resolvedMethod === 'tap_to_pay' || resolvedMethod === 'card';
+    const autoSendReceipt = async () => {
+      try {
+        if (isTerminalMethod && hasPI) {
+          await stripeTerminalApi.sendReceipt(paymentIntentId, email);
+        } else if (orderId) {
+          await transactionsApi.sendReceipt(orderId, email);
+        } else {
+          return;
         }
-      };
-      autoSendReceipt();
-    }
-  }, [success, customerEmail, paymentIntentId, receiptSent]);
+        setReceiptSent(true);
+        logger.log('[PaymentResult] Auto-sent receipt to:', email);
+      } catch (error) {
+        logger.error('[PaymentResult] Failed to auto-send receipt:', error);
+        // Don't show error to user - they can manually send later
+      }
+    };
+    autoSendReceipt();
+  }, [success, customerEmail, paymentIntentId, orderId, resolvedMethod, receiptSent]);
 
   // Legacy preorder completion flow — preorders were replaced by table_sessions.
   // The session system handles its own settlement via /sessions/{id}/settle.
@@ -442,14 +453,25 @@ export function PaymentResultScreen() {
     }
 
     setSendingReceipt(true);
+    const email = receiptEmail.trim();
+    const hasPI = typeof paymentIntentId === 'string' && paymentIntentId.length > 0;
+    const isTerminalMethod = resolvedMethod === 'tap_to_pay' || resolvedMethod === 'card';
     try {
-      await stripeTerminalApi.sendReceipt(paymentIntentId, receiptEmail.trim());
+      if (isTerminalMethod && hasPI) {
+        await stripeTerminalApi.sendReceipt(paymentIntentId, email);
+      } else if (orderId) {
+        await transactionsApi.sendReceipt(orderId, email);
+      } else {
+        throw new Error(t('receiptErrorMessage'));
+      }
       setReceiptSent(true);
       setShowEmailInput(false);
-      Alert.alert(t('receiptSentTitle'), t('receiptSentMessage', { email: receiptEmail.trim() }));
+      Alert.alert(t('receiptSentTitle'), t('receiptSentMessage', { email }));
     } catch (error: any) {
       logger.error('Error sending receipt:', error);
-      Alert.alert(t('receiptErrorTitle'), error.message || t('receiptErrorMessage'));
+      // stripeTerminalApi.sendReceipt / transactionsApi.sendReceipt go through
+      // apiClient and throw ApiError {error, ...} — prefer `.error`.
+      Alert.alert(t('receiptErrorTitle'), error?.error || error?.message || t('receiptErrorMessage'));
     } finally {
       setSendingReceipt(false);
     }

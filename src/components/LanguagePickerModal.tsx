@@ -48,8 +48,13 @@ export function LanguagePickerModal({ visible, onClose }: LanguagePickerModalPro
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('title')}</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton} accessibilityLabel={tc('close')}>
+          <Text style={[styles.headerTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{t('title')}</Text>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeButton}
+            accessibilityRole="button"
+            accessibilityLabel={tc('close')}
+          >
             <Ionicons name="close" size={24} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
@@ -80,11 +85,11 @@ export function LanguagePickerModal({ visible, onClose }: LanguagePickerModalPro
                 accessibilityState={{ selected: isSelected }}
               >
                 <View style={styles.rowLeft}>
-                  <Text style={[styles.languageName, { color: colors.text }]}>
+                  <Text style={[styles.languageName, { color: colors.text }]} maxFontSizeMultiplier={1.5}>
                     {LANGUAGE_NAMES[lang]}
                   </Text>
                   {isOrgDefault && (
-                    <Text style={[styles.defaultBadge, { color: colors.textMuted }]}>
+                    <Text style={[styles.defaultBadge, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
                       {t('defaultBadge')}
                     </Text>
                   )}

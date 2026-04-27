@@ -23,11 +23,24 @@ interface CatalogProviderProps {
 }
 
 export function CatalogProvider({ children }: CatalogProviderProps) {
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, organization } = useAuth();
   const [selectedCatalog, setSelectedCatalogState] = useState<Catalog | null>(null);
   const [catalogs, setCatalogs] = useState<Catalog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [hasFetched, setHasFetched] = useState(false);
+
+  // Defense-in-depth: ignore CATALOG_* emits for other orgs. Server scopes
+  // emits to org rooms today, but a future room-scoping regression mustn't
+  // be able to wipe / replace this user's selectedCatalog with another
+  // org's data.
+  const orgIdRef = useRef(organization?.id);
+  useEffect(() => {
+    orgIdRef.current = organization?.id;
+  }, [organization?.id]);
+  const isMyOrg = useCallback((data: any): boolean => {
+    if (!data?.organizationId) return true;
+    return !!orgIdRef.current && data.organizationId === orgIdRef.current;
+  }, []);
 
   // Load cached catalog (for selectedCatalog) - but don't stop loading until catalogs list is fetched
   const loadCachedCatalog = useCallback(async () => {
@@ -183,14 +196,16 @@ export function CatalogProvider({ children }: CatalogProviderProps) {
   }, []);
 
   // Listen for socket events to refresh catalogs in real-time
-  const handleCatalogUpdate = useCallback((data?: { catalogId?: string }) => {
+  const handleCatalogUpdate = useCallback((data?: any) => {
+    if (!isMyOrg(data)) return;
     if (isAuthenticated) {
       // Immediately refresh catalogs when any catalog changes
       refreshCatalogs();
     }
-  }, [isAuthenticated, refreshCatalogs]);
+  }, [isAuthenticated, refreshCatalogs, isMyOrg]);
 
-  const handleCatalogDelete = useCallback(async (data?: { catalogId?: string }) => {
+  const handleCatalogDelete = useCallback(async (data?: any) => {
+    if (!isMyOrg(data)) return;
     if (isAuthenticated) {
       // Refresh catalogs first to get the updated list
       try {

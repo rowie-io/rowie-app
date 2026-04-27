@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ import { sessionsApi, type SessionItem, type ItemStatus } from '../lib/api/sessi
 import { formatCurrency, toSmallestUnit, isZeroDecimal } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
+import { useTranslations } from '../lib/i18n';
 
 type RouteParams = {
   SessionDetail: {
@@ -32,22 +33,23 @@ type RouteParams = {
   };
 };
 
-const STATUS_CONFIG: Record<string, { icon: string; color: string; label: string }> = {
-  pending: { icon: 'time-outline', color: '#78716C', label: 'Pending' },
-  sent: { icon: 'send-outline', color: '#3B82F6', label: 'Sent' },
-  preparing: { icon: 'flame-outline', color: '#F59E0B', label: 'Preparing' },
-  ready: { icon: 'checkmark-circle-outline', color: '#22C55E', label: 'Ready' },
-  served: { icon: 'restaurant-outline', color: '#A8A29E', label: 'Served' },
+const STATUS_CONFIG: Record<string, { icon: string; color: string; labelKey: string }> = {
+  pending: { icon: 'time-outline', color: '#78716C', labelKey: 'itemStatusPending' },
+  sent: { icon: 'send-outline', color: '#3B82F6', labelKey: 'itemStatusSent' },
+  preparing: { icon: 'flame-outline', color: '#F59E0B', labelKey: 'itemStatusPreparing' },
+  ready: { icon: 'checkmark-circle-outline', color: '#22C55E', labelKey: 'itemStatusReady' },
+  served: { icon: 'restaurant-outline', color: '#A8A29E', labelKey: 'itemStatusServed' },
 };
 
 export function SessionDetailScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'SessionDetail'>>();
-  const { currency } = useAuth();
+  const { currency, organization } = useAuth();
   const { selectedCatalog } = useCatalog();
   const queryClient = useQueryClient();
   const { sessionId } = route.params;
+  const t = useTranslations('sessionDetail');
 
   // Tip modal state
   const [tipModalOpen, setTipModalOpen] = useState(false);
@@ -60,7 +62,7 @@ export function SessionDetailScreen() {
   const tipPercentages = selectedCatalog?.tipPercentages ?? [15, 18, 20, 25];
   const allowCustomTip = selectedCatalog?.allowCustomTip ?? true;
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading, refetch, isError } = useQuery({
     queryKey: ['sessions', sessionId],
     queryFn: () => sessionsApi.get(sessionId),
   });
@@ -68,10 +70,23 @@ export function SessionDetailScreen() {
   const session = data?.session;
   const items = data?.items || [];
 
+  // Defense-in-depth: ignore SESSION_* emits for other orgs so a future
+  // room-scoping regression can't silently refetch this device's session
+  // detail with another org's payload.
+  const orgIdRef = useRef(organization?.id);
+  useEffect(() => {
+    orgIdRef.current = organization?.id;
+  }, [organization?.id]);
+  const isMyOrg = useCallback((data: any): boolean => {
+    if (!data?.organizationId) return true;
+    return !!orgIdRef.current && data.organizationId === orgIdRef.current;
+  }, []);
+
   // Real-time updates
-  const handleSessionUpdate = useCallback(() => {
+  const handleSessionUpdate = useCallback((data: any) => {
+    if (!isMyOrg(data)) return;
     refetch();
-  }, [refetch]);
+  }, [refetch, isMyOrg]);
 
   useSocketEvent(SocketEvents.SESSION_UPDATED, handleSessionUpdate);
   useSocketEvent(SocketEvents.SESSION_ITEMS_ADDED, handleSessionUpdate);
@@ -102,6 +117,14 @@ export function SessionDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
       navigation.goBack();
     },
+    // Bug fix: cancel was silent on failure — staff hits "Cancel session",
+    // network blip / 409 race / 403 returns, screen does nothing. The user
+    // assumes it worked and walks away. Surface the API error string via the
+    // same shape closeTabMutation/settleCashMutation use below. The mobile
+    // apiClient throws { error, statusCode, code } — `.error` not `.message`.
+    onError: (err: any) => {
+      Alert.alert(t('failedCancelTitle'), err?.error || err?.message || t('failedCancelMessage'));
+    },
   });
 
   const closeTabMutation = useMutation({
@@ -112,11 +135,18 @@ export function SessionDetailScreen() {
       setTipModalOpen(false);
       setSelectedTipPct(null);
       setCustomTipText('');
-      Alert.alert('Tab closed', 'Payment charged successfully.');
+      Alert.alert(t('closedTitle'), t('closedMessage'));
       navigation.goBack();
     },
+    // Bug fix: the mobile apiClient throws { error, statusCode, code, details }
+    // (see lib/api/client.ts:120-127) — NOT an Error instance. `err?.message`
+    // is undefined so a card-decline / "Tab not found" / Stripe error fell
+    // through to the generic translation, leaving the staff member guessing.
+    // Prefer `err?.error` (server's `{ error: '...' }` body), then `.message`,
+    // then the translation as a last resort. Mirrors the vendor close-tab fix
+    // in rowie-vendor/app/[locale]/(authenticated)/tables/page.tsx:599-606.
     onError: (err: any) => {
-      Alert.alert('Failed to close tab', err?.message || 'Could not charge the saved card.');
+      Alert.alert(t('failedCloseTitle'), err?.error || err?.message || t('failedCloseMessage'));
     },
   });
 
@@ -140,11 +170,11 @@ export function SessionDetailScreen() {
     // If the menu has the tip screen disabled, skip straight to charging with tip=0.
     if (!showTipScreen) {
       Alert.alert(
-        'Close Tab',
-        'Charge the saved card for the full amount?',
+        t('closeTabConfirmTitle'),
+        t('closeTabConfirmMessage'),
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Charge Now', onPress: () => closeTabMutation.mutate(0) },
+          { text: t('cancel'), style: 'cancel' },
+          { text: t('closeTabConfirmAction'), onPress: () => closeTabMutation.mutate(0) },
         ],
       );
       return;
@@ -152,7 +182,7 @@ export function SessionDetailScreen() {
     setSelectedTipPct(null);
     setCustomTipText('');
     setTipModalOpen(true);
-  }, [showTipScreen, closeTabMutation]);
+  }, [showTipScreen, closeTabMutation, t]);
 
   const handleConfirmCloseTab = useCallback(() => {
     const tipCents = toSmallestUnit(computedTipBase, currency);
@@ -165,24 +195,27 @@ export function SessionDetailScreen() {
     mutationFn: () => sessionsApi.settle(sessionId, { paymentMethod: 'cash', tipAmount: 0 }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
-      Alert.alert('Session settled', 'Order recorded as cash payment.');
+      Alert.alert(t('settledTitle'), t('settledMessage'));
       navigation.goBack();
     },
+    // Bug fix: same `err.error` vs `err.message` issue — mobile apiClient
+    // throws an object literal so cash-settle Stripe/payment failures were
+    // showing the generic translation instead of the API's reason string.
     onError: (err: any) => {
-      Alert.alert('Failed to settle', err?.message || 'Could not settle session.');
+      Alert.alert(t('failedSettleTitle'), err?.error || err?.message || t('failedSettleMessage'));
     },
   });
 
   const handleSettle = useCallback(() => {
     Alert.alert(
-      'Settle Session',
-      'Mark this session as settled (cash payment)?',
+      t('settleConfirmTitle'),
+      t('settleConfirmMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Settle', onPress: () => settleCashMutation.mutate() },
+        { text: t('cancel'), style: 'cancel' },
+        { text: t('settleConfirmAction'), onPress: () => settleCashMutation.mutate() },
       ],
     );
-  }, [settleCashMutation]);
+  }, [settleCashMutation, t]);
 
   const markRoundStatus = useCallback((roundItems: SessionItem[], status: ItemStatus) => {
     const itemIds = roundItems.filter(i => i.status !== status).map(i => i.id);
@@ -193,20 +226,57 @@ export function SessionDetailScreen() {
 
   const handleCancel = useCallback(() => {
     Alert.alert(
-      'Cancel Session',
-      'Are you sure you want to cancel this session?',
+      t('cancelConfirmTitle'),
+      t('cancelConfirmMessage'),
       [
-        { text: 'No', style: 'cancel' },
-        { text: 'Yes, Cancel', style: 'destructive', onPress: () => cancelMutation.mutate() },
+        { text: t('cancelConfirmNo'), style: 'cancel' },
+        { text: t('cancelConfirmYes'), style: 'destructive', onPress: () => cancelMutation.mutate() },
       ]
     );
-  }, [cancelMutation]);
+  }, [cancelMutation, t]);
 
   if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel="Loading" />
+          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('loading')} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (isError) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel={t('goBack')}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }} />
+        </View>
+        <View style={styles.center}>
+          <Ionicons name="cloud-offline-outline" size={48} color="#EF4444" />
+          <Text style={[styles.emptyText, { color: colors.text }]} maxFontSizeMultiplier={1.3} accessibilityRole="alert">
+            {t('errorTitle')}
+          </Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary, fontSize: 14 }]} maxFontSizeMultiplier={1.5}>
+            {t('errorSubtitle')}
+          </Text>
+          <TouchableOpacity
+            onPress={() => refetch()}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, backgroundColor: colors.primary, minHeight: 44 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('retryAccessibilityLabel')}
+          >
+            <Ionicons name="refresh" size={18} color="#1C1917" />
+            <Text style={{ fontSize: 15, fontFamily: fonts.bold, color: '#1C1917' }} maxFontSizeMultiplier={1.3}>
+              {t('retryButton')}
+            </Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -217,7 +287,7 @@ export function SessionDetailScreen() {
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.center}>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-            Session not found
+            {t('notFound')}
           </Text>
         </View>
       </SafeAreaView>
@@ -225,6 +295,19 @@ export function SessionDetailScreen() {
   }
 
   const isOpen = session.status === 'open';
+  const sourceLabel = (() => {
+    if (session.source === 'qr_table' || session.source === 'qr_menu') return t('sourceQr');
+    if (session.source === 'hold') return t('sourceHeld');
+    if (session.source === 'tab') return t('sourceTab');
+    return t('sourcePos');
+  })();
+  const statusLabel = (() => {
+    if (session.status === 'open') return t('statusOpen');
+    if (session.status === 'settling') return t('statusSettling');
+    if (session.status === 'settled') return t('statusSettled');
+    if (session.status === 'cancelled') return t('statusCancelled');
+    return session.status;
+  })();
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -233,7 +316,7 @@ export function SessionDetailScreen() {
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('goBack')}
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
@@ -242,12 +325,12 @@ export function SessionDetailScreen() {
             {session.tableLabel || session.holdName || session.sessionNumber}
           </Text>
           <Text style={[styles.headerSubtitle, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-            {session.sessionNumber} · {session.source === 'qr_table' || session.source === 'qr_menu' ? 'QR' : session.source === 'hold' ? 'Held' : session.source === 'tab' ? 'Tab' : 'POS'}
+            {session.sessionNumber} · {sourceLabel}
           </Text>
         </View>
         <View style={[styles.statusBadge, { backgroundColor: isOpen ? '#22C55E20' : '#78716C20' }]}>
           <Text style={[styles.statusText, { color: isOpen ? '#22C55E' : '#78716C' }]} maxFontSizeMultiplier={1.3}>
-            {session.status}
+            {statusLabel}
           </Text>
         </View>
       </View>
@@ -276,7 +359,7 @@ export function SessionDetailScreen() {
             <View key={roundNum} style={styles.roundSection}>
               <View style={styles.roundHeader}>
                 <Text style={[styles.roundLabel, { color: colors.textMuted }]} maxFontSizeMultiplier={1.3}>
-                  Round {roundNum}
+                  {t('roundLabel', { number: roundNum })}
                 </Text>
                 {isOpen && !allServed && (
                   <View style={styles.roundActions}>
@@ -284,25 +367,25 @@ export function SessionDetailScreen() {
                       onPress={() => markRoundStatus(roundItems, 'sent')}
                       style={[styles.roundActionBtn, { backgroundColor: '#3B82F620' }]}
                       accessibilityRole="button"
-                      accessibilityLabel={`Mark round ${roundNum} as sent`}
+                      accessibilityLabel={t('markRoundSentLabel', { number: roundNum })}
                     >
-                      <Text style={[styles.roundActionText, { color: '#3B82F6' }]} maxFontSizeMultiplier={1.3}>Sent</Text>
+                      <Text style={[styles.roundActionText, { color: '#3B82F6' }]} maxFontSizeMultiplier={1.3}>{t('roundActionSent')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => markRoundStatus(roundItems, 'ready')}
                       style={[styles.roundActionBtn, { backgroundColor: '#22C55E20' }]}
                       accessibilityRole="button"
-                      accessibilityLabel={`Mark round ${roundNum} as ready`}
+                      accessibilityLabel={t('markRoundReadyLabel', { number: roundNum })}
                     >
-                      <Text style={[styles.roundActionText, { color: '#22C55E' }]} maxFontSizeMultiplier={1.3}>Ready</Text>
+                      <Text style={[styles.roundActionText, { color: '#22C55E' }]} maxFontSizeMultiplier={1.3}>{t('roundActionReady')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => markRoundStatus(roundItems, 'served')}
                       style={[styles.roundActionBtn, { backgroundColor: '#A8A29E20' }]}
                       accessibilityRole="button"
-                      accessibilityLabel={`Mark round ${roundNum} as served`}
+                      accessibilityLabel={t('markRoundServedLabel', { number: roundNum })}
                     >
-                      <Text style={[styles.roundActionText, { color: '#A8A29E' }]} maxFontSizeMultiplier={1.3}>Served</Text>
+                      <Text style={[styles.roundActionText, { color: '#A8A29E' }]} maxFontSizeMultiplier={1.3}>{t('roundActionServed')}</Text>
                     </TouchableOpacity>
                   </View>
                 )}
@@ -330,7 +413,7 @@ export function SessionDetailScreen() {
                         <View style={[styles.itemStatusBadge, { backgroundColor: config.color + '20' }]}>
                           <Ionicons name={config.icon as any} size={12} color={config.color} />
                           <Text style={[styles.itemStatusText, { color: config.color }]} maxFontSizeMultiplier={1.3}>
-                            {config.label}
+                            {t(config.labelKey)}
                           </Text>
                         </View>
                       </View>
@@ -345,23 +428,23 @@ export function SessionDetailScreen() {
         {/* Totals */}
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.totalRow}>
-            <Text style={[styles.totalLabel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>Subtotal</Text>
+            <Text style={[styles.totalLabel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>{t('subtotalLabel')}</Text>
             <Text style={[styles.totalValue, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{formatCurrency(session.subtotal, currency)}</Text>
           </View>
           {session.taxAmount > 0 && (
             <View style={styles.totalRow}>
-              <Text style={[styles.totalLabel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>Tax</Text>
+              <Text style={[styles.totalLabel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>{t('taxLabel')}</Text>
               <Text style={[styles.totalValue, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{formatCurrency(session.taxAmount, currency)}</Text>
             </View>
           )}
           {session.tipAmount > 0 && (
             <View style={styles.totalRow}>
-              <Text style={[styles.totalLabel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>Tip</Text>
+              <Text style={[styles.totalLabel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>{t('tipLabel')}</Text>
               <Text style={[styles.totalValue, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{formatCurrency(session.tipAmount, currency)}</Text>
             </View>
           )}
           <View style={[styles.totalRow, styles.grandTotalRow, { borderTopColor: colors.border }]}>
-            <Text style={[styles.grandTotalLabel, { color: colors.text }]} maxFontSizeMultiplier={1.3}>Total</Text>
+            <Text style={[styles.grandTotalLabel, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{t('totalLabel')}</Text>
             <Text style={[styles.grandTotalValue, { color: colors.primary }]} maxFontSizeMultiplier={1.2}>
               {formatCurrency(session.subtotal + session.taxAmount, currency)}
             </Text>
@@ -371,7 +454,7 @@ export function SessionDetailScreen() {
         {/* Notes */}
         {session.orderNotes && (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.notesLabel, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>Notes</Text>
+            <Text style={[styles.notesLabel, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>{t('notesLabel')}</Text>
             <Text style={[styles.notesText, { color: colors.text }]} maxFontSizeMultiplier={1.5}>{session.orderNotes}</Text>
           </View>
         )}
@@ -385,11 +468,11 @@ export function SessionDetailScreen() {
             })}
             style={[styles.addItemsButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
             accessibilityRole="button"
-            accessibilityLabel="Add items to this session"
+            accessibilityLabel={t('addItemsAccessibilityLabel')}
           >
             <Ionicons name="add-circle-outline" size={22} color={colors.primary} />
             <Text style={[styles.addItemsButtonText, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-              Add Items
+              {t('addItems')}
             </Text>
           </TouchableOpacity>
         )}
@@ -402,9 +485,9 @@ export function SessionDetailScreen() {
             onPress={handleCancel}
             style={[styles.cancelButton, { borderColor: colors.border }]}
             accessibilityRole="button"
-            accessibilityLabel="Cancel session"
+            accessibilityLabel={t('cancelSessionAccessibilityLabel')}
           >
-            <Text style={[styles.cancelButtonText, { color: '#EF4444' }]} maxFontSizeMultiplier={1.3}>Cancel</Text>
+            <Text style={[styles.cancelButtonText, { color: '#EF4444' }]} maxFontSizeMultiplier={1.3}>{t('cancel')}</Text>
           </TouchableOpacity>
           {session.source === 'tab' ? (
             <TouchableOpacity
@@ -416,14 +499,14 @@ export function SessionDetailScreen() {
                 (closeTabMutation.isPending || items.length === 0) && { opacity: 0.5 },
               ]}
               accessibilityRole="button"
-              accessibilityLabel={items.length === 0 ? 'No items to charge — cancel instead' : 'Close tab and charge saved card'}
+              accessibilityLabel={items.length === 0 ? t('closeTabAccessibilityNoItems') : t('closeTabAccessibility')}
             >
               {closeTabMutation.isPending ? (
-                <ActivityIndicator color="#1C1917" accessibilityLabel="Charging card" />
+                <ActivityIndicator color="#1C1917" accessibilityLabel={t('chargingCardLabel')} />
               ) : (
                 <>
                   <Ionicons name="wallet-outline" size={20} color="#1C1917" />
-                  <Text style={styles.settleButtonText} maxFontSizeMultiplier={1.3}>Close Tab</Text>
+                  <Text style={styles.settleButtonText} maxFontSizeMultiplier={1.3}>{t('closeTabButton')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -433,14 +516,14 @@ export function SessionDetailScreen() {
               disabled={settleCashMutation.isPending}
               style={[styles.settleButton, { backgroundColor: colors.primary }, settleCashMutation.isPending && { opacity: 0.6 }]}
               accessibilityRole="button"
-              accessibilityLabel="Settle session as cash"
+              accessibilityLabel={t('settleAccessibilityLabel')}
             >
               {settleCashMutation.isPending ? (
-                <ActivityIndicator color="#1C1917" accessibilityLabel="Settling session" />
+                <ActivityIndicator color="#1C1917" accessibilityLabel={t('settlingLabel')} />
               ) : (
                 <>
                   <Ionicons name="cash-outline" size={20} color="#1C1917" />
-                  <Text style={styles.settleButtonText} maxFontSizeMultiplier={1.3}>Settle</Text>
+                  <Text style={styles.settleButtonText} maxFontSizeMultiplier={1.3}>{t('settleButton')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -462,12 +545,12 @@ export function SessionDetailScreen() {
           <View style={[styles.tipModalContent, { backgroundColor: colors.card }]}>
             <View style={styles.tipModalHeader}>
               <Text style={[styles.tipModalTitle, { color: colors.text }]} maxFontSizeMultiplier={1.2}>
-                Add Tip
+                {t('addTipTitle')}
               </Text>
               <TouchableOpacity
                 onPress={() => setTipModalOpen(false)}
                 accessibilityRole="button"
-                accessibilityLabel="Close tip dialog"
+                accessibilityLabel={t('closeTipDialogLabel')}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
                 <Ionicons name="close" size={24} color={colors.textSecondary} />
@@ -475,7 +558,7 @@ export function SessionDetailScreen() {
             </View>
 
             <Text style={[styles.tipSubtotalLabel, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-              Subtotal: {session ? formatCurrency(session.subtotal, currency) : ''}
+              {t('subtotalPreview', { amount: session ? formatCurrency(session.subtotal, currency) : '' })}
             </Text>
 
             <View style={styles.tipOptionsGrid}>
@@ -491,11 +574,11 @@ export function SessionDetailScreen() {
                       { borderColor: isActive ? colors.primary : colors.border, backgroundColor: isActive ? colors.primary + '15' : colors.surface },
                     ]}
                     accessibilityRole="button"
-                    accessibilityLabel={`Tip ${pct}%`}
+                    accessibilityLabel={t('tipPercentAccessibility', { pct })}
                     accessibilityState={{ selected: isActive }}
                   >
                     <Text style={[styles.tipOptionPct, { color: isActive ? colors.primary : colors.text }]} maxFontSizeMultiplier={1.2}>
-                      {pct}%
+                      {t('tipPercentLabel', { pct })}
                     </Text>
                     <Text style={[styles.tipOptionAmount, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
                       {formatCurrency(tipPreview, currency)}
@@ -511,11 +594,11 @@ export function SessionDetailScreen() {
                     { borderColor: selectedTipPct === -1 ? colors.primary : colors.border, backgroundColor: selectedTipPct === -1 ? colors.primary + '15' : colors.surface },
                   ]}
                   accessibilityRole="button"
-                  accessibilityLabel="Custom tip amount"
+                  accessibilityLabel={t('customTipAccessibility')}
                   accessibilityState={{ selected: selectedTipPct === -1 }}
                 >
                   <Text style={[styles.tipOptionPct, { color: selectedTipPct === -1 ? colors.primary : colors.text }]} maxFontSizeMultiplier={1.2}>
-                    Custom
+                    {t('customTip')}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -526,11 +609,11 @@ export function SessionDetailScreen() {
                   { borderColor: selectedTipPct === 0 ? colors.primary : colors.border, backgroundColor: selectedTipPct === 0 ? colors.primary + '15' : colors.surface },
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel="No tip"
+                accessibilityLabel={t('noTipAccessibility')}
                 accessibilityState={{ selected: selectedTipPct === 0 }}
               >
                 <Text style={[styles.tipOptionPct, { color: selectedTipPct === 0 ? colors.primary : colors.text }]} maxFontSizeMultiplier={1.2}>
-                  No Tip
+                  {t('noTip')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -538,7 +621,7 @@ export function SessionDetailScreen() {
             {selectedTipPct === -1 && (
               <View style={styles.customTipRow}>
                 <Text style={[styles.customTipLabel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                  Custom amount
+                  {t('customTipLabel')}
                 </Text>
                 <TextInput
                   value={customTipText}
@@ -549,11 +632,11 @@ export function SessionDetailScreen() {
                       : text.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
                     setCustomTipText(cleaned);
                   }}
-                  placeholder="0.00"
+                  placeholder={t('customTipPlaceholder')}
                   placeholderTextColor={colors.textMuted}
                   keyboardType="decimal-pad"
                   style={[styles.customTipInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-                  accessibilityLabel="Custom tip amount"
+                  accessibilityLabel={t('customTipAccessibility')}
                 />
               </View>
             )}
@@ -562,7 +645,7 @@ export function SessionDetailScreen() {
             <View style={[styles.tipSummary, { borderTopColor: colors.border }]}>
               <View style={styles.totalRow}>
                 <Text style={[styles.totalLabel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                  Subtotal + Tax
+                  {t('subtotalPlusTax')}
                 </Text>
                 <Text style={[styles.totalValue, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
                   {formatCurrency(sessionPreTipTotal, currency)}
@@ -570,7 +653,7 @@ export function SessionDetailScreen() {
               </View>
               <View style={styles.totalRow}>
                 <Text style={[styles.totalLabel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                  Tip
+                  {t('tipLabel')}
                 </Text>
                 <Text style={[styles.totalValue, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
                   {formatCurrency(computedTipBase, currency)}
@@ -578,7 +661,7 @@ export function SessionDetailScreen() {
               </View>
               <View style={[styles.totalRow, { marginTop: 6 }]}>
                 <Text style={[styles.grandTotalLabel, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-                  Total to charge
+                  {t('totalToCharge')}
                 </Text>
                 <Text style={[styles.grandTotalValue, { color: colors.primary }]} maxFontSizeMultiplier={1.2}>
                   {formatCurrency(sessionPreTipTotal + computedTipBase, currency)}
@@ -595,15 +678,15 @@ export function SessionDetailScreen() {
                 (selectedTipPct === null || closeTabMutation.isPending) && { opacity: 0.5 },
               ]}
               accessibilityRole="button"
-              accessibilityLabel={`Charge saved card ${formatCurrency(sessionPreTipTotal + computedTipBase, currency)}`}
+              accessibilityLabel={t('chargeButtonAccessibility', { amount: formatCurrency(sessionPreTipTotal + computedTipBase, currency) })}
             >
               {closeTabMutation.isPending ? (
-                <ActivityIndicator color="#1C1917" accessibilityLabel="Charging card" />
+                <ActivityIndicator color="#1C1917" accessibilityLabel={t('chargingCardLabel')} />
               ) : (
                 <>
                   <Ionicons name="wallet-outline" size={20} color="#1C1917" />
                   <Text style={styles.chargeButtonText} maxFontSizeMultiplier={1.3}>
-                    Charge {formatCurrency(sessionPreTipTotal + computedTipBase, currency)}
+                    {t('chargeButton', { amount: formatCurrency(sessionPreTipTotal + computedTipBase, currency) })}
                   </Text>
                 </>
               )}

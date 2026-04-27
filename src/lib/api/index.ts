@@ -63,7 +63,6 @@ export type {
   Order,
   OrderItem,
   CreateOrderParams,
-  OrdersListResponse,
   HeldOrdersResponse,
   CashPaymentResponse,
   OrderPayment,

@@ -143,7 +143,8 @@ export function CatalogSettingsModal({
       });
       onClose();
     } catch (error: any) {
-      Alert.alert(tc('error'), error.message || t('errorFailedToSave'));
+      // onSave re-throws apiClient ApiError {error, ...} — prefer `.error`.
+      Alert.alert(tc('error'), error?.error || error?.message || t('errorFailedToSave'));
     } finally {
       setIsSaving(false);
     }
@@ -165,7 +166,8 @@ export function CatalogSettingsModal({
               await onDuplicate(catalog.id);
               onClose();
             } catch (error: any) {
-              Alert.alert(tc('error'), error.message || t('errorFailedToDuplicate'));
+              // onDuplicate re-throws apiClient ApiError {error, ...} — prefer `.error`.
+              Alert.alert(tc('error'), error?.error || error?.message || t('errorFailedToDuplicate'));
             } finally {
               setIsDuplicating(false);
             }
@@ -192,7 +194,8 @@ export function CatalogSettingsModal({
               await onDelete(catalog.id);
               onClose();
             } catch (error: any) {
-              Alert.alert(tc('error'), error.message || t('errorFailedToDelete'));
+              // onDelete re-throws apiClient ApiError {error, ...} — prefer `.error`.
+              Alert.alert(tc('error'), error?.error || error?.message || t('errorFailedToDelete'));
             } finally {
               setIsDeleting(false);
             }

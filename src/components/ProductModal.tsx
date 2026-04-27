@@ -181,7 +181,8 @@ export function ProductModal({
       });
       onClose();
     } catch (error: any) {
-      Alert.alert(tc('error'), error.message || t('errorFailedToSave'));
+      // onSave re-throws apiClient ApiError {error, ...} — prefer `.error`.
+      Alert.alert(tc('error'), error?.error || error?.message || t('errorFailedToSave'));
     } finally {
       setIsSaving(false);
     }

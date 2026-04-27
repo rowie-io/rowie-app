@@ -130,8 +130,15 @@ export const sessionsApi = {
     cashTendered?: number;
   }) => apiClient.post<{ session: Session; items: SessionItem[] }>('/sessions', data),
 
-  addItems: (sessionId: string, items: { catalogProductId: string; quantity: number; notes?: string }[]) =>
-    apiClient.post<{ items: SessionItem[]; roundNumber: number }>(`/sessions/${sessionId}/items`, { items }),
+  addItems: (
+    sessionId: string,
+    items: { catalogProductId: string; quantity: number; notes?: string }[],
+    roundNotes?: string,
+  ) =>
+    apiClient.post<{ items: SessionItem[]; roundNumber: number; roundNotes: string | null }>(
+      `/sessions/${sessionId}/items`,
+      { items, roundNotes },
+    ),
 
   removeItem: (sessionId: string, itemId: string) =>
     apiClient.delete<{ success: boolean }>(`/sessions/${sessionId}/items/${itemId}`),

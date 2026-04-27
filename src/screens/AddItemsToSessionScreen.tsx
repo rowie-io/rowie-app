@@ -7,6 +7,9 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -22,6 +25,7 @@ import { productsApi, categoriesApi } from '../lib/api';
 import { formatCents } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import logger from '../lib/logger';
+import { useTranslations } from '../lib/i18n';
 
 type RouteParams = {
   AddItemsToSession: {
@@ -49,9 +53,13 @@ export function AddItemsToSessionScreen() {
   const { currency } = useAuth();
   const queryClient = useQueryClient();
   const { sessionId, displayName } = route.params;
+  const t = useTranslations('addItemsToSession');
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selected, setSelected] = useState<Record<string, SelectedItem>>({});
+  // Server-entered notes for the kitchen. Persisted on session_rounds.notes
+  // and shown prominently on the kitchen display (red/amber alert block).
+  const [roundNotes, setRoundNotes] = useState('');
 
   // Fetch the session first to get its catalog_id (the staff-selected catalog
   // may be different from the one the session was created on).
@@ -121,16 +129,20 @@ export function AddItemsToSessionScreen() {
         catalogProductId: i.catalogProductId,
         quantity: i.quantity,
       }));
-      return sessionsApi.addItems(sessionId, items);
+      return sessionsApi.addItems(sessionId, items, roundNotes.trim() || undefined);
     },
     onSuccess: () => {
+      setRoundNotes('');
       queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
       navigation.goBack();
     },
     onError: (err: any) => {
       logger.error('[AddItems] Failed', err);
-      Alert.alert('Failed to add items', err?.message || 'Could not add items to session.');
+      // sessionsApi throws ApiError {error, statusCode, code, details} — not
+      // an Error instance — so `err?.message` is always undefined and the
+      // user would see only the generic fallback.
+      Alert.alert(t('failedAddTitle'), err?.error || err?.message || t('failedAddMessage'));
     },
   });
 
@@ -138,7 +150,7 @@ export function AddItemsToSessionScreen() {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel="Loading" />
+          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('loading')} />
         </View>
       </SafeAreaView>
     );
@@ -154,14 +166,14 @@ export function AddItemsToSessionScreen() {
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
-          accessibilityLabel="Cancel and go back"
+          accessibilityLabel={t('cancelAndBack')}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
         >
           <Ionicons name="close" size={26} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={[styles.headerTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-            Add Items
+            {t('headerTitle')}
           </Text>
           {displayName && (
             <Text style={[styles.headerSubtitle, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
@@ -177,7 +189,7 @@ export function AddItemsToSessionScreen() {
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={[{ id: null as string | null, name: 'All' }, ...categories]}
+          data={[{ id: null as string | null, name: t('categoryAll') }, ...categories]}
           keyExtractor={(item) => item.id || 'all'}
           contentContainerStyle={styles.categoryList}
           renderItem={({ item }) => {
@@ -193,7 +205,7 @@ export function AddItemsToSessionScreen() {
                   },
                 ]}
                 accessibilityRole="button"
-                accessibilityLabel={`Filter by ${item.name}`}
+                accessibilityLabel={t('filterByCategory', { name: item.name })}
               >
                 <Text
                   style={[
@@ -230,39 +242,79 @@ export function AddItemsToSessionScreen() {
         ListEmptyComponent={
           <View style={styles.center}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-              No products in this category
+              {t('noProductsInCategory')}
             </Text>
           </View>
         }
       />
 
-      {/* Confirm footer */}
-      <View style={[styles.footer, { borderTopColor: colors.border }]}>
-        <TouchableOpacity
-          onPress={() => addItemsMutation.mutate()}
-          disabled={selectedCount === 0 || addItemsMutation.isPending}
-          style={[
-            styles.confirmButton,
-            { backgroundColor: colors.primary },
-            (selectedCount === 0 || addItemsMutation.isPending) && styles.confirmButtonDisabled,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={`Add ${selectedCount} items for ${formatCents(selectedTotalCents, currency)}`}
-        >
-          {addItemsMutation.isPending ? (
-            <ActivityIndicator color="#1C1917" accessibilityLabel="Adding items" />
-          ) : (
-            <>
-              <Text style={styles.confirmButtonText} maxFontSizeMultiplier={1.3}>
-                Add {selectedCount} {selectedCount === 1 ? 'item' : 'items'}
+      {/* Confirm footer — wrapped in KeyboardAvoidingView so the textarea
+          stays visible when the soft keyboard opens. Only rendered once the
+          cart has items so the main list doesn't lose space unnecessarily. */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={0}
+      >
+        <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          {selectedCount > 0 && (
+            <View style={styles.notesWrap}>
+              <Text
+                style={[styles.notesLabel, { color: colors.textSecondary }]}
+                maxFontSizeMultiplier={1.5}
+              >
+                {t('notesLabel')}
               </Text>
-              <Text style={styles.confirmButtonAmount} maxFontSizeMultiplier={1.2}>
-                {formatCents(selectedTotalCents, currency)}
-              </Text>
-            </>
+              <TextInput
+                value={roundNotes}
+                onChangeText={setRoundNotes}
+                placeholder={t('notesPlaceholder')}
+                placeholderTextColor={colors.textMuted}
+                multiline
+                maxLength={1000}
+                accessibilityLabel={t('notesAccessibilityLabel')}
+                style={[
+                  styles.notesInput,
+                  {
+                    borderColor: colors.border,
+                    backgroundColor: colors.card,
+                    color: colors.text,
+                  },
+                ]}
+              />
+            </View>
           )}
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            onPress={() => addItemsMutation.mutate()}
+            disabled={selectedCount === 0 || addItemsMutation.isPending}
+            style={[
+              styles.confirmButton,
+              { backgroundColor: colors.primary },
+              (selectedCount === 0 || addItemsMutation.isPending) && styles.confirmButtonDisabled,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={
+              selectedCount === 1
+                ? t('addItemAccessibilitySingular', { count: selectedCount, amount: formatCents(selectedTotalCents, currency) })
+                : t('addItemAccessibilityPlural', { count: selectedCount, amount: formatCents(selectedTotalCents, currency) })
+            }
+          >
+            {addItemsMutation.isPending ? (
+              <ActivityIndicator color="#1C1917" accessibilityLabel={t('addingItemsLabel')} />
+            ) : (
+              <>
+                <Text style={styles.confirmButtonText} maxFontSizeMultiplier={1.3}>
+                  {selectedCount === 1
+                    ? t('addItemSingular', { count: selectedCount })
+                    : t('addItemPlural', { count: selectedCount })}
+                </Text>
+                <Text style={styles.confirmButtonAmount} maxFontSizeMultiplier={1.2}>
+                  {formatCents(selectedTotalCents, currency)}
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -283,6 +335,7 @@ const ProductRow = React.memo(function ProductRow({
   onRemove,
 }: ProductRowProps) {
   const { colors } = useTheme();
+  const t = useTranslations('addItemsToSession');
   return (
     <View style={[styles.productRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.productInfo}>
@@ -307,7 +360,7 @@ const ProductRow = React.memo(function ProductRow({
               onPress={onRemove}
               style={[styles.qtyButton, { borderColor: colors.border }]}
               accessibilityRole="button"
-              accessibilityLabel={`Remove one ${product.name}`}
+              accessibilityLabel={t('removeOneAccessibility', { name: product.name })}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Ionicons name="remove" size={16} color={colors.text} />
@@ -321,7 +374,7 @@ const ProductRow = React.memo(function ProductRow({
           onPress={onAdd}
           style={[styles.qtyButton, { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}
           accessibilityRole="button"
-          accessibilityLabel={`Add ${product.name}`}
+          accessibilityLabel={t('addAccessibility', { name: product.name })}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons name="add" size={18} color={colors.primary} />
@@ -386,6 +439,27 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 16,
     borderTopWidth: 1,
+  },
+  notesWrap: {
+    marginBottom: 10,
+  },
+  notesLabel: {
+    fontSize: 12,
+    fontFamily: fonts.semiBold,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  notesInput: {
+    minHeight: 48,
+    maxHeight: 100,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    fontFamily: fonts.regular,
+    textAlignVertical: 'top',
   },
   confirmButton: {
     flexDirection: 'row',

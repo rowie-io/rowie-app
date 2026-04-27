@@ -132,7 +132,8 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
       logger.log('[ProfileEditModal] Avatar uploaded successfully');
     } catch (error: any) {
       logger.error('[ProfileEditModal] Error uploading avatar:', error);
-      Alert.alert(t('uploadFailedTitle'), error.message || t('uploadFailedMessage'));
+      // apiClient.postForm throws ApiError {error, ...} — prefer `.error`.
+      Alert.alert(t('uploadFailedTitle'), error?.error || error?.message || t('uploadFailedMessage'));
       setAvatarPreview(null);
     } finally {
       setIsUploadingAvatar(false);

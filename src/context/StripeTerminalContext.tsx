@@ -1075,14 +1075,29 @@ async function fetchConnectionToken(): Promise<string> {
   } catch (error: any) {
     logger.error('[StripeTerminal] Failed to get connection token:', error);
 
+    // Structured error shape from ApiClient: { error, statusCode, code, details }.
+    // Prefer the structured `code` over string matching to avoid misclassifying
+    // distinct backend conditions (e.g. an "account is under review" 403 used to
+    // fall into the Stripe-onboarding branch below because "account" matched).
+    const errorCode: string | undefined = error?.code || error?.details?.code;
     const errorMessage = error?.message?.toLowerCase() || '';
     const statusCode = error?.statusCode;
 
-    if (
+    if (errorCode === 'ACCOUNT_UNDER_REVIEW') {
+      // Fraud gate — distinct from onboarding. Surface the API's user-facing
+      // message so the vendor sees "on hold while under review" instead of a
+      // generic "complete onboarding" prompt that would send them in circles.
+      lastConnectionTokenError =
+        error?.error ||
+        error?.details?.error ||
+        'Payments are temporarily on hold while your account is under review.';
+    } else if (errorCode === 'CONNECT_INCOMPLETE' ||
+      errorMessage.includes('onboarding') ||
       errorMessage.includes('connect') ||
-      errorMessage.includes('account') ||
       errorMessage.includes('charges_enabled') ||
       errorMessage.includes('not found') ||
+      // Keep the 400/403 catch-all for backward compat, but AFTER the specific
+      // code checks above so we don't swallow review/other distinct states.
       statusCode === 400 ||
       statusCode === 403
     ) {

@@ -75,12 +75,21 @@ const KeypadButton = memo(function KeypadButton({ keyValue, onPress, colors, but
 
   const isAction = keyValue === 'C' || keyValue === 'DEL';
 
+  const buttonLabel =
+    keyValue === 'DEL'
+      ? 'Delete last digit'
+      : keyValue === 'C'
+        ? 'Clear amount'
+        : `Keypad ${keyValue}`;
+
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
       <Pressable
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onPress={handlePress}
+        accessibilityRole="button"
+        accessibilityLabel={buttonLabel}
         style={({ pressed }) => [
           {
             width: buttonSize,
@@ -214,7 +223,12 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalContainer}
       >
-        <Pressable style={styles.overlay} onPress={handleClose}>
+        <Pressable
+          style={styles.overlay}
+          onPress={handleClose}
+          accessibilityRole="button"
+          accessibilityLabel="Close quick charge"
+        >
           <Pressable
             style={[
               styles.sheetContainer,
@@ -224,6 +238,8 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
               },
             ]}
             onPress={(e) => e.stopPropagation()}
+            accessible={false}
+            accessibilityRole="none"
           >
             {/* Handle bar */}
             <View style={styles.handleContainer}>
@@ -233,7 +249,12 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
             {/* Header */}
             <View style={styles.header}>
               <Text style={[styles.title, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{t('title')}</Text>
-              <Pressable onPress={handleClose} hitSlop={12}>
+              <Pressable
+                onPress={handleClose}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+              >
                 <Ionicons name="close" size={24} color={colors.textSecondary} />
               </Pressable>
             </View>
@@ -271,6 +292,9 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
                   }
                 }}
                 disabled={chargeDisabled}
+                accessibilityRole="button"
+                accessibilityLabel={cents < 50 ? t('enterAmount') : t('chargeAmount', { amount: formattedAmount })}
+                accessibilityState={{ disabled: chargeDisabled }}
                 style={({ pressed }) => [
                   styles.chargeButton,
                   {

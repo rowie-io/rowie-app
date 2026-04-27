@@ -15,6 +15,9 @@ const BIOMETRIC_ENABLED_KEY = 'biometric_enabled';
 const BIOMETRIC_CREDENTIALS_KEY = 'biometric_credentials';
 const CREDENTIALS_STORED_KEY = 'credentials_stored';
 
+// Biometric + SecureStore aren't usable on web — guard to avoid runtime errors.
+const IS_WEB = Platform.OS === 'web';
+
 export interface BiometricCapabilities {
   isAvailable: boolean;
   biometricTypes: LocalAuthentication.AuthenticationType[];
@@ -34,6 +37,15 @@ export interface StoredCredentials {
  * Check if biometric authentication is available on this device
  */
 export async function checkBiometricCapabilities(): Promise<BiometricCapabilities> {
+  if (IS_WEB) {
+    return {
+      isAvailable: false,
+      biometricTypes: [],
+      hasHardware: false,
+      isEnrolled: false,
+      biometricName: 'Biometric',
+    };
+  }
   try {
     const hasHardware = await LocalAuthentication.hasHardwareAsync();
     const isEnrolled = await LocalAuthentication.isEnrolledAsync();
@@ -137,6 +149,7 @@ export async function authenticateWithBiometric(
  * Check if biometric login is enabled for this user
  */
 export async function isBiometricLoginEnabled(): Promise<boolean> {
+  if (IS_WEB) return false;
   try {
     const value = await SecureStore.getItemAsync(BIOMETRIC_ENABLED_KEY);
     return value === 'true';
@@ -156,6 +169,7 @@ export async function storeCredentials(
   email: string,
   password: string
 ): Promise<boolean> {
+  if (IS_WEB) return false;
   try {
     logger.log('[BiometricAuth] Storing credentials for:', email);
 
@@ -182,6 +196,7 @@ export async function storeCredentials(
  * Check if credentials are stored (from a previous login)
  */
 export async function hasStoredCredentials(): Promise<boolean> {
+  if (IS_WEB) return false;
   try {
     const value = await SecureStore.getItemAsync(CREDENTIALS_STORED_KEY);
     return value === 'true';
@@ -195,6 +210,7 @@ export async function hasStoredCredentials(): Promise<boolean> {
  * Requires credentials to already be stored (from login) and biometric verification
  */
 export async function enableBiometricLogin(): Promise<boolean> {
+  if (IS_WEB) return false;
   try {
     logger.log('[BiometricAuth] Enabling biometric login...');
 
@@ -227,6 +243,7 @@ export async function enableBiometricLogin(): Promise<boolean> {
  * Disable biometric login (keeps credentials stored for easy re-enable)
  */
 export async function disableBiometricLogin(): Promise<void> {
+  if (IS_WEB) return;
   try {
     await SecureStore.deleteItemAsync(BIOMETRIC_ENABLED_KEY);
     logger.log('[BiometricAuth] Biometric login disabled');
@@ -239,6 +256,7 @@ export async function disableBiometricLogin(): Promise<void> {
  * Clear all stored credentials (called on logout when biometric is disabled)
  */
 export async function clearStoredCredentials(): Promise<void> {
+  if (IS_WEB) return;
   try {
     await SecureStore.deleteItemAsync(BIOMETRIC_CREDENTIALS_KEY);
     await SecureStore.deleteItemAsync(CREDENTIALS_STORED_KEY);
@@ -257,6 +275,7 @@ export async function getBiometricCredentials(): Promise<{
   email: string;
   password: string;
 } | null> {
+  if (IS_WEB) return null;
   try {
     logger.log('[BiometricAuth] Getting biometric credentials...');
 

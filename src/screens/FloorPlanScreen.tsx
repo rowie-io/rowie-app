@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   FlatList,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -20,6 +21,7 @@ import { floorPlansApi, sessionsApi, type Table, type Session } from '../lib/api
 import { formatCurrency } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
+import { useTranslations } from '../lib/i18n';
 
 type RouteParams = {
   FloorPlan: {
@@ -42,6 +44,7 @@ export function FloorPlanScreen() {
   const { currency } = useAuth();
   const { selectedCatalog } = useCatalog();
   const queryClient = useQueryClient();
+  const t = useTranslations('floorPlan');
 
   const [selectedFloorPlanId, setSelectedFloorPlanId] = useState<string | null>(
     route.params?.floorPlanId || null
@@ -70,12 +73,12 @@ export function FloorPlanScreen() {
         navigation.navigate('SessionDetail', { sessionId: existingSessionId });
         return;
       }
-      Alert.alert('Failed to start session', err?.error || err?.message || 'Could not open a new session on this table.');
+      Alert.alert(t('failedStartSessionTitle'), err?.error || err?.message || t('failedStartSessionMessage'));
     },
   });
 
   // Fetch floor plans
-  const { data: floorPlansData, isLoading: loadingPlans } = useQuery({
+  const { data: floorPlansData, isLoading: loadingPlans, isError: floorPlansError, refetch: refetchPlans } = useQuery({
     queryKey: ['floor-plans'],
     queryFn: floorPlansApi.list,
   });
@@ -90,17 +93,22 @@ export function FloorPlanScreen() {
   }, [floorPlans, selectedFloorPlanId]);
 
   // Fetch tables for selected floor plan
-  const { data: floorPlanData, isLoading: loadingTables } = useQuery({
+  const { data: floorPlanData, isLoading: loadingTables, refetch: refetchTables, isRefetching: refetchingTables } = useQuery({
     queryKey: ['floor-plans', selectedFloorPlanId],
     queryFn: () => floorPlansApi.get(selectedFloorPlanId!),
     enabled: !!selectedFloorPlanId,
   });
 
   // Fetch active sessions
-  const { data: sessionsData } = useQuery({
+  const { data: sessionsData, refetch: refetchSessions } = useQuery({
     queryKey: ['sessions', { status: 'open' }],
     queryFn: () => sessionsApi.list({ status: 'open', limit: 50 }),
   });
+
+  const handleRefresh = useCallback(() => {
+    refetchTables();
+    refetchSessions();
+  }, [refetchTables, refetchSessions]);
 
   const tables = floorPlanData?.tables || [];
   const sessions = sessionsData?.sessions || [];
@@ -124,24 +132,64 @@ export function FloorPlanScreen() {
     }
     // No active session — offer to start one
     if (!selectedCatalog) {
-      Alert.alert('No menu selected', 'Please select a menu before starting a session.');
+      Alert.alert(t('noMenuTitle'), t('noMenuMessage'));
       return;
     }
     Alert.alert(
-      `Table ${table.label}`,
-      'Start a new session on this table?',
+      t('startSessionPromptTitle', { label: table.label }),
+      t('startSessionPromptMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Start Session', onPress: () => createSessionMutation.mutate(table.id) },
+        { text: t('cancel'), style: 'cancel' },
+        { text: t('startSessionAction'), onPress: () => createSessionMutation.mutate(table.id) },
       ],
     );
-  }, [navigation, tableSessionMap, selectedCatalog, createSessionMutation]);
+  }, [navigation, tableSessionMap, selectedCatalog, createSessionMutation, t]);
 
   if (loadingPlans) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel="Loading" />
+          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('loading')} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (floorPlansError) {
+    return (
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel={t('goBack')}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
+            {t('headerTitle')}
+          </Text>
+          <View style={{ width: 24 }} />
+        </View>
+        <View style={styles.center}>
+          <Ionicons name="cloud-offline-outline" size={48} color="#EF4444" />
+          <Text style={[styles.emptyText, { color: colors.text }]} maxFontSizeMultiplier={1.5} accessibilityRole="alert">
+            {t('errorTitle')}
+          </Text>
+          <Text style={[styles.emptySubtext, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
+            {t('errorSubtitle')}
+          </Text>
+          <TouchableOpacity
+            onPress={() => refetchPlans()}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 14, backgroundColor: colors.primary, minHeight: 44 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('retryAccessibilityLabel')}
+          >
+            <Ionicons name="refresh" size={18} color="#1C1917" />
+            <Text style={{ fontSize: 15, fontFamily: fonts.bold, color: '#1C1917' }} maxFontSizeMultiplier={1.3}>
+              {t('retryButton')}
+            </Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -154,22 +202,22 @@ export function FloorPlanScreen() {
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             accessibilityRole="button"
-            accessibilityLabel="Go back"
+            accessibilityLabel={t('goBack')}
           >
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-            Tables
+            {t('headerTitle')}
           </Text>
           <View style={{ width: 24 }} />
         </View>
         <View style={styles.center}>
           <Ionicons name="grid-outline" size={48} color={colors.textMuted} />
           <Text style={[styles.emptyText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-            No floor plans configured
+            {t('noFloorPlansTitle')}
           </Text>
           <Text style={[styles.emptySubtext, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-            Set up floor plans in the vendor portal
+            {t('noFloorPlansSubtitle')}
           </Text>
         </View>
       </SafeAreaView>
@@ -183,12 +231,12 @@ export function FloorPlanScreen() {
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('goBack')}
         >
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-          Tables
+          {t('headerTitle')}
         </Text>
         <View style={{ width: 24 }} />
       </View>
@@ -232,7 +280,7 @@ export function FloorPlanScreen() {
       {/* Table grid */}
       {loadingTables ? (
         <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel="Loading tables" />
+          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('loadingTables')} />
         </View>
       ) : (
         <FlatList
@@ -240,9 +288,29 @@ export function FloorPlanScreen() {
           numColumns={3}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.gridContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refetchingTables}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+            />
+          }
           renderItem={({ item: table }) => {
             const session = tableSessionMap.get(table.id);
             const statusColor = STATUS_COLORS[table.status] || STATUS_COLORS.available;
+            const translatedStatus = t(
+              `status${table.status.charAt(0).toUpperCase()}${table.status.slice(1)}`,
+            );
+            const tableAccessibilityLabel = session
+              ? t('tableAccessibilityLabelWithSession', {
+                  label: table.label,
+                  status: translatedStatus,
+                  count: session.itemCount,
+                })
+              : t('tableAccessibilityLabel', {
+                  label: table.label,
+                  status: translatedStatus,
+                });
 
             return (
               <TouchableOpacity
@@ -256,14 +324,14 @@ export function FloorPlanScreen() {
                 ]}
                 onPress={() => handleTablePress(table)}
                 accessibilityRole="button"
-                accessibilityLabel={`${table.label}, ${table.status}${session ? `, ${session.itemCount} items` : ''}`}
+                accessibilityLabel={tableAccessibilityLabel}
               >
                 <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
                 <Text style={[styles.tableLabel, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
                   {table.label}
                 </Text>
                 <Text style={[styles.tableCapacity, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-                  {table.capacity} seats
+                  {t('seats', { count: table.capacity })}
                 </Text>
                 {session && (
                   <Text style={[styles.tableAmount, { color: colors.primary }]} maxFontSizeMultiplier={1.2}>
@@ -276,7 +344,7 @@ export function FloorPlanScreen() {
           ListEmptyComponent={
             <View style={styles.center}>
               <Text style={[styles.emptyText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                No tables on this floor plan
+                {t('noTablesOnFloorPlan')}
               </Text>
             </View>
           }
@@ -285,11 +353,11 @@ export function FloorPlanScreen() {
 
       {/* Legend */}
       <View style={[styles.legend, { borderTopColor: colors.border }]}>
-        {Object.entries(STATUS_COLORS).map(([status, color]) => (
+        {Object.keys(STATUS_COLORS).map((status) => (
           <View key={status} style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: color }]} />
+            <View style={[styles.legendDot, { backgroundColor: STATUS_COLORS[status] }]} />
             <Text style={[styles.legendText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-              {status.charAt(0).toUpperCase() + status.slice(1)}
+              {t(`legend${status.charAt(0).toUpperCase()}${status.slice(1)}`)}
             </Text>
           </View>
         ))}

@@ -45,7 +45,11 @@ export function ConfirmModal({
       accessibilityViewIsModal={true}
     >
       <Pressable style={styles.overlay} onPress={onCancel} accessibilityLabel={t('closeDialog')} accessibilityRole="button">
-        <Pressable style={[styles.container, { backgroundColor: colors.card }]}>
+        <Pressable
+          style={[styles.container, { backgroundColor: colors.card }]}
+          accessible={false}
+          accessibilityRole="none"
+        >
           <Text style={[styles.title, { color: colors.text }]} maxFontSizeMultiplier={1.3}>{title}</Text>
           <Text style={[styles.message, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
             {message}

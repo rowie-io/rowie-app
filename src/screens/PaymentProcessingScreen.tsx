@@ -206,12 +206,26 @@ export function PaymentProcessingScreen() {
       if (isCancelledRef.current) return;
 
       let errorMessage = error.message || t('paymentFailed');
+      const lower = errorMessage.toLowerCase();
 
-      if (errorMessage.toLowerCase().includes('command was canceled') ||
-          errorMessage.toLowerCase().includes('command was cancelled')) {
+      if (lower.includes('command was canceled') ||
+          lower.includes('command was cancelled')) {
         errorMessage = t('transactionCanceled');
-      } else if (errorMessage.toLowerCase().includes('no such payment_intent')) {
+      } else if (lower.includes('no such payment_intent')) {
         errorMessage = t('stripeSettingUp');
+      } else if (
+        // Network drop mid-payment — the tap may have completed on the
+        // reader but our app couldn't confirm. Tell the cashier to verify
+        // in History rather than charging the customer twice on retry.
+        lower.includes('network') ||
+        lower.includes('internet') ||
+        lower.includes('connection') ||
+        lower.includes('timed out') ||
+        lower.includes('timeout') ||
+        lower.includes('offline') ||
+        lower.includes('unreachable')
+      ) {
+        errorMessage = t('paymentNetworkDropVerifyHistory');
       }
 
       navigateToResult({
@@ -268,9 +282,24 @@ export function PaymentProcessingScreen() {
       if (isCancelledRef.current) return;
 
       let errorMessage = error.message || t('failedToSendToReader');
+      const lower = errorMessage.toLowerCase();
 
       if (errorMessage.includes('No such terminal.reader')) {
         errorMessage = t('readerNotFound');
+      } else if (
+        // Same network-drop guard as SDK flow: don't let a generic
+        // "Failed to send to reader" hide the fact the payment may have
+        // captured server-side. Cashier must verify in History before
+        // re-running the charge.
+        lower.includes('network') ||
+        lower.includes('internet') ||
+        lower.includes('connection') ||
+        lower.includes('timed out') ||
+        lower.includes('timeout') ||
+        lower.includes('offline') ||
+        lower.includes('unreachable')
+      ) {
+        errorMessage = t('paymentNetworkDropVerifyHistory');
       }
 
       navigateToResult({

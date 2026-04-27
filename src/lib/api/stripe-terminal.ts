@@ -68,10 +68,18 @@ export const stripeTerminalApi = {
     apiClient.post<ConnectionToken>('/stripe/terminal/connection-token', {}),
 
   /**
-   * Create a payment intent for terminal payment
+   * Create a payment intent for terminal payment.
+   *
+   * Pass `idempotencyKey` to make the create idempotent: if the user double-taps
+   * "Pay" or the request retries due to a transient network failure, Stripe
+   * returns the same PaymentIntent rather than charging twice. The API
+   * (`src/routes/stripe/terminal.ts`) honors `Idempotency-Key` and forwards it
+   * to Stripe.
    */
-  createPaymentIntent: (params: CreatePaymentIntentParams) =>
-    apiClient.post<PaymentIntent>('/stripe/terminal/payment-intent', params),
+  createPaymentIntent: (params: CreatePaymentIntentParams, idempotencyKey?: string) =>
+    apiClient.post<PaymentIntent>('/stripe/terminal/payment-intent', params,
+      idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined,
+    ),
 
   /**
    * Create a SetupIntent for tab pre-authorization (bar tab flow).

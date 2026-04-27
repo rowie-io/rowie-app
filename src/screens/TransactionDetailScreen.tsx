@@ -76,7 +76,9 @@ export function TransactionDetailScreen() {
     },
     onError: (error: any) => {
       setShowRefundModal(false);
-      setResultMessage({ title: t('refundErrorTitle'), message: error.message || t('refundErrorMessage'), isError: true });
+      // transactionsApi.refund throws ApiError {error, ...} — prefer `.error`
+      // so the API's reason (e.g. "already refunded") isn't masked.
+      setResultMessage({ title: t('refundErrorTitle'), message: error?.error || error?.message || t('refundErrorMessage'), isError: true });
       setShowResultModal(true);
     },
   });
@@ -110,7 +112,8 @@ export function TransactionDetailScreen() {
       setResultMessage({ title: t('receiptSentTitle'), message: t('receiptSentMessage', { email }), isError: false });
       setShowResultModal(true);
     } catch (error: any) {
-      setResultMessage({ title: t('receiptErrorTitle'), message: error.message || t('receiptErrorMessage'), isError: true });
+      // transactionsApi.sendReceipt throws ApiError {error, ...} — prefer `.error`.
+      setResultMessage({ title: t('receiptErrorTitle'), message: error?.error || error?.message || t('receiptErrorMessage'), isError: true });
       setShowResultModal(true);
     } finally {
       setSendingReceipt(false);
