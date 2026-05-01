@@ -224,15 +224,18 @@ export function OpenTabScreen() {
           )}
 
           {!isConnected && (
-            <View
+            <TouchableOpacity
               style={[styles.warnCard, { backgroundColor: '#F59E0B10', borderColor: '#F59E0B40' }]}
-              accessibilityRole="alert"
+              onPress={() => navigation.navigate('TapToPayEducation')}
+              accessibilityRole="button"
+              accessibilityLabel={t('readerNotConnected')}
             >
               <Ionicons name="wifi-outline" size={18} color="#F59E0B" />
               <Text style={styles.warnText} maxFontSizeMultiplier={1.5}>
                 {t('readerNotConnected')}
               </Text>
-            </View>
+              <Ionicons name="chevron-forward" size={18} color="#F59E0B" />
+            </TouchableOpacity>
           )}
         </ScrollView>
 

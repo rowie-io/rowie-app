@@ -65,7 +65,7 @@ export function SettingsScreen() {
   const { selectedCatalog, catalogs, clearCatalog } = useCatalog();
   const {
     deviceCompatibility,
-    isInitialized,
+    isConnected,
     isWarming,
     configurationStage,
     configurationProgress,
@@ -662,14 +662,18 @@ export function SettingsScreen() {
                 {/* Tap to Pay Status */}
                 {(() => {
                   const bankingReady = !!connectStatus?.chargesEnabled;
-                  const needsSetup = bankingReady && Platform.OS !== 'web' && deviceCompatibility.isCompatible && !isInitialized && !isWarming;
+                  // "Ready" requires a connected reader, not just an initialized SDK —
+                  // matches OpenTabScreen / payment flows which gate on isConnected
+                  // because collect* calls fail without a connected LocalMobile reader.
+                  const tapToPayReady = isConnected;
+                  const needsSetup = bankingReady && Platform.OS !== 'web' && deviceCompatibility.isCompatible && !tapToPayReady && !isWarming;
                   const RowComponent = needsSetup ? TouchableOpacity : View;
                   const rowProps = needsSetup ? {
                     onPress: () => navigation.navigate('TapToPayEducation'),
                     accessibilityRole: 'button' as const,
                     accessibilityLabel: `${TAP_TO_PAY_NAME}, ${t('tapToConfigure')}`,
                   } : {
-                    accessibilityLabel: `${TAP_TO_PAY_NAME}, ${!bankingReady ? t('completeBankingSetupFirst') : Platform.OS === 'web' ? t('notAvailableOnWeb') : !deviceCompatibility.isCompatible ? t('deviceNotSupported') : isInitialized ? t('ready').toLowerCase() : isWarming ? t('initializing').toLowerCase() : t('tapToConfigure')}`,
+                    accessibilityLabel: `${TAP_TO_PAY_NAME}, ${!bankingReady ? t('completeBankingSetupFirst') : Platform.OS === 'web' ? t('notAvailableOnWeb') : !deviceCompatibility.isCompatible ? t('deviceNotSupported') : tapToPayReady ? t('ready').toLowerCase() : isWarming ? t('initializing').toLowerCase() : t('tapToConfigure')}`,
                   };
 
                   return (
@@ -685,7 +689,7 @@ export function SettingsScreen() {
                                 ? t('notAvailableOnWeb')
                                 : !deviceCompatibility.isCompatible
                                   ? t('deviceNotSupported')
-                                  : isInitialized
+                                  : tapToPayReady
                                     ? t('readyToAcceptPayments')
                                     : isWarming
                                       ? t('initializing')
@@ -699,7 +703,7 @@ export function SettingsScreen() {
                         <Text style={styles.rowValueMuted} maxFontSizeMultiplier={1.5}>{t('notAvailable')}</Text>
                       ) : !deviceCompatibility.isCompatible ? (
                         <Ionicons name="close-circle" size={16} color={colors.error} />
-                      ) : isInitialized ? (
+                      ) : tapToPayReady ? (
                         <View style={styles.statusBadgeSuccess}>
                           <Ionicons name="checkmark-circle" size={14} color={colors.success} />
                           <Text style={[styles.statusBadgeText, { color: colors.success }]} maxFontSizeMultiplier={1.5}>{t('ready')}</Text>

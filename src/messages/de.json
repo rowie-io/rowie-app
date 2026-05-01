@@ -985,17 +985,6 @@
     "readerTapToConnect": "Tippen zum Verbinden"
   },
   "upgrade": {
-    "featureUnlimitedMenus": "Unbegrenzte individuelle Menüs",
-    "featureMultiLocation": "Verwalten Sie unbegrenzte Standorte",
-    "featureUnlimitedUsers": "Unbegrenzte Benutzer & Geräte",
-    "featureFloorPlans": "Tischplan & Tischservice",
-    "featureStaffManagement": "Mitarbeiterverwaltung",
-    "featureRevenueSplits": "Umsatzaufteilung (Veranstaltungsort/Promoter)",
-    "featureTipReports": "Trinkgeldberichte & -verfolgung",
-    "featureTipPooling": "Trinkgeldpool & Auszahlungsregeln",
-    "featureInvoicing": "Individuelle Rechnungsstellung",
-    "featureAnalytics": "Analyse-Dashboard",
-    "featureExport": "Export als CSV/PDF",
     "goBackAccessibilityLabel": "Zurück",
     "headerTitle": "Auf Pro upgraden",
     "heroTitle": "Rowie Pro",
@@ -1023,7 +1012,13 @@
     "subscriptionRestoredMessage": "Ihr Pro-Abonnement wurde wiederhergestellt!",
     "noSubscriptionFoundTitle": "Kein Abonnement gefunden",
     "noSubscriptionFoundMessage": "Kein aktives Abonnement zur Wiederherstellung gefunden.",
-    "errorRestorePurchasesDefaultMessage": "Käufe konnten nicht wiederhergestellt werden."
+    "errorRestorePurchasesDefaultMessage": "Käufe konnten nicht wiederhergestellt werden.",
+    "featureLowerFees": "Niedrigere Transaktionsgebühren",
+    "featureLocationsAndMenus": "Unbegrenzte Standorte & Menüs",
+    "featureTableServiceAndQrOrdering": "Tischservice & QR-Bestellung",
+    "featureInvoicingAndSubscriptions": "Individuelle Rechnungen & Abonnements",
+    "featureTeamPay": "Team Pay (Stunden, Trinkgelder & Auszahlungen)",
+    "featureAnalyticsAndExports": "Vollständige Analyse & CSV/PDF-Exporte"
   },
   "locations": {
     "pickerTitle": "Wählen Sie Ihren Standort",

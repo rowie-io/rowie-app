@@ -985,17 +985,6 @@
     "readerTapToConnect": "Trykk for å koble til"
   },
   "upgrade": {
-    "featureUnlimitedMenus": "Ubegrensede tilpassede menyer",
-    "featureMultiLocation": "Administrer ubegrensede lokasjoner",
-    "featureUnlimitedUsers": "Ubegrensede brukere og enheter",
-    "featureFloorPlans": "Planløsninger & bordservering",
-    "featureStaffManagement": "Personaladministrasjon",
-    "featureRevenueSplits": "Inntektsdeling (venue/arrangør)",
-    "featureTipReports": "Tipsrapporter og sporing",
-    "featureTipPooling": "Tipspott og utdelingsregler",
-    "featureInvoicing": "Tilpasset fakturering",
-    "featureAnalytics": "Analysepanel",
-    "featureExport": "Eksporter til CSV/PDF",
     "goBackAccessibilityLabel": "Gå tilbake",
     "headerTitle": "Oppgrader til Pro",
     "heroTitle": "Rowie Pro",
@@ -1023,7 +1012,13 @@
     "subscriptionRestoredMessage": "Pro-abonnementet ditt er gjenopprettet!",
     "noSubscriptionFoundTitle": "Ingen abonnement funnet",
     "noSubscriptionFoundMessage": "Ingen aktivt abonnement ble funnet å gjenopprette.",
-    "errorRestorePurchasesDefaultMessage": "Kunne ikke gjenopprette kjøp."
+    "errorRestorePurchasesDefaultMessage": "Kunne ikke gjenopprette kjøp.",
+    "featureLowerFees": "Lavere transaksjonsgebyrer",
+    "featureLocationsAndMenus": "Ubegrensede lokasjoner og menyer",
+    "featureTableServiceAndQrOrdering": "Bordservering og QR-bestilling",
+    "featureInvoicingAndSubscriptions": "Tilpasset fakturering og abonnementer",
+    "featureTeamPay": "Team Pay (timer, tips og utbetalinger)",
+    "featureAnalyticsAndExports": "Full analyse og CSV/PDF-eksport"
   },
   "locations": {
     "pickerTitle": "Velg lokasjonen din",

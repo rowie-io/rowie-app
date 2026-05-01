@@ -985,17 +985,6 @@
     "readerTapToConnect": "Toca para conectar"
   },
   "upgrade": {
-    "featureUnlimitedMenus": "Menús personalizados ilimitados",
-    "featureMultiLocation": "Gestiona ubicaciones ilimitadas",
-    "featureUnlimitedUsers": "Usuarios y dispositivos ilimitados",
-    "featureFloorPlans": "Planos de sala y servicio en mesa",
-    "featureStaffManagement": "Gestión de cuentas de personal",
-    "featureRevenueSplits": "División de ingresos (local/promotor)",
-    "featureTipReports": "Reportes y seguimiento de propinas",
-    "featureTipPooling": "Fondo común de propinas y reglas de distribución",
-    "featureInvoicing": "Facturación personalizada",
-    "featureAnalytics": "Panel de análisis",
-    "featureExport": "Exportar a CSV/PDF",
     "goBackAccessibilityLabel": "Volver",
     "headerTitle": "Mejorar a Pro",
     "heroTitle": "Rowie Pro",
@@ -1023,7 +1012,13 @@
     "subscriptionRestoredMessage": "¡Tu suscripción Pro ha sido restaurada!",
     "noSubscriptionFoundTitle": "No se encontró suscripción",
     "noSubscriptionFoundMessage": "No se encontró una suscripción activa para restaurar.",
-    "errorRestorePurchasesDefaultMessage": "No se pudieron restaurar las compras."
+    "errorRestorePurchasesDefaultMessage": "No se pudieron restaurar las compras.",
+    "featureLowerFees": "Tarifas de transacción más bajas",
+    "featureLocationsAndMenus": "Ubicaciones y menús ilimitados",
+    "featureTableServiceAndQrOrdering": "Servicio de mesa y pedidos QR",
+    "featureInvoicingAndSubscriptions": "Facturación personalizada y suscripciones",
+    "featureTeamPay": "Team Pay (horas, propinas y pagos)",
+    "featureAnalyticsAndExports": "Analítica completa y exportaciones CSV/PDF"
   },
   "locations": {
     "pickerTitle": "Selecciona tu ubicación",

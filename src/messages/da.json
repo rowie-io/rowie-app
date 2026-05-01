@@ -985,17 +985,6 @@
     "readerTapToConnect": "Tryk for at forbinde"
   },
   "upgrade": {
-    "featureUnlimitedMenus": "Ubegrænsede tilpassede menuer",
-    "featureMultiLocation": "Administrer ubegrænsede lokationer",
-    "featureUnlimitedUsers": "Ubegrænsede brugere og enheder",
-    "featureFloorPlans": "Plantegninger & bordservice",
-    "featureStaffManagement": "Medarbejderadministration",
-    "featureRevenueSplits": "Indtægtsdeling (venue/arrangør)",
-    "featureTipReports": "Drikkepengerapporter og sporing",
-    "featureTipPooling": "Drikkepengepulje og uddelingsregler",
-    "featureInvoicing": "Tilpasset fakturering",
-    "featureAnalytics": "Analysepanel",
-    "featureExport": "Eksportér til CSV/PDF",
     "goBackAccessibilityLabel": "Gå tilbage",
     "headerTitle": "Opgrader til Pro",
     "heroTitle": "Rowie Pro",
@@ -1023,7 +1012,13 @@
     "subscriptionRestoredMessage": "Dit Pro-abonnement er blevet gendannet!",
     "noSubscriptionFoundTitle": "Intet abonnement fundet",
     "noSubscriptionFoundMessage": "Intet aktivt abonnement blev fundet at gendanne.",
-    "errorRestorePurchasesDefaultMessage": "Kunne ikke gendanne køb."
+    "errorRestorePurchasesDefaultMessage": "Kunne ikke gendanne køb.",
+    "featureLowerFees": "Lavere transaktionsgebyrer",
+    "featureLocationsAndMenus": "Ubegrænsede lokationer og menuer",
+    "featureTableServiceAndQrOrdering": "Bordservice og QR-bestilling",
+    "featureInvoicingAndSubscriptions": "Tilpasset fakturering og abonnementer",
+    "featureTeamPay": "Team Pay (timer, drikkepenge og udbetalinger)",
+    "featureAnalyticsAndExports": "Fuld analyse og CSV/PDF-eksport"
   },
   "locations": {
     "pickerTitle": "Vælg din lokation",

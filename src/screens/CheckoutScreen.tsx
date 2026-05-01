@@ -673,7 +673,7 @@ export function CheckoutScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={[styles.container, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -1538,7 +1538,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       flexDirection: 'row',
       alignItems: 'center',
       padding: 16,
-      paddingBottom: 32,
+      paddingBottom: 12,
       gap: 10,
     },
     payButton: {

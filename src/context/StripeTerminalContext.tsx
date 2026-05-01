@@ -963,9 +963,12 @@ function StripeTerminalInner({ children }: { children: React.ReactNode }) {
       logger.log('[StripeTerminal] SetupIntent retrieved:', setupIntent.id);
 
       // 2. Collect payment method via Tap to Pay
+      // Stripe requires allowRedisplay='always' (or 'limited') when saving a
+      // PM for later use — tabs charge this card on close, so 'always' fits.
       const { setupIntent: collectedIntent, error: collectError } = await collectSetupIntentPaymentMethod({
         setupIntent,
         customerConsentCollected: true,
+        allowRedisplay: 'always',
       });
       if (collectError || !collectedIntent) {
         throw new Error(collectError?.message || 'Failed to collect payment method');

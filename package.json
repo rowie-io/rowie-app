@@ -7,7 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "cross-env EXPO_NO_DOTENV=1 dotenv -e .env.local -- expo start --web --port 4336",
-    "build:dev": "eas build --profile dev --platform all",
+    "build:dev": "eas build --profile dev --platform ios",
     "build:dev:ios": "eas build --profile dev --platform ios --auto-submit",
     "build:prod": "eas build --profile prod --platform ios",
     "submit:ios": "eas submit --platform ios",

@@ -1633,7 +1633,7 @@ export function MenuScreen() {
         <SetupRequired type="no-catalogs" onQuickCharge={() => setQuickChargeVisible(true)} />
 
         {/* Quick Charge FAB - disabled without connected account */}
-        <View style={[styles.bottomActions, styles.bottomActionsEmpty, { bottom: insets.bottom }]}>
+        <View style={[styles.bottomActions, styles.bottomActionsEmpty, { bottom: 8 }]}>
           <TouchableOpacity
             style={[styles.quickChargeFab, { backgroundColor: colors.text, opacity: isPaymentReady ? 1 : 0.35 }]}
             onPress={() => isPaymentReady && setQuickChargeVisible(true)}
@@ -2054,7 +2054,7 @@ export function MenuScreen() {
 
       {/* Bottom Action Buttons (only when not in edit mode) */}
       {!isEditMode && (
-        <View style={[styles.bottomActions, { bottom: insets.bottom }, itemCount === 0 && styles.bottomActionsEmpty]}>
+        <View style={[styles.bottomActions, { bottom: 8 }, itemCount === 0 && styles.bottomActionsEmpty]}>
           {/* Quick Charge FAB */}
           <TouchableOpacity
             style={[styles.quickChargeFab, { backgroundColor: colors.text }]}

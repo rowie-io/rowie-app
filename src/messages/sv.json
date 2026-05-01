@@ -985,17 +985,6 @@
     "readerTapToConnect": "Tryck för att ansluta"
   },
   "upgrade": {
-    "featureUnlimitedMenus": "Obegränsade anpassade menyer",
-    "featureMultiLocation": "Hantera obegränsade platser",
-    "featureUnlimitedUsers": "Obegränsade användare och enheter",
-    "featureFloorPlans": "Planritningar & bordsservice",
-    "featureStaffManagement": "Personalhantering",
-    "featureRevenueSplits": "Intäktsdelning (lokal/arrangör)",
-    "featureTipReports": "Dricksrapporter och spårning",
-    "featureTipPooling": "Drickspool och utdelningsregler",
-    "featureInvoicing": "Anpassad fakturering",
-    "featureAnalytics": "Analyspanel",
-    "featureExport": "Exportera till CSV/PDF",
     "goBackAccessibilityLabel": "Gå tillbaka",
     "headerTitle": "Uppgradera till Pro",
     "heroTitle": "Rowie Pro",
@@ -1023,7 +1012,13 @@
     "subscriptionRestoredMessage": "Ditt Pro-abonnemang har återställts!",
     "noSubscriptionFoundTitle": "Inget abonnemang hittades",
     "noSubscriptionFoundMessage": "Inget aktivt abonnemang hittades att återställa.",
-    "errorRestorePurchasesDefaultMessage": "Kunde inte återställa köp."
+    "errorRestorePurchasesDefaultMessage": "Kunde inte återställa köp.",
+    "featureLowerFees": "Lägre transaktionsavgifter",
+    "featureLocationsAndMenus": "Obegränsade platser och menyer",
+    "featureTableServiceAndQrOrdering": "Bordsservering och QR-beställning",
+    "featureInvoicingAndSubscriptions": "Anpassad fakturering och prenumerationer",
+    "featureTeamPay": "Team Pay (timmar, dricks och utbetalningar)",
+    "featureAnalyticsAndExports": "Komplett analys och CSV/PDF-export"
   },
   "locations": {
     "pickerTitle": "Välj din plats",

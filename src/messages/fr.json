@@ -985,17 +985,6 @@
     "readerTapToConnect": "Appuyez pour connecter"
   },
   "upgrade": {
-    "featureUnlimitedMenus": "Menus personnalisés illimités",
-    "featureMultiLocation": "Gérez des emplacements illimités",
-    "featureUnlimitedUsers": "Utilisateurs et appareils illimités",
-    "featureFloorPlans": "Plans de salle et service à table",
-    "featureStaffManagement": "Gestion des comptes employés",
-    "featureRevenueSplits": "Répartition des revenus (salle/organisateur)",
-    "featureTipReports": "Rapports et suivi des pourboires",
-    "featureTipPooling": "Mise en commun et règles de répartition des pourboires",
-    "featureInvoicing": "Facturation personnalisée",
-    "featureAnalytics": "Tableau de bord analytique",
-    "featureExport": "Export CSV/PDF",
     "goBackAccessibilityLabel": "Retour",
     "headerTitle": "Passer à Pro",
     "heroTitle": "Rowie Pro",
@@ -1023,7 +1012,13 @@
     "subscriptionRestoredMessage": "Votre abonnement Pro a été restauré !",
     "noSubscriptionFoundTitle": "Aucun abonnement trouvé",
     "noSubscriptionFoundMessage": "Aucun abonnement actif n'a été trouvé à restaurer.",
-    "errorRestorePurchasesDefaultMessage": "Échec de la restauration des achats."
+    "errorRestorePurchasesDefaultMessage": "Échec de la restauration des achats.",
+    "featureLowerFees": "Frais de transaction réduits",
+    "featureLocationsAndMenus": "Emplacements et menus illimités",
+    "featureTableServiceAndQrOrdering": "Service à table et commande QR",
+    "featureInvoicingAndSubscriptions": "Facturation personnalisée et abonnements",
+    "featureTeamPay": "Team Pay (heures, pourboires et paiements)",
+    "featureAnalyticsAndExports": "Analyses complètes et exports CSV/PDF"
   },
   "locations": {
     "pickerTitle": "Sélectionnez votre emplacement",

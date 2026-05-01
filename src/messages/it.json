@@ -985,17 +985,6 @@
     "readerTapToConnect": "Tocca per connettere"
   },
   "upgrade": {
-    "featureUnlimitedMenus": "Menù personalizzati illimitati",
-    "featureMultiLocation": "Gestisci sedi illimitate",
-    "featureUnlimitedUsers": "Utenti e dispositivi illimitati",
-    "featureFloorPlans": "Planimetrie e servizio al tavolo",
-    "featureStaffManagement": "Gestione del personale",
-    "featureRevenueSplits": "Suddivisione ricavi (locale/promoter)",
-    "featureTipReports": "Report e monitoraggio mance",
-    "featureTipPooling": "Pool mance e regole di distribuzione",
-    "featureInvoicing": "Fatturazione personalizzata",
-    "featureAnalytics": "Dashboard analisi",
-    "featureExport": "Esportazione CSV/PDF",
     "goBackAccessibilityLabel": "Indietro",
     "headerTitle": "Aggiorna a Pro",
     "heroTitle": "Rowie Pro",
@@ -1023,7 +1012,13 @@
     "subscriptionRestoredMessage": "Il tuo abbonamento Pro è stato ripristinato!",
     "noSubscriptionFoundTitle": "Nessun abbonamento trovato",
     "noSubscriptionFoundMessage": "Nessun abbonamento attivo trovato da ripristinare.",
-    "errorRestorePurchasesDefaultMessage": "Ripristino acquisti fallito."
+    "errorRestorePurchasesDefaultMessage": "Ripristino acquisti fallito.",
+    "featureLowerFees": "Commissioni di transazione più basse",
+    "featureLocationsAndMenus": "Sedi e menu illimitati",
+    "featureTableServiceAndQrOrdering": "Servizio al tavolo e ordini QR",
+    "featureInvoicingAndSubscriptions": "Fatturazione personalizzata e abbonamenti",
+    "featureTeamPay": "Team Pay (ore, mance e pagamenti)",
+    "featureAnalyticsAndExports": "Analisi completa ed esportazioni CSV/PDF"
   },
   "locations": {
     "pickerTitle": "Seleziona la tua sede",

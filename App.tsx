@@ -28,6 +28,8 @@ import {
   PlusJakartaSans_800ExtraBold,
 } from '@expo-google-fonts/plus-jakarta-sans';
 
+import { useQuery } from '@tanstack/react-query';
+import { eventsApi } from './src/lib/api/events';
 import { QueryProvider } from './src/providers/QueryProvider';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
@@ -165,12 +167,24 @@ function TabNavigatorWithOnboarding() {
 // Main tab navigator - Floating pill bar
 function TabNavigator() {
   const { colors } = useTheme();
-  const { subscription } = useAuth();
+  const { subscription, user } = useAuth();
 
   // Tabs are a Pro feature but are not tied to QR ordering (unlike the old
   // preorders system). Any Pro vendor can open/close tabs on any catalog.
   const isPro = subscription?.tier === 'pro' || subscription?.tier === 'enterprise';
   const showTabsTab = isPro;
+
+  // Hide Events tab when the org has zero events — keeps the bar uncluttered
+  // for vendors that only use POS / table sessions. Reappears the moment they
+  // create their first event (CatalogContext / SocketContext don't help here
+  // since events live on their own queue, so we fetch directly).
+  const { data: eventsList } = useQuery({
+    queryKey: ['events', 'tab-bar', user?.organizationId],
+    queryFn: () => eventsApi.list(),
+    enabled: !!user,
+    staleTime: 60_000,
+  });
+  const showEventsTab = (eventsList?.events?.length ?? 0) > 0;
 
   return (
     <Tab.Navigator
@@ -194,10 +208,12 @@ function TabNavigator() {
         name="History"
         component={HistoryStackNavigator}
       />
-      <Tab.Screen
-        name="Events"
-        component={EventsScannerScreen}
-      />
+      {showEventsTab && (
+        <Tab.Screen
+          name="Events"
+          component={EventsScannerScreen}
+        />
+      )}
       <Tab.Screen
         name="Settings"
         component={SettingsScreen}

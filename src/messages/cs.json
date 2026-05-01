@@ -985,17 +985,6 @@
     "readerTapToConnect": "Klepněte pro připojení"
   },
   "upgrade": {
-    "featureUnlimitedMenus": "Neomezená vlastní menu",
-    "featureMultiLocation": "Spravujte neomezené pobočky",
-    "featureUnlimitedUsers": "Neomezení uživatelé a zařízení",
-    "featureFloorPlans": "Půdorysy a obsluha u stolu",
-    "featureStaffManagement": "Správa zaměstnanců",
-    "featureRevenueSplits": "Rozdělení příjmů (místo/promotér)",
-    "featureTipReports": "Reporty spropitného a sledování",
-    "featureTipPooling": "Sdílení spropitného a pravidla rozdělení",
-    "featureInvoicing": "Vlastní fakturace",
-    "featureAnalytics": "Analytický přehled",
-    "featureExport": "Export do CSV/PDF",
     "goBackAccessibilityLabel": "Zpět",
     "headerTitle": "Upgradovat na Pro",
     "heroTitle": "Rowie Pro",
@@ -1023,7 +1012,13 @@
     "subscriptionRestoredMessage": "Vaše Pro předplatné bylo obnoveno!",
     "noSubscriptionFoundTitle": "Předplatné nenalezeno",
     "noSubscriptionFoundMessage": "Nebylo nalezeno žádné aktivní předplatné k obnovení.",
-    "errorRestorePurchasesDefaultMessage": "Obnovení nákupů selhalo."
+    "errorRestorePurchasesDefaultMessage": "Obnovení nákupů selhalo.",
+    "featureLowerFees": "Nižší transakční poplatky",
+    "featureLocationsAndMenus": "Neomezené lokality a menu",
+    "featureTableServiceAndQrOrdering": "Obsluha stolů a QR objednávky",
+    "featureInvoicingAndSubscriptions": "Vlastní fakturace a předplatné",
+    "featureTeamPay": "Team Pay (hodiny, spropitné a výplaty)",
+    "featureAnalyticsAndExports": "Kompletní analytika a CSV/PDF exporty"
   },
   "locations": {
     "pickerTitle": "Vyberte svou pobočku",

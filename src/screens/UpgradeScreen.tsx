@@ -25,17 +25,12 @@ import { getTTPDisplayRate } from '../lib/countries';
 import { useTranslations } from '../lib/i18n';
 
 const PRO_FEATURE_KEYS = [
-  { icon: 'business-outline', key: 'featureMultiLocation' },
-  { icon: 'infinite-outline', key: 'featureUnlimitedMenus' },
-  { icon: 'people-outline', key: 'featureUnlimitedUsers' },
-  { icon: 'grid-outline', key: 'featureFloorPlans' },
-  { icon: 'person-add-outline', key: 'featureStaffManagement' },
-  { icon: 'git-branch-outline', key: 'featureRevenueSplits' },
-  { icon: 'cash-outline', key: 'featureTipReports' },
-  { icon: 'wallet-outline', key: 'featureTipPooling' },
-  { icon: 'document-text-outline', key: 'featureInvoicing' },
-  { icon: 'analytics-outline', key: 'featureAnalytics' },
-  { icon: 'download-outline', key: 'featureExport' },
+  { icon: 'cash-outline', key: 'featureLowerFees' },
+  { icon: 'business-outline', key: 'featureLocationsAndMenus' },
+  { icon: 'grid-outline', key: 'featureTableServiceAndQrOrdering' },
+  { icon: 'document-text-outline', key: 'featureInvoicingAndSubscriptions' },
+  { icon: 'people-outline', key: 'featureTeamPay' },
+  { icon: 'analytics-outline', key: 'featureAnalyticsAndExports' },
 ] as const;
 
 export function UpgradeScreen() {

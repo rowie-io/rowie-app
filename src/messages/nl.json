@@ -985,17 +985,6 @@
     "readerTapToConnect": "Tik om te verbinden"
   },
   "upgrade": {
-    "featureUnlimitedMenus": "Onbeperkte aangepaste menu's",
-    "featureMultiLocation": "Beheer onbeperkte locaties",
-    "featureUnlimitedUsers": "Onbeperkte gebruikers & apparaten",
-    "featureFloorPlans": "Plattegronden & tafelservice",
-    "featureStaffManagement": "Personeelsbeheer",
-    "featureRevenueSplits": "Omzetverdeling (locatie/promotor)",
-    "featureTipReports": "Fooirapporten & -tracking",
-    "featureTipPooling": "Fooipooling & fooiregels",
-    "featureInvoicing": "Aangepaste facturering",
-    "featureAnalytics": "Analysedashboard",
-    "featureExport": "Exporteren naar CSV/PDF",
     "goBackAccessibilityLabel": "Ga terug",
     "headerTitle": "Upgraden naar Pro",
     "heroTitle": "Rowie Pro",
@@ -1023,7 +1012,13 @@
     "subscriptionRestoredMessage": "Je Pro-abonnement is hersteld!",
     "noSubscriptionFoundTitle": "Geen abonnement gevonden",
     "noSubscriptionFoundMessage": "Er is geen actief abonnement gevonden om te herstellen.",
-    "errorRestorePurchasesDefaultMessage": "Aankopen herstellen mislukt."
+    "errorRestorePurchasesDefaultMessage": "Aankopen herstellen mislukt.",
+    "featureLowerFees": "Lagere transactiekosten",
+    "featureLocationsAndMenus": "Onbeperkte locaties en menu's",
+    "featureTableServiceAndQrOrdering": "Tafelservice en QR-bestellen",
+    "featureInvoicingAndSubscriptions": "Aangepaste facturatie en abonnementen",
+    "featureTeamPay": "Team Pay (uren, fooien en uitbetalingen)",
+    "featureAnalyticsAndExports": "Volledige analyses en CSV/PDF-exports"
   },
   "locations": {
     "pickerTitle": "Selecteer je locatie",

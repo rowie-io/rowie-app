@@ -985,17 +985,6 @@
     "readerTapToConnect": "Napauta yhdistääksesi"
   },
   "upgrade": {
-    "featureUnlimitedMenus": "Rajattomat mukautetut menut",
-    "featureMultiLocation": "Hallitse rajattomia toimipisteitä",
-    "featureUnlimitedUsers": "Rajattomat käyttäjät ja laitteet",
-    "featureFloorPlans": "Pohjapiirrokset ja pöytäpalvelu",
-    "featureStaffManagement": "Henkilökunnan hallinta",
-    "featureRevenueSplits": "Tulonjako (paikka/promoottori)",
-    "featureTipReports": "Tippiraportit ja seuranta",
-    "featureTipPooling": "Tippien yhdistäminen ja jakosäännöt",
-    "featureInvoicing": "Mukautettu laskutus",
-    "featureAnalytics": "Analytiikkanäkymä",
-    "featureExport": "Vie CSV/PDF-muodossa",
     "goBackAccessibilityLabel": "Takaisin",
     "headerTitle": "Päivitä Pro-pakettiin",
     "heroTitle": "Rowie Pro",
@@ -1023,7 +1012,13 @@
     "subscriptionRestoredMessage": "Pro-tilauksesi on palautettu!",
     "noSubscriptionFoundTitle": "Tilausta ei löytynyt",
     "noSubscriptionFoundMessage": "Palautettavaa aktiivista tilausta ei löytynyt.",
-    "errorRestorePurchasesDefaultMessage": "Ostosten palautus epäonnistui."
+    "errorRestorePurchasesDefaultMessage": "Ostosten palautus epäonnistui.",
+    "featureLowerFees": "Alemmat transaktiomaksut",
+    "featureLocationsAndMenus": "Rajattomat toimipaikat ja menut",
+    "featureTableServiceAndQrOrdering": "Pöytäpalvelu ja QR-tilaus",
+    "featureInvoicingAndSubscriptions": "Mukautettu laskutus ja tilaukset",
+    "featureTeamPay": "Team Pay (tunnit, juomarahat ja maksut)",
+    "featureAnalyticsAndExports": "Täysi analytiikka ja CSV/PDF-viennit"
   },
   "locations": {
     "pickerTitle": "Valitse toimipisteesi",
