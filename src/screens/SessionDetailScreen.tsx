@@ -30,6 +30,10 @@ import { useTranslations } from '../lib/i18n';
 type RouteParams = {
   SessionDetail: {
     sessionId: string;
+    // Set by AddItemsToSessionScreen's "Pay now" path so the operator drops
+    // directly into the settle modal after a round is fired to the kitchen.
+    // Consumed once on mount, then ignored.
+    autoOpenSettle?: boolean;
   };
 };
 
@@ -48,13 +52,26 @@ export function SessionDetailScreen() {
   const { currency, organization } = useAuth();
   const { selectedCatalog } = useCatalog();
   const queryClient = useQueryClient();
-  const { sessionId } = route.params;
+  const { sessionId, autoOpenSettle } = route.params;
   const t = useTranslations('sessionDetail');
+  const autoOpenSettleConsumedRef = useRef(false);
 
   // Tip modal state
   const [tipModalOpen, setTipModalOpen] = useState(false);
   const [selectedTipPct, setSelectedTipPct] = useState<number | null>(null);
   const [customTipText, setCustomTipText] = useState('');
+
+  // Settle modal state. Sessions without a saved card (non-tab) need the
+  // operator to pick a payment method on close — cash/tap/split — instead of
+  // the previous one-click "always cash, no tip" path. Modal is opened from
+  // the Settle button; submits via settleMutation below.
+  const [settleModalOpen, setSettleModalOpen] = useState(false);
+  const [settleMethod, setSettleMethod] = useState<'cash' | 'tap_to_pay' | 'split'>('cash');
+  const [settleTipText, setSettleTipText] = useState(''); // base-unit digits
+  const [settleCashTenderedText, setSettleCashTenderedText] = useState(''); // base-unit digits
+  const [settleSplitPieces, setSettleSplitPieces] = useState<Array<{ method: 'cash' | 'tap_to_pay'; amount: number }>>([]);
+  const [settleSplitAddMethod, setSettleSplitAddMethod] = useState<'cash' | 'tap_to_pay'>('cash');
+  const [settleSplitAddAmount, setSettleSplitAddAmount] = useState(''); // base-unit digits
 
   // Tip settings from the catalog — "Tip" screen only shown if enabled.
   // Defaults match the catalog's typical values when not set.
@@ -91,6 +108,11 @@ export function SessionDetailScreen() {
   useSocketEvent(SocketEvents.SESSION_UPDATED, handleSessionUpdate);
   useSocketEvent(SocketEvents.SESSION_ITEMS_ADDED, handleSessionUpdate);
   useSocketEvent(SocketEvents.SESSION_SETTLED, handleSessionUpdate);
+  // Without this, another device cancelling the session leaves this view on
+  // stale "open" state until manual refresh — the global SocketEventHandlers
+  // invalidates the list-shaped `['sessions']` key but not the detail-shaped
+  // `['sessions', sessionId]` we read.
+  useSocketEvent(SocketEvents.SESSION_CANCELLED, handleSessionUpdate);
 
   // Group items by round
   const rounds = useMemo(() => {
@@ -189,33 +211,120 @@ export function SessionDetailScreen() {
     closeTabMutation.mutate(tipCents);
   }, [computedTipBase, currency, closeTabMutation]);
 
-  // Non-tab settlement via cash (simple path). Tap-to-pay settlement would
-  // require a dedicated checkout flow keyed to sessions — out of scope here.
-  const settleCashMutation = useMutation({
-    mutationFn: () => sessionsApi.settle(sessionId, { paymentMethod: 'cash', tipAmount: 0 }),
+  // Generic settle mutation. The payload shape depends on the picked method:
+  //   cash       → { paymentMethod: 'cash', tipAmount, cashTendered? }
+  //   tap_to_pay → { paymentMethod: 'tap_to_pay', tipAmount, stripePaymentIntentId }
+  //                (Terminal SDK confirms the PI separately; PI ID is passed
+  //                here just for the order linkage. v1 records pending and
+  //                relies on the webhook to flip status — same pattern as
+  //                the legacy POS checkout.)
+  //   split      → { paymentMethod: 'split', tipAmount, payments: [...] }
+  // sessionsApi.settle types this; the API validates the sum-of-pieces.
+  const settleMutation = useMutation({
+    mutationFn: (payload: Parameters<typeof sessionsApi.settle>[1]) =>
+      sessionsApi.settle(sessionId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      setSettleModalOpen(false);
       Alert.alert(t('settledTitle'), t('settledMessage'));
       navigation.goBack();
     },
-    // Bug fix: same `err.error` vs `err.message` issue — mobile apiClient
-    // throws an object literal so cash-settle Stripe/payment failures were
-    // showing the generic translation instead of the API's reason string.
     onError: (err: any) => {
       Alert.alert(t('failedSettleTitle'), err?.error || err?.message || t('failedSettleMessage'));
     },
   });
 
+  // Tip parsed from the modal field. Empty / non-numeric → 0.
+  const settleTipBase = useMemo(() => {
+    const n = parseFloat(settleTipText);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }, [settleTipText]);
+  const settleTipSmallest = useMemo(
+    () => toSmallestUnit(settleTipBase, currency),
+    [settleTipBase, currency],
+  );
+  // Pre-tip totals from the session (base units already).
+  const settleSubtotalBase = session?.subtotal || 0;
+  const settleTaxBase = session?.taxAmount || 0;
+  const settlePreTipBase = settleSubtotalBase + settleTaxBase;
+  const settlePreTipSmallest = useMemo(
+    () => toSmallestUnit(settlePreTipBase, currency),
+    [settlePreTipBase, currency],
+  );
+  const settleTotalBase = settlePreTipBase + settleTipBase;
+  // Cash tendered + change for the modal cash mode.
+  const settleCashTenderedBase = parseFloat(settleCashTenderedText) || 0;
+  const settleCashTenderedSmallest = toSmallestUnit(settleCashTenderedBase, currency);
+  const settleTotalSmallest = toSmallestUnit(settleTotalBase, currency);
+  const settleCashChangeSmallest = Math.max(0, settleCashTenderedSmallest - settleTotalSmallest);
+  // Split pieces — each amount is in smallest units (entered base, converted).
+  const settleSplitTotalSmallest = settleSplitPieces.reduce((s, p) => s + p.amount, 0);
+  const settleSplitRemainingSmallest = Math.max(0, settlePreTipSmallest - settleSplitTotalSmallest);
+  const settleSplitAddAmountSmallest = toSmallestUnit(parseFloat(settleSplitAddAmount) || 0, currency);
+  const settleSplitComplete =
+    settleSplitPieces.length >= 2 && settleSplitTotalSmallest === settlePreTipSmallest;
+
+  const settleSubmitDisabled = (() => {
+    if (settleMutation.isPending) return true;
+    if (settleMethod === 'cash') return settleCashTenderedSmallest < settleTotalSmallest;
+    if (settleMethod === 'split') return !settleSplitComplete;
+    return false; // tap_to_pay: enabled (reader interaction is out-of-scope v1)
+  })();
+
+  const handleSubmitSettle = useCallback(() => {
+    // tipAmount on /sessions/{id}/settle is in BASE units (dollars) — matches
+    // sessions/orders DECIMAL columns and /menu/preorder. closeTab still uses
+    // smallest units (see closeTabMutation above). cashTendered / split piece
+    // amounts stay in smallest units (server compares them as integers).
+    if (settleMethod === 'cash') {
+      settleMutation.mutate({
+        paymentMethod: 'cash',
+        tipAmount: settleTipBase,
+        cashTendered: settleCashTenderedSmallest || undefined,
+      });
+      return;
+    }
+    if (settleMethod === 'split') {
+      settleMutation.mutate({
+        paymentMethod: 'split',
+        tipAmount: settleTipBase,
+        payments: settleSplitPieces.map((p) => ({
+          paymentMethod: p.method,
+          amount: p.amount,
+          cashTendered: p.method === 'cash' ? p.amount : undefined,
+        })),
+      });
+      return;
+    }
+    // tap_to_pay
+    settleMutation.mutate({
+      paymentMethod: 'tap_to_pay',
+      tipAmount: settleTipBase,
+    });
+  }, [settleMethod, settleTipBase, settleCashTenderedSmallest, settleSplitPieces, settleMutation]);
+
   const handleSettle = useCallback(() => {
-    Alert.alert(
-      t('settleConfirmTitle'),
-      t('settleConfirmMessage'),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        { text: t('settleConfirmAction'), onPress: () => settleCashMutation.mutate() },
-      ],
-    );
-  }, [settleCashMutation, t]);
+    // Reset modal state on open so a previous failed attempt's values don't
+    // leak in. Default to cash + no tip — matches the most common in-person
+    // bar/restaurant flow.
+    setSettleMethod('cash');
+    setSettleTipText('');
+    setSettleCashTenderedText('');
+    setSettleSplitPieces([]);
+    setSettleSplitAddMethod('cash');
+    setSettleSplitAddAmount('');
+    setSettleModalOpen(true);
+  }, []);
+
+  // Auto-open settle modal for the "Pay now" route from AddItemsToSession.
+  // Wait for the session to load + still be open; consume the param once so
+  // re-renders from socket events don't re-trigger it.
+  useEffect(() => {
+    if (!autoOpenSettle || autoOpenSettleConsumedRef.current) return;
+    if (!session || session.status !== 'open') return;
+    autoOpenSettleConsumedRef.current = true;
+    handleSettle();
+  }, [autoOpenSettle, session, handleSettle]);
 
   const markRoundStatus = useCallback((roundItems: SessionItem[], status: ItemStatus) => {
     const itemIds = roundItems.filter(i => i.status !== status).map(i => i.id);
@@ -513,12 +622,12 @@ export function SessionDetailScreen() {
           ) : (
             <TouchableOpacity
               onPress={handleSettle}
-              disabled={settleCashMutation.isPending}
-              style={[styles.settleButton, { backgroundColor: colors.primary }, settleCashMutation.isPending && { opacity: 0.6 }]}
+              disabled={settleMutation.isPending}
+              style={[styles.settleButton, { backgroundColor: colors.primary }, settleMutation.isPending && { opacity: 0.6 }]}
               accessibilityRole="button"
               accessibilityLabel={t('settleAccessibilityLabel')}
             >
-              {settleCashMutation.isPending ? (
+              {settleMutation.isPending ? (
                 <ActivityIndicator color="#1C1917" accessibilityLabel={t('settlingLabel')} />
               ) : (
                 <>
@@ -691,6 +800,279 @@ export function SessionDetailScreen() {
                 </>
               )}
             </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Settle modal — opens when the operator taps Settle on a non-tab
+          session. Three methods (cash/tap/split), shared tip entry, and
+          method-specific fields (tendered for cash, piece-builder for split).
+          Reuses tipModal styles where possible. */}
+      <Modal
+        visible={settleModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSettleModalOpen(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.tipModalContent, { backgroundColor: colors.card, maxHeight: '90%' }]}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+            <View style={styles.tipModalHeader}>
+              <Text style={[styles.tipModalTitle, { color: colors.text }]} maxFontSizeMultiplier={1.2}>
+                {t('settleConfirmTitle')}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setSettleModalOpen(false)}
+                accessibilityRole="button"
+                accessibilityLabel={t('cancel')}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Method picker */}
+            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
+              {([
+                { key: 'cash', labelKey: 'methodCash' },
+                { key: 'tap_to_pay', labelKey: 'methodTap' },
+                { key: 'split', labelKey: 'methodSplit' },
+              ] as const).map((opt) => {
+                const isActive = settleMethod === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    onPress={() => setSettleMethod(opt.key)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: isActive ? colors.primary : colors.border,
+                      backgroundColor: isActive ? colors.primary + '15' : colors.surface,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text style={{ fontFamily: fonts.semiBold, fontSize: 13, color: isActive ? colors.primary : colors.text }} maxFontSizeMultiplier={1.3}>
+                      {t(opt.labelKey)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Totals snapshot */}
+            <View style={{ backgroundColor: colors.surface, borderRadius: 10, padding: 12, marginBottom: 12, gap: 4 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 13 }} maxFontSizeMultiplier={1.5}>{t('subtotalLabel')}</Text>
+                <Text style={{ color: colors.text, fontSize: 13, fontFamily: fonts.medium }} maxFontSizeMultiplier={1.5}>{formatCurrency(settleSubtotalBase, currency)}</Text>
+              </View>
+              {settleTaxBase > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 13 }} maxFontSizeMultiplier={1.5}>{t('taxLabel')}</Text>
+                  <Text style={{ color: colors.text, fontSize: 13, fontFamily: fonts.medium }} maxFontSizeMultiplier={1.5}>{formatCurrency(settleTaxBase, currency)}</Text>
+                </View>
+              )}
+              {settleTipBase > 0 && (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 13 }} maxFontSizeMultiplier={1.5}>{t('tipLabel')}</Text>
+                  <Text style={{ color: colors.text, fontSize: 13, fontFamily: fonts.medium }} maxFontSizeMultiplier={1.5}>{formatCurrency(settleTipBase, currency)}</Text>
+                </View>
+              )}
+              <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 4 }} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ color: colors.text, fontSize: 14, fontFamily: fonts.semiBold }} maxFontSizeMultiplier={1.3}>{t('totalLabel')}</Text>
+                <Text style={{ color: colors.text, fontSize: 14, fontFamily: fonts.bold }} maxFontSizeMultiplier={1.3}>{formatCurrency(settleTotalBase, currency)}</Text>
+              </View>
+            </View>
+
+            {/* Tip entry — shared across methods. Optional. */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 4 }} maxFontSizeMultiplier={1.5}>{t('tipOptionalLabel')}</Text>
+              <TextInput
+                value={settleTipText}
+                onChangeText={(text) => {
+                  const cleaned = isZeroDecimal(currency)
+                    ? text.replace(/[^0-9]/g, '')
+                    : text.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+                  setSettleTipText(cleaned);
+                }}
+                placeholder="0"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="decimal-pad"
+                style={[styles.customTipInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+                accessibilityLabel={t('tipOptionalLabel')}
+              />
+            </View>
+
+            {/* Cash mode: tendered + change */}
+            {settleMethod === 'cash' && (
+              <View style={{ marginBottom: 12 }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 4 }} maxFontSizeMultiplier={1.5}>{t('cashTenderedLabel')}</Text>
+                <TextInput
+                  value={settleCashTenderedText}
+                  onChangeText={(text) => {
+                    const cleaned = isZeroDecimal(currency)
+                      ? text.replace(/[^0-9]/g, '')
+                      : text.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+                    setSettleCashTenderedText(cleaned);
+                  }}
+                  placeholder={String(settleTotalBase.toFixed(isZeroDecimal(currency) ? 0 : 2))}
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="decimal-pad"
+                  style={[styles.customTipInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+                  accessibilityLabel={t('cashTenderedLabel')}
+                />
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 13 }} maxFontSizeMultiplier={1.5}>{t('changeLabel')}</Text>
+                  <Text style={{ color: '#22C55E', fontSize: 13, fontFamily: fonts.semiBold }} maxFontSizeMultiplier={1.3}>
+                    {formatCurrency(settleCashChangeSmallest / Math.pow(10, isZeroDecimal(currency) ? 0 : 2), currency)}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            {/* Split mode: piece builder */}
+            {settleMethod === 'split' && (
+              <View style={{ marginBottom: 12 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12 }} maxFontSizeMultiplier={1.5}>{t('splitRemainingLabel')}</Text>
+                  <Text style={{ color: colors.text, fontSize: 13, fontFamily: fonts.semiBold }} maxFontSizeMultiplier={1.3}>
+                    {formatCurrency(settleSplitRemainingSmallest / Math.pow(10, isZeroDecimal(currency) ? 0 : 2), currency)}
+                  </Text>
+                </View>
+
+                {settleSplitPieces.length > 0 && (
+                  <View style={{ marginBottom: 8 }}>
+                    {settleSplitPieces.map((p, i) => (
+                      <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.surface, padding: 8, borderRadius: 8, marginBottom: 4 }}>
+                        <Text style={{ color: colors.text, fontSize: 13 }} maxFontSizeMultiplier={1.5}>
+                          {p.method === 'cash' ? t('methodCash') : t('methodTap')}
+                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Text style={{ color: colors.text, fontFamily: fonts.medium, fontSize: 13 }} maxFontSizeMultiplier={1.3}>
+                            {formatCurrency(p.amount / Math.pow(10, isZeroDecimal(currency) ? 0 : 2), currency)}
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => setSettleSplitPieces(settleSplitPieces.filter((_, idx) => idx !== i))}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('removePieceLabel')}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {settleSplitRemainingSmallest > 0 && (
+                  <View style={{ gap: 6 }}>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      {(['cash', 'tap_to_pay'] as const).map((m) => {
+                        const isActive = settleSplitAddMethod === m;
+                        return (
+                          <TouchableOpacity
+                            key={m}
+                            onPress={() => setSettleSplitAddMethod(m)}
+                            style={{
+                              flex: 1,
+                              paddingVertical: 8,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: isActive ? colors.primary : colors.border,
+                              backgroundColor: isActive ? colors.primary + '15' : colors.surface,
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text style={{ color: isActive ? colors.primary : colors.text, fontFamily: fonts.medium, fontSize: 12 }} maxFontSizeMultiplier={1.3}>
+                              {m === 'cash' ? t('methodCash') : t('methodTap')}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <TextInput
+                        value={settleSplitAddAmount}
+                        onChangeText={(text) => {
+                          const cleaned = isZeroDecimal(currency)
+                            ? text.replace(/[^0-9]/g, '')
+                            : text.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+                          setSettleSplitAddAmount(cleaned);
+                        }}
+                        placeholder={t('pieceAmountPlaceholder')}
+                        placeholderTextColor={colors.textMuted}
+                        keyboardType="decimal-pad"
+                        style={[styles.customTipInput, { flex: 1, backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+                        accessibilityLabel={t('pieceAmountPlaceholder')}
+                      />
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (settleSplitAddAmountSmallest <= 0 || settleSplitAddAmountSmallest > settleSplitRemainingSmallest) return;
+                          setSettleSplitPieces([...settleSplitPieces, { method: settleSplitAddMethod, amount: settleSplitAddAmountSmallest }]);
+                          setSettleSplitAddAmount('');
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('addPieceLabel')}
+                        disabled={settleSplitAddAmountSmallest <= 0 || settleSplitAddAmountSmallest > settleSplitRemainingSmallest}
+                        style={{
+                          paddingHorizontal: 14,
+                          justifyContent: 'center',
+                          borderRadius: 8,
+                          backgroundColor: settleSplitAddAmountSmallest > 0 && settleSplitAddAmountSmallest <= settleSplitRemainingSmallest ? colors.primary : colors.border,
+                        }}
+                      >
+                        <Text style={{ color: '#fff', fontFamily: fonts.semiBold, fontSize: 13 }} maxFontSizeMultiplier={1.3}>{t('addPieceLabel')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setSettleSplitPieces([...settleSplitPieces, { method: settleSplitAddMethod, amount: settleSplitRemainingSmallest }]);
+                          setSettleSplitAddAmount('');
+                        }}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('addRemainingLabel')}
+                        style={{
+                          paddingHorizontal: 12,
+                          justifyContent: 'center',
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: colors.border,
+                        }}
+                      >
+                        <Text style={{ color: colors.text, fontFamily: fonts.medium, fontSize: 12 }} maxFontSizeMultiplier={1.3}>{t('addRemainingLabel')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+
+            <TouchableOpacity
+              onPress={handleSubmitSettle}
+              disabled={settleSubmitDisabled}
+              accessibilityRole="button"
+              accessibilityLabel={t('settleConfirmAction')}
+              style={{
+                backgroundColor: settleSubmitDisabled ? colors.border : colors.primary,
+                paddingVertical: 14,
+                borderRadius: 12,
+                alignItems: 'center',
+              }}
+            >
+              {settleMutation.isPending ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={{ color: '#fff', fontFamily: fonts.bold, fontSize: 15 }} maxFontSizeMultiplier={1.3}>{t('settleConfirmAction')}</Text>
+              )}
+            </TouchableOpacity>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>

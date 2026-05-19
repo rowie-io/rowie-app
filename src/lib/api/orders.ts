@@ -57,6 +57,7 @@ export interface CreateOrderParams {
   deviceId?: string;
   notes?: string; // order-level notes
   holdName?: string; // for creating held orders
+  tableId?: string; // optional table attribution (Table Service mode)
 }
 
 export interface HeldOrdersResponse {

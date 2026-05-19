@@ -63,7 +63,6 @@ export function CatalogSettingsModal({
   const [tipPercentages, setTipPercentages] = useState<number[]>([15, 18, 20, 25]);
   const [allowCustomTip, setAllowCustomTip] = useState(true);
   const [promptForEmail, setPromptForEmail] = useState(false);
-  const [taxRateString, setTaxRateString] = useState('0');
   const [layoutType, setLayoutType] = useState<CatalogLayoutType>('classic-grid');
   const [isSaving, setIsSaving] = useState(false);
   const [isDuplicating, setIsDuplicating] = useState(false);
@@ -83,7 +82,6 @@ export function CatalogSettingsModal({
       setTipPercentages(catalog.tipPercentages || [15, 18, 20, 25]);
       setAllowCustomTip(catalog.allowCustomTip);
       setPromptForEmail(catalog.promptForEmail);
-      setTaxRateString(String(catalog.taxRate || 0));
       setLayoutType(catalog.layoutType);
       setShowDatePicker(false);
     }
@@ -120,12 +118,6 @@ export function CatalogSettingsModal({
       return;
     }
 
-    const taxRate = parseFloat(taxRateString) || 0;
-    if (isNaN(taxRate) || taxRate < 0 || taxRate > 100) {
-      Alert.alert(tc('error'), t('errorInvalidTaxRate'));
-      return;
-    }
-
     setIsSaving(true);
     try {
       await onSave({
@@ -138,7 +130,6 @@ export function CatalogSettingsModal({
         tipPercentages,
         allowCustomTip,
         promptForEmail,
-        taxRate,
         layoutType,
       });
       onClose();
@@ -441,23 +432,6 @@ export function CatalogSettingsModal({
                     </TouchableOpacity>
                   );
                 })}
-              </View>
-            </View>
-
-            {/* Tax Rate */}
-            <View style={styles.section}>
-              <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('taxRateLabel')}</Text>
-              <View style={styles.taxInputContainer}>
-                <TextInput
-                  style={styles.taxInput}
-                  value={taxRateString}
-                  onChangeText={setTaxRateString}
-                  placeholder="0"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="decimal-pad"
-                  accessibilityLabel={t('taxRateLabel')}
-                />
-                <Text style={styles.taxSymbol} maxFontSizeMultiplier={1.5}>{tc('percentSymbol')}</Text>
               </View>
             </View>
 

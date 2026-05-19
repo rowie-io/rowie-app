@@ -58,7 +58,11 @@ export function CheckoutScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'Checkout'>>();
-  const { items, itemCount, clearCart, incrementItem, decrementItem, removeItem, subtotal: cartSubtotal, orderNotes, setOrderNotes, customerEmail, setCustomerEmail, paymentMethod, setPaymentMethod, selectedTipIndex, setSelectedTipIndex, customTipAmount, setCustomTipAmount, showCustomTipInput, setShowCustomTipInput } = useCart();
+  const { items, itemCount, clearCart, incrementItem, decrementItem, removeItem, subtotal: cartSubtotal, orderNotes, setOrderNotes, customerEmail, setCustomerEmail, paymentMethod, setPaymentMethod, selectedTipIndex, setSelectedTipIndex, customTipAmount, setCustomTipAmount, showCustomTipInput, setShowCustomTipInput, tableId, serviceMode } = useCart();
+  // Only attribute orders to a table when explicitly in Table Service mode;
+  // CartContext keeps tableId across mode flips for ergonomics, but Quick
+  // Service orders must NOT inherit a leftover table from a prior session.
+  const effectiveTableId = serviceMode === 'table_service' ? tableId : null;
   const { selectedCatalog } = useCatalog();
   const { isPaymentReady, connectLoading, connectStatus, currency } = useAuth();
   const { deviceCompatibility, isInitialized: isTerminalInitialized, isWarming, preferredReader } = useTerminal();
@@ -391,6 +395,7 @@ export function CheckoutScreen() {
           deviceId,
           notes: orderNotes || undefined,
           holdName: holdName.trim() || undefined,
+          tableId: effectiveTableId || undefined,
         };
 
         logger.log('Hold order: Creating order with params:', JSON.stringify(createOrderParams, null, 2));
@@ -553,6 +558,7 @@ export function CheckoutScreen() {
           description: isQuickCharge ? quickChargeDescription : undefined,
           deviceId,
           notes: orderNotes || undefined, // Include order-level notes
+          tableId: effectiveTableId || undefined,
         });
       }
 
@@ -618,6 +624,7 @@ export function CheckoutScreen() {
           subtotal: subtotal.toString(),
           taxAmount: taxAmount.toString(),
           tipAmount: tipAmount.toString(),
+          ...(effectiveTableId ? { tableId: effectiveTableId } : {}),
         },
         receiptEmail,
       }, idempotencyKey);
@@ -1156,7 +1163,7 @@ export function CheckoutScreen() {
               {/* Totals */}
               <View style={styles.totalsSection}>
                 <View style={styles.totalsRow}>
-                  <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('subtotalWithCount', { count: itemCount })}</Text>
+                  <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t(itemCount === 1 ? 'subtotalWithCountSingular' : 'subtotalWithCount', { count: itemCount })}</Text>
                   <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(subtotal, currency)}</Text>
                 </View>
                 {taxAmount > 0 && (

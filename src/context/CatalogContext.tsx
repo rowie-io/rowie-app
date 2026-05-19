@@ -23,7 +23,7 @@ interface CatalogProviderProps {
 }
 
 export function CatalogProvider({ children }: CatalogProviderProps) {
-  const { isAuthenticated, isLoading: authLoading, organization } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, organization, currentLocationId } = useAuth();
   const [selectedCatalog, setSelectedCatalogState] = useState<Catalog | null>(null);
   const [catalogs, setCatalogs] = useState<Catalog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -248,6 +248,23 @@ export function CatalogProvider({ children }: CatalogProviderProps) {
     if (isConnected) hasEverConnectedRef.current = true;
     wasConnectedRef.current = isConnected;
   }, [isConnected, isAuthenticated, refreshCatalogs]);
+
+  // Refetch when the active location changes. The API filters /catalogs by
+  // X-Location-Id (catalogs.ts:248-281) so the response is the new location's
+  // catalog set. refreshCatalogs already handles fallback when the previously
+  // selected catalog isn't in the new list. Skip the initial mount —
+  // loadCachedCatalog → fetchAndValidateCatalogs above handles first fetch.
+  const lastLocationRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!isAuthenticated || !hasFetched) {
+      lastLocationRef.current = currentLocationId;
+      return;
+    }
+    if (lastLocationRef.current === currentLocationId) return;
+    lastLocationRef.current = currentLocationId;
+    logger.log('[CatalogContext] Location changed, refreshing catalogs');
+    refreshCatalogs();
+  }, [currentLocationId, isAuthenticated, hasFetched, refreshCatalogs]);
 
   const value = useMemo(() => ({
     selectedCatalog,

@@ -19,6 +19,8 @@ export interface Country {
   currency: string;
   /** IANA timezone (org default at signup) */
   timezone: string;
+  /** Default vendor-portal language code at signup. One of the 12 shipped locales. */
+  language: string;
 }
 
 /**
@@ -27,61 +29,61 @@ export interface Country {
  */
 export const COUNTRIES: Country[] = [
   // Oceania
-  { code: 'AU', name: 'Australia', currency: 'aud', timezone: 'Australia/Sydney' },
+  { code: 'AU', name: 'Australia', currency: 'aud', timezone: 'Australia/Sydney', language: 'en' },
   // Europe — EUR
-  { code: 'AT', name: 'Austria', currency: 'eur', timezone: 'Europe/Vienna' },
-  { code: 'BE', name: 'Belgium', currency: 'eur', timezone: 'Europe/Brussels' },
-  { code: 'BG', name: 'Bulgaria', currency: 'eur', timezone: 'Europe/Sofia' },
+  { code: 'AT', name: 'Austria', currency: 'eur', timezone: 'Europe/Vienna', language: 'de' },
+  { code: 'BE', name: 'Belgium', currency: 'eur', timezone: 'Europe/Brussels', language: 'nl' },
+  { code: 'BG', name: 'Bulgaria', currency: 'eur', timezone: 'Europe/Sofia', language: 'en' },
   // North America
-  { code: 'CA', name: 'Canada', currency: 'cad', timezone: 'America/Toronto' },
+  { code: 'CA', name: 'Canada', currency: 'cad', timezone: 'America/Toronto', language: 'en' },
   // Europe — EUR
-  { code: 'HR', name: 'Croatia', currency: 'eur', timezone: 'Europe/Zagreb' },
-  { code: 'CY', name: 'Cyprus', currency: 'eur', timezone: 'Asia/Nicosia' },
+  { code: 'HR', name: 'Croatia', currency: 'eur', timezone: 'Europe/Zagreb', language: 'en' },
+  { code: 'CY', name: 'Cyprus', currency: 'eur', timezone: 'Asia/Nicosia', language: 'en' },
   // Europe — non-EUR
-  { code: 'CZ', name: 'Czechia', currency: 'czk', timezone: 'Europe/Prague' },
-  { code: 'DK', name: 'Denmark', currency: 'dkk', timezone: 'Europe/Copenhagen' },
+  { code: 'CZ', name: 'Czechia', currency: 'czk', timezone: 'Europe/Prague', language: 'cs' },
+  { code: 'DK', name: 'Denmark', currency: 'dkk', timezone: 'Europe/Copenhagen', language: 'da' },
   // Europe — EUR
-  { code: 'EE', name: 'Estonia', currency: 'eur', timezone: 'Europe/Tallinn' },
-  { code: 'FI', name: 'Finland', currency: 'eur', timezone: 'Europe/Helsinki' },
-  { code: 'FR', name: 'France', currency: 'eur', timezone: 'Europe/Paris' },
-  { code: 'DE', name: 'Germany', currency: 'eur', timezone: 'Europe/Berlin' },
+  { code: 'EE', name: 'Estonia', currency: 'eur', timezone: 'Europe/Tallinn', language: 'en' },
+  { code: 'FI', name: 'Finland', currency: 'eur', timezone: 'Europe/Helsinki', language: 'fi' },
+  { code: 'FR', name: 'France', currency: 'eur', timezone: 'Europe/Paris', language: 'fr' },
+  { code: 'DE', name: 'Germany', currency: 'eur', timezone: 'Europe/Berlin', language: 'de' },
   // Europe — non-EUR
-  { code: 'HU', name: 'Hungary', currency: 'huf', timezone: 'Europe/Budapest' },
+  { code: 'HU', name: 'Hungary', currency: 'huf', timezone: 'Europe/Budapest', language: 'en' },
   // Europe — EUR
-  { code: 'IE', name: 'Ireland', currency: 'eur', timezone: 'Europe/Dublin' },
-  { code: 'IT', name: 'Italy', currency: 'eur', timezone: 'Europe/Rome' },
-  { code: 'LV', name: 'Latvia', currency: 'eur', timezone: 'Europe/Riga' },
+  { code: 'IE', name: 'Ireland', currency: 'eur', timezone: 'Europe/Dublin', language: 'en' },
+  { code: 'IT', name: 'Italy', currency: 'eur', timezone: 'Europe/Rome', language: 'it' },
+  { code: 'LV', name: 'Latvia', currency: 'eur', timezone: 'Europe/Riga', language: 'en' },
   // Europe — non-EUR
-  { code: 'LI', name: 'Liechtenstein', currency: 'chf', timezone: 'Europe/Vaduz' },
+  { code: 'LI', name: 'Liechtenstein', currency: 'chf', timezone: 'Europe/Vaduz', language: 'de' },
   // Europe — EUR
-  { code: 'LT', name: 'Lithuania', currency: 'eur', timezone: 'Europe/Vilnius' },
-  { code: 'LU', name: 'Luxembourg', currency: 'eur', timezone: 'Europe/Luxembourg' },
+  { code: 'LT', name: 'Lithuania', currency: 'eur', timezone: 'Europe/Vilnius', language: 'en' },
+  { code: 'LU', name: 'Luxembourg', currency: 'eur', timezone: 'Europe/Luxembourg', language: 'fr' },
   // Asia
-  { code: 'MY', name: 'Malaysia', currency: 'myr', timezone: 'Asia/Kuala_Lumpur' },
+  { code: 'MY', name: 'Malaysia', currency: 'myr', timezone: 'Asia/Kuala_Lumpur', language: 'en' },
   // Europe — EUR
-  { code: 'MT', name: 'Malta', currency: 'eur', timezone: 'Europe/Malta' },
-  { code: 'NL', name: 'Netherlands', currency: 'eur', timezone: 'Europe/Amsterdam' },
+  { code: 'MT', name: 'Malta', currency: 'eur', timezone: 'Europe/Malta', language: 'en' },
+  { code: 'NL', name: 'Netherlands', currency: 'eur', timezone: 'Europe/Amsterdam', language: 'nl' },
   // Oceania
-  { code: 'NZ', name: 'New Zealand', currency: 'nzd', timezone: 'Pacific/Auckland' },
+  { code: 'NZ', name: 'New Zealand', currency: 'nzd', timezone: 'Pacific/Auckland', language: 'en' },
   // Europe — non-EUR
-  { code: 'NO', name: 'Norway', currency: 'nok', timezone: 'Europe/Oslo' },
+  { code: 'NO', name: 'Norway', currency: 'nok', timezone: 'Europe/Oslo', language: 'no' },
   // Europe — EUR
-  { code: 'PL', name: 'Poland', currency: 'pln', timezone: 'Europe/Warsaw' },
-  { code: 'PT', name: 'Portugal', currency: 'eur', timezone: 'Europe/Lisbon' },
-  { code: 'RO', name: 'Romania', currency: 'ron', timezone: 'Europe/Bucharest' },
+  { code: 'PL', name: 'Poland', currency: 'pln', timezone: 'Europe/Warsaw', language: 'en' },
+  { code: 'PT', name: 'Portugal', currency: 'eur', timezone: 'Europe/Lisbon', language: 'pt' },
+  { code: 'RO', name: 'Romania', currency: 'ron', timezone: 'Europe/Bucharest', language: 'en' },
   // Asia
-  { code: 'SG', name: 'Singapore', currency: 'sgd', timezone: 'Asia/Singapore' },
+  { code: 'SG', name: 'Singapore', currency: 'sgd', timezone: 'Asia/Singapore', language: 'en' },
   // Europe — EUR
-  { code: 'SK', name: 'Slovakia', currency: 'eur', timezone: 'Europe/Bratislava' },
-  { code: 'SI', name: 'Slovenia', currency: 'eur', timezone: 'Europe/Ljubljana' },
-  { code: 'ES', name: 'Spain', currency: 'eur', timezone: 'Europe/Madrid' },
+  { code: 'SK', name: 'Slovakia', currency: 'eur', timezone: 'Europe/Bratislava', language: 'en' },
+  { code: 'SI', name: 'Slovenia', currency: 'eur', timezone: 'Europe/Ljubljana', language: 'en' },
+  { code: 'ES', name: 'Spain', currency: 'eur', timezone: 'Europe/Madrid', language: 'es' },
   // Europe — non-EUR
-  { code: 'SE', name: 'Sweden', currency: 'sek', timezone: 'Europe/Stockholm' },
-  { code: 'CH', name: 'Switzerland', currency: 'chf', timezone: 'Europe/Zurich' },
+  { code: 'SE', name: 'Sweden', currency: 'sek', timezone: 'Europe/Stockholm', language: 'sv' },
+  { code: 'CH', name: 'Switzerland', currency: 'chf', timezone: 'Europe/Zurich', language: 'de' },
   // Europe — GBP
-  { code: 'GB', name: 'United Kingdom', currency: 'gbp', timezone: 'Europe/London' },
+  { code: 'GB', name: 'United Kingdom', currency: 'gbp', timezone: 'Europe/London', language: 'en' },
   // North America
-  { code: 'US', name: 'United States', currency: 'usd', timezone: 'America/New_York' },
+  { code: 'US', name: 'United States', currency: 'usd', timezone: 'America/New_York', language: 'en' },
 ] as const;
 
 /** Set of all supported country codes for quick lookups */
@@ -100,6 +102,11 @@ export function getCurrencyForCountry(code: string): string {
 /** Get default timezone for a country code. Falls back to 'Europe/London'. */
 export function getTimezoneForCountry(code: string): string {
   return getCountry(code)?.timezone || 'Europe/London';
+}
+
+/** Get default vendor-portal language for a country code. Falls back to 'en'. */
+export function getLanguageForCountry(code: string): string {
+  return getCountry(code)?.language || 'en';
 }
 
 /** All country names as a comma-separated string (for FAQ / display). */

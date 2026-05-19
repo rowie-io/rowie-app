@@ -15,7 +15,9 @@ export type TableStatus =
   | 'active'
   | 'aging'
   | 'urgent'
-  | 'check_requested';
+  | 'check_requested'
+  | 'merged'
+  | 'unavailable';
 
 export const TABLE_STATUS_COLORS: Record<
   TableStatus,
@@ -51,6 +53,18 @@ export const TABLE_STATUS_COLORS: Record<
     text: '#1C1917',
     label: 'Check requested',
   },
+  merged: {
+    fill: 'rgba(168, 85, 247, 0.06)', // purple-500 @ 6% — very subtle
+    border: 'rgba(168, 85, 247, 0.3)',
+    text: '#57534E',
+    label: 'Merged',
+  },
+  unavailable: {
+    fill: '#1C1917', // stone-900
+    border: '#292524',
+    text: '#57534E',
+    label: 'Unavailable',
+  },
 };
 
 /** Minutes. Keep identical across repos. */
@@ -63,6 +77,12 @@ export const TABLE_STATUS_THRESHOLDS = {
 
 /**
  * Derive the visual status of a table from its live session state.
+ *
+ * `tableStatus` is the table row's own column (`available | occupied |
+ * reserved | cleaning | merged | unavailable`). It overrides the session-
+ * derived state for the non-session states ('merged', 'unavailable') so a
+ * merged secondary or out-of-service table renders correctly even when an
+ * adjacent session is open.
  */
 export function deriveTableStatus(
   session:
@@ -72,8 +92,11 @@ export function deriveTableStatus(
       }
     | null
     | undefined,
-  now: number = Date.now()
+  now: number = Date.now(),
+  tableStatus?: string,
 ): TableStatus {
+  if (tableStatus === 'merged') return 'merged';
+  if (tableStatus === 'unavailable') return 'unavailable';
   if (!session) return 'empty';
   if (session.checkRequested) return 'check_requested';
 

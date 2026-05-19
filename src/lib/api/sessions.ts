@@ -33,6 +33,10 @@ export interface Session {
   openedAt: string;
   settledAt: string | null;
   createdAt: string;
+  // Multi-table merge — the session lives on `tableId` (primary) and absorbs
+  // every id in `mergedTableIds` (secondaries). Secondary `Table.status` is
+  // flipped to 'merged' API-side so the floor plan view hides them visually.
+  mergedTableIds?: string[];
 }
 
 export interface SessionItem {
@@ -148,9 +152,17 @@ export const sessionsApi = {
 
   settle: (sessionId: string, data: {
     tipAmount?: number;
-    paymentMethod: string;
+    paymentMethod: 'card' | 'cash' | 'tap_to_pay' | 'split';
     stripePaymentIntentId?: string;
     cashTendered?: number;
+    // Required when paymentMethod === 'split'. Sum of piece amounts must
+    // equal subtotal+tax (tip is allocated pro-rata server-side).
+    payments?: Array<{
+      paymentMethod: 'card' | 'cash' | 'tap_to_pay';
+      amount: number;
+      stripePaymentIntentId?: string;
+      cashTendered?: number;
+    }>;
   }) => apiClient.post<{ session: Session; order: { id: string; orderNumber: string; totalAmount: number } }>(
     `/sessions/${sessionId}/settle`, data
   ),
@@ -177,6 +189,19 @@ export const sessionsApi = {
 
   listTabs: () =>
     apiClient.get<{ tabs: Session[] }>('/sessions/tabs'),
+
+  // Merge another table into this session. Secondary table flips to 'merged'
+  // status server-side and disappears from the canvas; QR scans on it still
+  // resolve to this session.
+  mergeTables: (sessionId: string, tableId: string) =>
+    apiClient.post<{ success: boolean; mergedTableIds: string[] }>(
+      `/sessions/${sessionId}/merge`, { tableId }
+    ),
+
+  unmergeTable: (sessionId: string, tableId: string) =>
+    apiClient.post<{ success: boolean; mergedTableIds: string[] }>(
+      `/sessions/${sessionId}/unmerge`, { tableId }
+    ),
 };
 
 export const floorPlansApi = {

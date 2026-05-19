@@ -1072,14 +1072,6 @@ export function SignUpScreen() {
               </Text>
             </View>
             <Text maxFontSizeMultiplier={1.3} style={styles.planPriceSubtext}>{t('proPlanPriceSubtext')}</Text>
-            {PRICING.pro.trialDays > 0 && (
-              <View style={styles.trialBadge}>
-                <Ionicons name="gift-outline" size={14} color={colors.primary} />
-                <Text maxFontSizeMultiplier={1.3} style={styles.trialBadgeText}>
-                  {t('proPlanTrialBadge', { days: PRICING.pro.trialDays })}
-                </Text>
-              </View>
-            )}
           </View>
 
           <View style={styles.planFee}>
@@ -1669,22 +1661,6 @@ const createStyles = (colors: any, isDark: boolean) =>
       fontFamily: fonts.regular,
       color: colors.textSecondary,
       marginTop: 2,
-    },
-    trialBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      marginTop: 8,
-      backgroundColor: colors.primary + '15',
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 8,
-      alignSelf: 'flex-start',
-    },
-    trialBadgeText: {
-      fontSize: 13,
-      fontFamily: fonts.medium,
-      color: colors.primary,
     },
     planFee: {
       flexDirection: 'row',

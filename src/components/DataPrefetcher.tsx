@@ -62,10 +62,14 @@ export function DataPrefetcher() {
       queryFn: () => ordersApi.listHeld(deviceId),
     });
 
-    // Sessions: Pro/Enterprise only — prefetch open sessions + tabs
+    // Sessions: Pro/Enterprise only — prefetch open sessions + tabs.
+    // The catalog filter MUST be reflected in the query key, otherwise this
+    // collides with FloorPlanScreen's `['sessions', { status: 'open' }]`
+    // (unfiltered, org-wide) and the last-fetch-wins race silently wipes the
+    // canvas's session data depending on response ordering.
     if (isPro) {
       queryClient.prefetchQuery({
-        queryKey: ['sessions', { status: 'open' }],
+        queryKey: ['sessions', { status: 'open', catalogId: selectedCatalog.id }],
         queryFn: () => sessionsApi.list({ status: 'open', catalogId: selectedCatalog.id }),
       });
       queryClient.prefetchQuery({

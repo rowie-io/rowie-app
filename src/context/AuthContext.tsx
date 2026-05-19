@@ -27,6 +27,9 @@ interface AuthState {
   organization: Organization | null;
   subscription: Subscription | null;
   accessibleLocations: AccessibleLocation[];
+  // Mirrored from AsyncStorage so consumers (CatalogContext, FloorPlanScreen)
+  // can react to switches via React state instead of polling storage.
+  currentLocationId: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   connectStatus: ConnectStatus | null;
@@ -45,6 +48,7 @@ interface AuthContextType extends AuthState {
   completeOnboarding: () => Promise<void>;
   setBiometricEnabled: (enabled: boolean) => void;
   refreshBiometricStatus: () => Promise<void>;
+  setCurrentLocationId: (id: string | null) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -55,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     organization: null,
     subscription: null,
     accessibleLocations: [],
+    currentLocationId: null,
     isLoading: true,
     isAuthenticated: false,
     connectStatus: null,
@@ -91,6 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       organization: null,
       subscription: null,
       accessibleLocations: [],
+      currentLocationId: null,
       isLoading: false,
       isAuthenticated: false,
       connectStatus: null,
@@ -138,11 +144,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user && organization) {
         // We have cached data, show it immediately
         logger.log('[AuthContext] loadCachedAuth: using cached data');
+        const storedLocationId = await AsyncStorage.getItem('currentLocationId');
         setState(prev => ({
           ...prev,
           user,
           organization,
           subscription,
+          currentLocationId: storedLocationId,
           isLoading: false,
           isAuthenticated: true,
           currency: user.currency || 'usd',
@@ -181,11 +189,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         // Update state with fresh data
         const profileLocations: AccessibleLocation[] = (profile as any).accessibleLocations || [];
+        const effectiveLocations = profileLocations.length > 0 ? profileLocations : null;
+
+        // If the stored currentLocationId no longer matches an accessible
+        // location (e.g. staff was removed from that site), fall back to the
+        // org default. Done here — not in signIn — to also catch background
+        // refreshes where the assignment changed mid-session.
+        let nextLocationId: string | null | undefined = undefined;
+        if (effectiveLocations) {
+          const stored = await AsyncStorage.getItem('currentLocationId');
+          const stillValid = stored && effectiveLocations.some((l) => l.id === stored);
+          if (!stillValid) {
+            const def = effectiveLocations.find((l) => l.isDefault) || effectiveLocations[0];
+            nextLocationId = def ? def.id : null;
+            if (nextLocationId) {
+              await AsyncStorage.setItem('currentLocationId', nextLocationId);
+            } else {
+              await AsyncStorage.removeItem('currentLocationId');
+            }
+          } else {
+            nextLocationId = stored;
+          }
+        }
+
         setState(prev => ({
           ...prev,
           user: profile.user,
           organization: profile.organization,
-          accessibleLocations: profileLocations.length > 0 ? profileLocations : prev.accessibleLocations,
+          accessibleLocations: effectiveLocations || prev.accessibleLocations,
+          currentLocationId: nextLocationId !== undefined ? nextLocationId : prev.currentLocationId,
           isLoading: false,
           isAuthenticated: true,
           currency: profile.user.currency || 'usd',
@@ -201,6 +233,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             organization: null,
             subscription: null,
             accessibleLocations: [],
+            currentLocationId: null,
             isLoading: false,
             isAuthenticated: false,
             connectStatus: null,
@@ -244,14 +277,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // location users keep whatever's already stored (LocationPickerScreen will
     // prompt them to pick if the stored id is missing or stale).
     const accessibleLocations: any[] = (response as any).accessibleLocations || [];
+    let nextLocationId: string | null = null;
     if (accessibleLocations.length === 1) {
-      await AsyncStorage.setItem('currentLocationId', accessibleLocations[0].id);
+      const id: string = accessibleLocations[0].id;
+      nextLocationId = id;
+      await AsyncStorage.setItem('currentLocationId', id);
     } else if (accessibleLocations.length > 1) {
       const existing = await AsyncStorage.getItem('currentLocationId');
       const stillValid = existing && accessibleLocations.some((l: any) => l.id === existing);
-      if (!stillValid) {
+      if (stillValid && existing) {
+        nextLocationId = existing;
+      } else {
         const def = accessibleLocations.find((l: any) => l.isDefault) || accessibleLocations[0];
-        await AsyncStorage.setItem('currentLocationId', def.id);
+        const id: string = def.id;
+        nextLocationId = id;
+        await AsyncStorage.setItem('currentLocationId', id);
       }
     } else {
       await AsyncStorage.removeItem('currentLocationId');
@@ -263,6 +303,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       organization: response.organization,
       subscription: response.subscription || null,
       accessibleLocations,
+      currentLocationId: nextLocationId,
       isLoading: false,
       isAuthenticated: true,
       connectLoading: true, // Reset to loading state for connect status
@@ -281,6 +322,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       organization: null,
       subscription: null,
       accessibleLocations: [],
+      currentLocationId: null,
       isLoading: false,
       isAuthenticated: false,
       connectStatus: null,
@@ -369,6 +411,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setState(prev => ({ ...prev, biometricEnabled: enabled }));
   }, []);
 
+  // Single entry point for switching the active location. Writes AsyncStorage
+  // (so the API client picks it up via getCurrentLocationId on the next
+  // request) and updates state (so CatalogContext / screens can react).
+  const setCurrentLocationId = useCallback(async (id: string | null) => {
+    if (id) {
+      await AsyncStorage.setItem('currentLocationId', id).catch(() => {});
+    } else {
+      await AsyncStorage.removeItem('currentLocationId').catch(() => {});
+    }
+    setState(prev => ({ ...prev, currentLocationId: id }));
+  }, []);
+
   useEffect(() => {
     if (state.isAuthenticated && !state.isLoading) {
       refreshBiometricStatus();
@@ -391,7 +445,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     completeOnboarding,
     setBiometricEnabled,
     refreshBiometricStatus,
-  }), [state, signIn, signOut, refreshAuth, refreshConnectStatus, completeOnboarding, setBiometricEnabled, refreshBiometricStatus]);
+    setCurrentLocationId,
+  }), [state, signIn, signOut, refreshAuth, refreshConnectStatus, completeOnboarding, setBiometricEnabled, refreshBiometricStatus, setCurrentLocationId]);
 
   return (
     <AuthContext.Provider value={value}>

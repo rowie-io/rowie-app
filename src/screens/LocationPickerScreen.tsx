@@ -7,10 +7,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -31,23 +31,24 @@ interface AccessibleLocation {
 }
 
 /**
- * Shift-start location picker for multi-location vendors.
+ * Location picker for multi-location vendors.
  *
- * Rendered when `accessibleLocations.length > 1` and no valid
- * `currentLocationId` is persisted in AsyncStorage. Single-location vendors
- * never see this screen — the navigator in `App.tsx` skips straight to the
- * catalog picker.
+ * Mounted as a modal from SettingsScreen when the user taps "Switch" on the
+ * location row. The same screen handles both first-shift selection (no stored
+ * `currentLocationId`) and mid-session switching — `navigation.canGoBack()`
+ * distinguishes the modal case so we render a close button.
  *
- * Also rendered as a modal from SettingsScreen when the user wants to switch
- * locations mid-session. In that case `navigation.canGoBack()` is true and
- * we show a close button.
+ * Single-location vendors never reach this screen: AuthContext auto-selects
+ * the only location on signIn, and SettingsScreen hides the switcher.
  */
 export function LocationPickerScreen() {
   const { colors, isDark } = useTheme();
   const navigation = useNavigation<any>();
-  const { accessibleLocations } = useAuth() as {
+  const { accessibleLocations, setCurrentLocationId } = useAuth() as {
     accessibleLocations?: AccessibleLocation[];
+    setCurrentLocationId: (id: string | null) => Promise<void>;
   };
+  const queryClient = useQueryClient();
   const t = useTranslations('locations');
   const tc = useTranslations('common');
 
@@ -60,10 +61,21 @@ export function LocationPickerScreen() {
     async (location: AccessibleLocation) => {
       setSelectingId(location.id);
       try {
-        await AsyncStorage.setItem('currentLocationId', location.id);
-        // The API client reads the header fresh on every request (via
-        // getCurrentLocationId), so no context refresh is needed — the next
-        // request uses the new location. Navigate onward.
+        // Update AuthContext (which writes AsyncStorage). CatalogContext
+        // observes currentLocationId and refetches /catalogs filtered by the
+        // new X-Location-Id; auto-selecting the first available catalog if
+        // the previously selected one isn't in the new set.
+        await setCurrentLocationId(location.id);
+
+        // Drop cross-location stale data so it can't briefly flash before the
+        // refetch lands. removeQueries (not invalidate) clears the cache
+        // entirely; the next mount of each screen triggers a fresh fetch
+        // against the new location.
+        queryClient.removeQueries({ queryKey: ['floor-plans'] });
+        queryClient.removeQueries({ queryKey: ['sessions'] });
+        queryClient.removeQueries({ queryKey: ['products'] });
+        queryClient.removeQueries({ queryKey: ['categories'] });
+
         if (isModal) {
           navigation.goBack();
         } else {
@@ -77,7 +89,7 @@ export function LocationPickerScreen() {
         setSelectingId(null);
       }
     },
-    [navigation, isModal]
+    [navigation, isModal, setCurrentLocationId, queryClient]
   );
 
   const handleClose = useCallback(() => {

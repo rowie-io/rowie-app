@@ -13,23 +13,23 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { useTranslations } from '../lib/i18n';
 import { LanguagePickerModal } from '../components/LanguagePickerModal';
-import { useCatalog } from '../context/CatalogContext';
 import { useTerminal } from '../context/StripeTerminalContext';
 import { useSocketEvent, SocketEvents } from '../context/SocketContext';
 import { authService } from '../lib/api/auth';
 import { billingService, SubscriptionInfo } from '../lib/api/billing';
 import { Subscription } from '../lib/api';
 import { formatCents } from '../utils/currency';
+import { PRICING } from '../lib/pricing';
 import {
   enableBiometricLogin,
   disableBiometricLogin,
@@ -41,6 +41,7 @@ import { createVendorDashboardUrl } from '../lib/auth-handoff';
 import { config } from '../lib/config';
 import { Toggle } from '../components/Toggle';
 import { ProfileEditModal } from '../components/ProfileEditModal';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import { fonts } from '../lib/fonts';
 import logger from '../lib/logger';
@@ -60,9 +61,9 @@ export function SettingsScreen() {
       });
     }
   }, [isDark]);
-  const { user, organization, subscription, signOut, connectStatus, connectLoading, isPaymentReady, refreshAuth, biometricCapabilities, biometricEnabled, setBiometricEnabled, refreshBiometricStatus, currency, accessibleLocations } = useAuth();
+  const { user, organization, subscription, signOut, connectStatus, connectLoading, isPaymentReady, refreshAuth, biometricCapabilities, biometricEnabled, setBiometricEnabled, refreshBiometricStatus, currency, accessibleLocations, currentLocationId } = useAuth();
+  const { serviceMode, setServiceMode } = useCart();
   const tLocations = useTranslations('locations');
-  const { selectedCatalog, catalogs, clearCatalog } = useCatalog();
   const {
     deviceCompatibility,
     isConnected,
@@ -123,6 +124,11 @@ export function SettingsScreen() {
   // Profile edit modal
   const [showProfileEdit, setShowProfileEdit] = useState(false);
 
+  // Sign-out confirmation — using <ConfirmModal> instead of Alert.alert so it
+  // also works on React Native Web (Alert.alert is a no-op on web, which made
+  // the Sign Out button silent during web QA / dev builds).
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+
   // Change password modal
   const [showChangePassword, setShowChangePassword] = useState(false);
 
@@ -135,20 +141,18 @@ export function SettingsScreen() {
 
   const needsBankingSetup = !connectLoading && !connectStatus?.chargesEnabled && (user?.role === 'owner' || user?.role === 'admin');
 
-  // Current location id (persisted in AsyncStorage, read on focus so switching
-  // via LocationPicker is reflected when we return to Settings).
-  const [currentLocationId, setCurrentLocationId] = useState<string | null>(null);
+  // On the mobile POS we show the switcher whenever the user has access to
+  // >1 location, regardless of role: unlike the vendor *portal* — which hides
+  // the switcher for owner/admin per root CLAUDE.md — Tap to Pay and Stripe
+  // Terminal are physically location-bound, so admins and owners also need to
+  // pick the site they're charging from.
   const currentLocation = accessibleLocations.find((l) => l.id === currentLocationId) || null;
-  // Per root CLAUDE.md: owner/admin view the org-wide; only non-owner staff
-  // (and pos_user kiosks) are scoped to a specific location via the switcher.
-  const isOrgWideRole = user?.role === 'owner' || user?.role === 'admin';
-  const showLocationRow = !isOrgWideRole && accessibleLocations.length > 1;
+  const showLocationRow = accessibleLocations.length > 1;
 
   // Refresh biometric status when screen is focused
   useFocusEffect(
     useCallback(() => {
       refreshBiometricStatus();
-      AsyncStorage.getItem('currentLocationId').then((id) => setCurrentLocationId(id));
     }, [refreshBiometricStatus])
   );
 
@@ -184,28 +188,20 @@ export function SettingsScreen() {
   };
 
   const handleSignOut = () => {
-    // Confirm before signing out — destructive op that nukes the session
-    // (and any in-progress cart, held orders this device kept locally,
-    // active Stripe Terminal connection, queued queries).
-    Alert.alert(
-      t('signOutConfirmTitle'),
-      t('signOutConfirmMessage'),
-      [
-        { text: tc('cancel'), style: 'cancel' },
-        {
-          text: t('signOut'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await signOut();
-            } catch (error) {
-              logger.error('[SettingsScreen] Sign out error:', error);
-            }
-          },
-        },
-      ]
-    );
+    // Use the cross-platform ConfirmModal — Alert.alert is a no-op on RN Web,
+    // which left the Sign Out button silent during web QA. Native iOS/Android
+    // now also get a consistent in-app modal instead of the OS-styled alert.
+    setShowSignOutConfirm(true);
   };
+
+  const confirmSignOut = useCallback(async () => {
+    setShowSignOutConfirm(false);
+    try {
+      await signOut();
+    } catch (error) {
+      logger.error('[SettingsScreen] Sign out error:', error);
+    }
+  }, [signOut]);
 
   const handleDeleteAccount = () => {
     Alert.alert(
@@ -239,10 +235,6 @@ export function SettingsScreen() {
         },
       ]
     );
-  };
-
-  const handleSwitchCatalog = () => {
-    navigation.navigate('CatalogSelect');
   };
 
   const handleSwitchLocation = () => {
@@ -446,36 +438,9 @@ export function SettingsScreen() {
               </View>
             )}
 
-            {/* Menu Section */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>{t('sectionMenu')}</Text>
-              <View style={styles.card}>
-                <View style={styles.row}>
-                  <View style={styles.rowLeft}>
-                    <Ionicons name="restaurant-outline" size={20} color={colors.textSecondary} style={styles.rowIcon} />
-                    <View style={styles.labelContainer}>
-                      <Text style={styles.label} numberOfLines={1} maxFontSizeMultiplier={1.3}>
-                        {selectedCatalog?.name || t('noneSelected')}
-                      </Text>
-                      {selectedCatalog?.location && (
-                        <Text style={styles.sublabel} numberOfLines={1} maxFontSizeMultiplier={1.5}>{selectedCatalog.location}</Text>
-                      )}
-                    </View>
-                  </View>
-                  {catalogs.length > 1 && (
-                    <TouchableOpacity
-                      style={styles.switchButton}
-                      onPress={handleSwitchCatalog}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('switchMenuAccessibilityLabel')}
-                    >
-                      <Text style={styles.switchButtonText} maxFontSizeMultiplier={1.3}>{t('switch')}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            </View>
-
+            {/* Menu picker removed: catalogs are scoped to the active
+                location and switched inline on the Menu screen via the pill
+                strip / horizontal swipe. */}
 
             {/* Business Section - Subscription + Banking (owners/admins only) */}
             {(user?.role === 'owner' || user?.role === 'admin') && (
@@ -543,6 +508,16 @@ export function SettingsScreen() {
                           </Text>
                           {subscriptionInfo?.platform === 'manual' ? (
                             <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>{t('managedByRowie')}</Text>
+                          ) : isPro ? (
+                            // Pro is priced at $24.99 USD globally — don't
+                            // reflect Stripe's per-currency conversion (€24.99,
+                            // £24.99, etc.) which confuses vendors. Mirror
+                            // vendor /billing's USD override. Non-Pro paid
+                            // plans (enterprise / custom) still show the
+                            // Stripe-reported price.
+                            <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>
+                              {t('perMonth', { price: PRICING.pro.monthlyPriceDisplay })}
+                            </Text>
                           ) : subscriptionInfo?.current_plan?.price ? (
                             <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>
                               {t('perMonth', { price: formatCents(subscriptionInfo.current_plan.price, subscriptionInfo.current_plan.currency || currency) })}
@@ -759,6 +734,50 @@ export function SettingsScreen() {
             </View>
 
 
+            {/* POS Mode Section — table service vs quick service */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>POS Mode</Text>
+              <View style={styles.card}>
+                <TouchableOpacity
+                  style={styles.row}
+                  onPress={() => setServiceMode('table_service')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Table service mode"
+                  accessibilityState={{ selected: serviceMode === 'table_service' }}
+                >
+                  <View style={styles.rowLeft}>
+                    <Ionicons name="restaurant-outline" size={20} color={colors.textSecondary} style={styles.rowIcon} />
+                    <View>
+                      <Text style={styles.label} maxFontSizeMultiplier={1.5}>Table Service</Text>
+                      <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>Pick a table before each order. Orders attribute to tables.</Text>
+                    </View>
+                  </View>
+                  {serviceMode === 'table_service' && (
+                    <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+                <View style={styles.divider} />
+                <TouchableOpacity
+                  style={styles.row}
+                  onPress={() => setServiceMode('quick_service')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Quick service mode"
+                  accessibilityState={{ selected: serviceMode === 'quick_service' }}
+                >
+                  <View style={styles.rowLeft}>
+                    <Ionicons name="flash-outline" size={20} color={colors.textSecondary} style={styles.rowIcon} />
+                    <View>
+                      <Text style={styles.label} maxFontSizeMultiplier={1.5}>Quick Service</Text>
+                      <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>Counter/QSR/food-truck mode. Orders go straight to checkout, no table.</Text>
+                    </View>
+                  </View>
+                  {serviceMode === 'quick_service' && (
+                    <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+
             {/* Appearance Section */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>{t('sectionAppearance')}</Text>
@@ -951,6 +970,18 @@ export function SettingsScreen() {
       <LanguagePickerModal
         visible={showLanguagePicker}
         onClose={() => setShowLanguagePicker(false)}
+      />
+
+      {/* Sign-out confirmation — cross-platform replacement for Alert.alert */}
+      <ConfirmModal
+        visible={showSignOutConfirm}
+        title={t('signOutConfirmTitle')}
+        message={t('signOutConfirmMessage')}
+        confirmText={t('signOut')}
+        cancelText={tc('cancel')}
+        confirmStyle="destructive"
+        onConfirm={confirmSignOut}
+        onCancel={() => setShowSignOutConfirm(false)}
       />
     </View>
   );

@@ -97,7 +97,6 @@ function NoCatalogsWelcome({ colors, isDark, isManager, onQuickCharge }: { color
   const [catalogLocation, setCatalogLocation] = useState('');
   const [catalogDate, setCatalogDate] = useState<Date | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [taxRateString, setTaxRateString] = useState('0');
   const [layoutType, setLayoutType] = useState<CatalogLayoutType>('classic-grid');
   const [showTipScreen, setShowTipScreen] = useState(true);
   const [tipPercentages, setTipPercentages] = useState<number[]>([15, 18, 20, 25]);
@@ -122,7 +121,6 @@ function NoCatalogsWelcome({ colors, isDark, isManager, onQuickCharge }: { color
       setCatalogDescription('');
       setCatalogLocation('');
       setCatalogDate(null);
-      setTaxRateString('0');
       setLayoutType('classic-grid');
       setShowTipScreen(true);
       setTipPercentages([15, 18, 20, 25]);
@@ -143,12 +141,6 @@ function NoCatalogsWelcome({ colors, isDark, isManager, onQuickCharge }: { color
       return;
     }
 
-    const taxRate = parseFloat(taxRateString) || 0;
-    if (isNaN(taxRate) || taxRate < 0 || taxRate > 100) {
-      Alert.alert(tc('error'), t('errorInvalidTaxRate'));
-      return;
-    }
-
     createCatalogMutation.mutate({
       name,
       description: catalogDescription.trim() || null,
@@ -159,7 +151,6 @@ function NoCatalogsWelcome({ colors, isDark, isManager, onQuickCharge }: { color
       tipPercentages,
       allowCustomTip,
       promptForEmail,
-      taxRate,
       layoutType,
     });
   };
@@ -617,25 +608,6 @@ function NoCatalogsWelcome({ colors, isDark, isManager, onQuickCharge }: { color
                       </TouchableOpacity>
                     );
                   })}
-                </View>
-              </View>
-
-              <View style={styles.inputSection}>
-                <Text style={[styles.inputLabel, { color: colors.text }]} maxFontSizeMultiplier={1.5}>{ts('taxRateLabel')}</Text>
-                <View style={[styles.taxInputContainer, {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                }]}>
-                  <TextInput
-                    style={[styles.taxInput, { color: colors.text }]}
-                    value={taxRateString}
-                    onChangeText={setTaxRateString}
-                    placeholder="0"
-                    placeholderTextColor={colors.textMuted}
-                    keyboardType="decimal-pad"
-                    accessibilityLabel={ts('taxRateLabel')}
-                  />
-                  <Text style={[styles.taxSymbol, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>{tc('percentSymbol')}</Text>
                 </View>
               </View>
 

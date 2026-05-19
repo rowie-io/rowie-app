@@ -86,14 +86,46 @@ export function SocketEventHandlers() {
     queryClient.invalidateQueries({ queryKey: ['transactions'] });
   }, [queryClient, isMyOrg]);
 
+  // Order events that may carry a tableId (Table Service mode). Refresh the
+  // floor-plan and tables caches so the live service view across devices
+  // shows the new order without a manual pull-to-refresh.
+  const handleOrderCreated = useCallback((data: any) => {
+    if (!isMyOrg(data)) return;
+    queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    if (data?.tableId) {
+      queryClient.invalidateQueries({ queryKey: ['floor-plans'] });
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    }
+  }, [queryClient, isMyOrg]);
+
+  // Session lifecycle events affect every FloorPlan / tile / Tabs screen
+  // across devices. Invalidating sessions + floor-plans on every device
+  // (including ones not currently mounting FloorPlanScreen) keeps the cache
+  // hot so when the user navigates there the data is already fresh.
+  const handleSessionEvent = useCallback((data: any) => {
+    if (!isMyOrg(data)) return;
+    queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    queryClient.invalidateQueries({ queryKey: ['floor-plans'] });
+    queryClient.invalidateQueries({ queryKey: ['tables'] });
+  }, [queryClient, isMyOrg]);
+
   useSocketEvent(SocketEvents.USER_UPDATED, handleUserUpdate);
   useSocketEvent(SocketEvents.ORGANIZATION_UPDATED, handleOrgUpdate);
   useSocketEvent(SocketEvents.EVENT_CREATED, handleEventUpdate);
   useSocketEvent(SocketEvents.EVENT_UPDATED, handleEventUpdate);
   useSocketEvent(SocketEvents.EVENT_DELETED, handleEventUpdate);
+  useSocketEvent(SocketEvents.ORDER_CREATED, handleOrderCreated);
   useSocketEvent(SocketEvents.ORDER_COMPLETED, handleTransactionEvent);
   useSocketEvent(SocketEvents.PAYMENT_RECEIVED, handleTransactionEvent);
   useSocketEvent(SocketEvents.ORDER_REFUNDED, handleTransactionEvent);
+  useSocketEvent(SocketEvents.SESSION_CREATED, handleSessionEvent);
+  useSocketEvent(SocketEvents.SESSION_UPDATED, handleSessionEvent);
+  useSocketEvent(SocketEvents.SESSION_ITEMS_ADDED, handleSessionEvent);
+  useSocketEvent(SocketEvents.SESSION_SETTLED, handleSessionEvent);
+  useSocketEvent(SocketEvents.SESSION_CANCELLED, handleSessionEvent);
+  useSocketEvent(SocketEvents.TABLE_STATUS_CHANGED, handleSessionEvent);
+  useSocketEvent(SocketEvents.FLOOR_PLAN_UPDATED, handleSessionEvent);
+  // SESSION_SETTLED/CANCELLED also affect transactions cache; cover both.
   useSocketEvent(SocketEvents.SESSION_SETTLED, handleTransactionEvent);
   useSocketEvent(SocketEvents.SESSION_CANCELLED, handleTransactionEvent);
 

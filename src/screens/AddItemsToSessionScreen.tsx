@@ -123,19 +123,30 @@ export function AddItemsToSessionScreen() {
     });
   }, []);
 
+  // Two outcomes from the same add-items mutation:
+  //   'kitchen' — insert the round and go back; staff settles later.
+  //   'pay'     — insert the round, then jump straight into the settle modal
+  //               on SessionDetail (via the `autoOpenSettle` route param).
+  // Both paths still fire the same POST /sessions/{id}/items, so the kitchen
+  // sees the round either way — "pay now" must never bypass the kitchen.
   const addItemsMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async (_: { mode: 'kitchen' | 'pay' }) => {
       const items = Object.values(selected).map((i) => ({
         catalogProductId: i.catalogProductId,
         quantity: i.quantity,
       }));
       return sessionsApi.addItems(sessionId, items, roundNotes.trim() || undefined);
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       setRoundNotes('');
       queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
-      navigation.goBack();
+      if (variables.mode === 'pay') {
+        // Replace so the user can't bounce back here mid-checkout.
+        navigation.replace('SessionDetail', { sessionId, autoOpenSettle: true });
+      } else {
+        navigation.goBack();
+      }
     },
     onError: (err: any) => {
       logger.error('[AddItems] Failed', err);
@@ -145,6 +156,7 @@ export function AddItemsToSessionScreen() {
       Alert.alert(t('failedAddTitle'), err?.error || err?.message || t('failedAddMessage'));
     },
   });
+  const pendingMode = addItemsMutation.isPending ? addItemsMutation.variables?.mode : undefined;
 
   if (loadingSession || loadingProducts) {
     return (
@@ -283,36 +295,67 @@ export function AddItemsToSessionScreen() {
               />
             </View>
           )}
-          <TouchableOpacity
-            onPress={() => addItemsMutation.mutate()}
-            disabled={selectedCount === 0 || addItemsMutation.isPending}
-            style={[
-              styles.confirmButton,
-              { backgroundColor: colors.primary },
-              (selectedCount === 0 || addItemsMutation.isPending) && styles.confirmButtonDisabled,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={
-              selectedCount === 1
-                ? t('addItemAccessibilitySingular', { count: selectedCount, amount: formatCents(selectedTotalCents, currency) })
-                : t('addItemAccessibilityPlural', { count: selectedCount, amount: formatCents(selectedTotalCents, currency) })
-            }
-          >
-            {addItemsMutation.isPending ? (
-              <ActivityIndicator color="#1C1917" accessibilityLabel={t('addingItemsLabel')} />
-            ) : (
-              <>
-                <Text style={styles.confirmButtonText} maxFontSizeMultiplier={1.3}>
-                  {selectedCount === 1
-                    ? t('addItemSingular', { count: selectedCount })
-                    : t('addItemPlural', { count: selectedCount })}
-                </Text>
-                <Text style={styles.confirmButtonAmount} maxFontSizeMultiplier={1.2}>
-                  {formatCents(selectedTotalCents, currency)}
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              onPress={() => addItemsMutation.mutate({ mode: 'kitchen' })}
+              disabled={selectedCount === 0 || addItemsMutation.isPending}
+              style={[
+                styles.actionButton,
+                styles.actionButtonPrimary,
+                { backgroundColor: colors.primary },
+                (selectedCount === 0 || addItemsMutation.isPending) && styles.confirmButtonDisabled,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('sendToKitchenAccessibility', {
+                count: selectedCount,
+                amount: formatCents(selectedTotalCents, currency),
+              })}
+            >
+              {pendingMode === 'kitchen' ? (
+                <ActivityIndicator color="#1C1917" accessibilityLabel={t('sendingToKitchenLabel')} />
+              ) : (
+                <>
+                  <Ionicons name="send" size={18} color="#1C1917" />
+                  <Text style={styles.actionButtonTextPrimary} maxFontSizeMultiplier={1.3} numberOfLines={1}>
+                    {t('sendToKitchen')}
+                  </Text>
+                  <Text style={styles.actionButtonAmountPrimary} maxFontSizeMultiplier={1.2} numberOfLines={1}>
+                    {formatCents(selectedTotalCents, currency)}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => addItemsMutation.mutate({ mode: 'pay' })}
+              disabled={selectedCount === 0 || addItemsMutation.isPending}
+              style={[
+                styles.actionButton,
+                styles.actionButtonSecondary,
+                { borderColor: colors.primary, backgroundColor: colors.surface },
+                (selectedCount === 0 || addItemsMutation.isPending) && styles.confirmButtonDisabled,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('payNowAccessibility', {
+                count: selectedCount,
+                amount: formatCents(selectedTotalCents, currency),
+              })}
+            >
+              {pendingMode === 'pay' ? (
+                <ActivityIndicator color={colors.primary} accessibilityLabel={t('openingCheckoutLabel')} />
+              ) : (
+                <>
+                  <Ionicons name="card-outline" size={18} color={colors.primary} />
+                  <Text
+                    style={[styles.actionButtonTextSecondary, { color: colors.primary }]}
+                    maxFontSizeMultiplier={1.3}
+                    numberOfLines={1}
+                  >
+                    {t('payNow')}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -461,16 +504,42 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     textAlignVertical: 'top',
   },
-  confirmButton: {
+  confirmButtonDisabled: { opacity: 0.5 },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     minHeight: 56,
     borderRadius: 16,
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
   },
-  confirmButtonDisabled: { opacity: 0.5 },
-  confirmButtonText: { fontSize: 16, fontFamily: fonts.bold, color: '#1C1917' },
-  confirmButtonAmount: { fontSize: 18, fontFamily: fonts.bold, color: '#1C1917' },
+  actionButtonPrimary: {
+    flex: 1.7,
+    justifyContent: 'center',
+    gap: 8,
+  },
+  actionButtonSecondary: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 8,
+    borderWidth: 2,
+  },
+  actionButtonTextPrimary: {
+    fontSize: 15,
+    fontFamily: fonts.bold,
+    color: '#1C1917',
+  },
+  actionButtonAmountPrimary: {
+    fontSize: 16,
+    fontFamily: fonts.bold,
+    color: '#1C1917',
+  },
+  actionButtonTextSecondary: {
+    fontSize: 15,
+    fontFamily: fonts.bold,
+  },
   emptyText: { fontSize: 14, fontFamily: fonts.regular, textAlign: 'center' },
 });

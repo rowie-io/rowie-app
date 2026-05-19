@@ -41,6 +41,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
+import { Gesture, GestureDetector, Directions } from 'react-native-gesture-handler';
 
 import { useTheme } from '../context/ThemeContext';
 import { useCatalog } from '../context/CatalogContext';
@@ -417,7 +418,16 @@ export function MenuScreen() {
   const insets = useSafeAreaInsets();
   const { isLoading: authLoading, user, organization, completeOnboarding, subscription, currency, isPaymentReady } = useAuth();
   const { selectedCatalog, catalogs, isLoading: catalogsLoading, refreshCatalogs, setSelectedCatalog } = useCatalog();
-  const { addItem, getItemQuantity, decrementItem, itemCount, subtotal } = useCart();
+  const {
+    addItem,
+    getItemQuantity,
+    decrementItem,
+    itemCount,
+    subtotal,
+    serviceMode,
+    setServiceMode,
+    tableLabel,
+  } = useCart();
   const { guardCheckout } = useTapToPayGuard();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -427,6 +437,53 @@ export function MenuScreen() {
 
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
+
+  // If the user downgraded from Pro → Starter while `table_service` was the
+  // persisted mode, snap them back to quick_service so the cart can be used
+  // without a (locked) table picker. Wait until subscription has loaded
+  // (`subscription !== null && tier defined`) so we don't flip during the
+  // first-paint window when AuthContext is still hydrating from cache.
+  useEffect(() => {
+    if (!subscription || !subscription.tier) return;
+    const isProTier = subscription.tier === 'pro' || subscription.tier === 'enterprise';
+    if (!isProTier && serviceMode === 'table_service') {
+      setServiceMode('quick_service');
+    }
+  }, [subscription, serviceMode, setServiceMode]);
+
+  // Horizontal swipe-between-catalogs gesture. Fling (rather than Pan) keeps
+  // the trigger high-velocity so it doesn't fight the vertical product-list
+  // scroll or the horizontal category-pill ScrollView. Disabled in edit mode
+  // — accidentally swiping while reorganizing products would feel hostile.
+  const swipeToCatalog = useCallback(
+    (dir: 'left' | 'right') => {
+      if (catalogs.length < 2 || !selectedCatalog) return;
+      const idx = catalogs.findIndex((c) => c.id === selectedCatalog.id);
+      if (idx < 0) return;
+      const nextIdx = dir === 'left'
+        ? (idx + 1) % catalogs.length
+        : (idx - 1 + catalogs.length) % catalogs.length;
+      setSelectedCatalog(catalogs[nextIdx]);
+    },
+    [catalogs, selectedCatalog, setSelectedCatalog]
+  );
+  const catalogSwipeGesture = useMemo(() => {
+    // Disable per-direction (Race composition has no .enabled()). Edit mode
+    // suppresses swipes so accidental flings while reorganizing don't switch
+    // the active catalog.
+    const enabled = !isEditMode && catalogs.length > 1;
+    const swipeLeft = Gesture.Fling()
+      .direction(Directions.LEFT)
+      .enabled(enabled)
+      .runOnJS(true)
+      .onEnd(() => swipeToCatalog('left'));
+    const swipeRight = Gesture.Fling()
+      .direction(Directions.RIGHT)
+      .enabled(enabled)
+      .runOnJS(true)
+      .onEnd(() => swipeToCatalog('right'));
+    return Gesture.Race(swipeLeft, swipeRight);
+  }, [swipeToCatalog, isEditMode, catalogs.length]);
 
   // Exit edit mode and selection mode when navigating away from this screen
   useEffect(() => {
@@ -1053,10 +1110,29 @@ export function MenuScreen() {
     [currentLayoutType, screenWidth]
   );
 
+  // In Table Service mode, an order MUST be attributed to a table. If no
+  // table is picked yet, route the server to the floor plan picker BEFORE
+  // anything enters the cart. Returns true if blocked (caller should bail).
+  const requireTableIfTableService = useCallback((): boolean => {
+    if (serviceMode === 'table_service' && !tableLabel) {
+      Alert.alert(
+        'Pick a table first',
+        'Table Service mode requires you to pick a table before adding items. Tap a table on the floor plan.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open floor plan', onPress: () => navigation.navigate('FloorPlan' as never) },
+        ],
+      );
+      return true;
+    }
+    return false;
+  }, [serviceMode, tableLabel, navigation]);
+
   const handleAddToCart = (product: Product) => {
     if (isEditMode) {
       handleOpenProductModal(product);
     } else {
+      if (requireTableIfTableService()) return;
       addItem(product);
     }
   };
@@ -1064,6 +1140,7 @@ export function MenuScreen() {
   // Long-press opens notes modal
   const handleProductLongPress = (product: Product) => {
     if (!isEditMode) {
+      if (requireTableIfTableService()) return;
       setNotesProduct(product);
       setNotesModalVisible(true);
     }
@@ -1222,7 +1299,7 @@ export function MenuScreen() {
     if (currentLayoutType !== 'split-view') return [];
     const cats = categories || [];
     // Add "All" as first option
-    return [{ id: null, name: t('allProducts') || 'All' }, ...cats.filter(c => c.isActive)];
+    return [{ id: null, name: t('allCategoryLabel') }, ...cats.filter(c => c.isActive)];
   }, [currentLayoutType, categories, t]);
 
   // Split View: selected category in sidebar (null = all)
@@ -1630,13 +1707,13 @@ export function MenuScreen() {
   if (catalogs.length === 0) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <SetupRequired type="no-catalogs" onQuickCharge={() => setQuickChargeVisible(true)} />
+        <SetupRequired type="no-catalogs" onQuickCharge={() => { if (!requireTableIfTableService()) setQuickChargeVisible(true); }} />
 
         {/* Quick Charge FAB - disabled without connected account */}
         <View style={[styles.bottomActions, styles.bottomActionsEmpty, { bottom: 8 }]}>
           <TouchableOpacity
             style={[styles.quickChargeFab, { backgroundColor: colors.text, opacity: isPaymentReady ? 1 : 0.35 }]}
-            onPress={() => isPaymentReady && setQuickChargeVisible(true)}
+            onPress={() => { if (isPaymentReady && !requireTableIfTableService()) setQuickChargeVisible(true); }}
             disabled={!isPaymentReady}
             activeOpacity={0.9}
             accessibilityRole="button"
@@ -1732,6 +1809,7 @@ export function MenuScreen() {
   }
 
   return (
+    <GestureDetector gesture={catalogSwipeGesture}>
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={[styles.container, { paddingTop: insets.top }]}>
         {/* Header */}
@@ -1801,6 +1879,79 @@ export function MenuScreen() {
               {selectedCatalog.location ? (
                 <Text maxFontSizeMultiplier={1.5} style={styles.catalogLocation}>{selectedCatalog.location}</Text>
               ) : null}
+              {/* Service mode + table chip. Quick sale = no attribution.
+                  Table service = required table picker before cart use.
+                  Tap in quick_service flips to table_service + opens FloorPlan;
+                  tap in table_service navigates to FloorPlan to change/pick
+                  the active table.
+                  Pro-gated: free-tier users get an upgrade prompt instead so
+                  they discover the feature but can't activate it. */}
+              {(() => {
+                const isProTier =
+                  subscription?.tier === 'pro' || subscription?.tier === 'enterprise';
+                const onChipPress = () => {
+                  if (!isProTier) {
+                    Alert.alert(
+                      'Table service is Pro',
+                      'Upgrade to Pro to manage floor plans, tables, and table-side ordering.',
+                      [
+                        { text: 'Not now', style: 'cancel' },
+                        { text: 'Upgrade', onPress: () => navigation.navigate('Upgrade' as never) },
+                      ],
+                    );
+                    return;
+                  }
+                  if (serviceMode === 'quick_service') setServiceMode('table_service');
+                  navigation.navigate('FloorPlan' as never);
+                };
+                return (
+                  <TouchableOpacity
+                    style={styles.modeChip}
+                    onPress={onChipPress}
+                    activeOpacity={0.8}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      !isProTier
+                        ? 'Quick sale. Table service requires Pro — tap to upgrade.'
+                        : serviceMode === 'table_service'
+                        ? tableLabel
+                          ? `Current table ${tableLabel}, tap to change`
+                          : 'Pick a table'
+                        : 'Quick sale, tap to switch to table service'
+                    }
+                  >
+                    <Ionicons
+                      name={
+                        !isProTier
+                          ? 'flash-outline'
+                          : serviceMode === 'table_service'
+                          ? 'restaurant-outline'
+                          : 'flash-outline'
+                      }
+                      size={14}
+                      color={colors.textSecondary}
+                    />
+                    <Text maxFontSizeMultiplier={1.3} style={styles.modeChipText}>
+                      {!isProTier
+                        ? 'Quick sale'
+                        : serviceMode === 'table_service'
+                        ? tableLabel
+                          ? tableLabel
+                          : 'Pick a table'
+                        : 'Quick sale'}
+                    </Text>
+                    {!isProTier && (
+                      <Ionicons
+                        name="diamond-outline"
+                        size={11}
+                        color={colors.primary}
+                        style={{ marginLeft: 2 }}
+                      />
+                    )}
+                  </TouchableOpacity>
+                );
+              })()}
             </View>
             <View style={styles.headerButtons}>
               {!isEditMode && (
@@ -1843,6 +1994,60 @@ export function MenuScreen() {
           </>
         )}
       </View>
+
+      {/* Catalog pill strip — auto-collapses for single-catalog locations.
+          Switches the active catalog (locked catalogs go through the normal
+          upgrade flow when tapped via the existing per-product gating). */}
+      {catalogs.length > 1 && (
+        <View style={styles.catalogStripSection}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.catalogStripContainer}
+          >
+            {catalogs.map((cat) => {
+              const isActive = cat.id === selectedCatalog.id;
+              return (
+                <TouchableOpacity
+                  key={cat.id}
+                  onPress={() => setSelectedCatalog(cat)}
+                  activeOpacity={0.85}
+                  style={[
+                    styles.catalogStripPill,
+                    {
+                      backgroundColor: isActive ? colors.primary : colors.card,
+                      borderColor: isActive ? colors.primary : colors.border,
+                      opacity: cat.isLocked ? 0.55 : 1,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('switchToMenuAccessibilityLabel', { name: cat.name })}
+                  accessibilityState={{ selected: isActive }}
+                >
+                  <Text
+                    maxFontSizeMultiplier={1.3}
+                    style={[
+                      styles.catalogStripPillText,
+                      { color: isActive ? '#fff' : colors.text, fontFamily: isActive ? fonts.semiBold : fonts.regular },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {cat.name}
+                  </Text>
+                  {cat.isLocked && (
+                    <Ionicons
+                      name="lock-closed"
+                      size={11}
+                      color={isActive ? '#fff' : colors.textMuted}
+                      style={{ marginLeft: 6 }}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
 
       {/* Category Pills */}
       {activeCategories.length > 0 && (
@@ -2058,7 +2263,7 @@ export function MenuScreen() {
           {/* Quick Charge FAB */}
           <TouchableOpacity
             style={[styles.quickChargeFab, { backgroundColor: colors.text }]}
-            onPress={() => setQuickChargeVisible(true)}
+            onPress={() => { if (!requireTableIfTableService()) setQuickChargeVisible(true); }}
             activeOpacity={0.9}
             accessibilityRole="button"
             accessibilityLabel={t('quickChargeAccessibilityLabel')}
@@ -2136,6 +2341,7 @@ export function MenuScreen() {
         />
       </View>
     </View>
+    </GestureDetector>
   );
 }
 
@@ -2174,6 +2380,24 @@ const createStyles = (colors: any, cardWidth: number, layoutType: CatalogLayoutT
       fontWeight: '500',
       color: colors.textSecondary,
       marginTop: 2,
+    },
+    modeChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 4,
+      marginTop: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 999,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    modeChipText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
     },
     headerButtons: {
       flexDirection: 'row',
@@ -2268,6 +2492,29 @@ const createStyles = (colors: any, cardWidth: number, layoutType: CatalogLayoutT
       paddingHorizontal: 16,
       paddingVertical: 8,
       gap: 12,
+    },
+    catalogStripSection: {
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    catalogStripContainer: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      gap: 8,
+    },
+    catalogStripPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 999,
+      borderWidth: 1,
+      // 44pt minimum tap target per Apple HIG
+      minHeight: 36,
+    },
+    catalogStripPillText: {
+      fontSize: 13,
+      maxWidth: 180,
     },
     productList: {
       paddingHorizontal: GRID_PADDING,

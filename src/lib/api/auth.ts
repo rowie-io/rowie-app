@@ -30,6 +30,12 @@ export interface User {
   rates?: ComputedRates;
   language?: string;
   orgLanguage?: string;
+  // 2-letter ISO country code from the org's billing address; used by
+  // UpgradeScreen to pick the correct regional transaction-fee display
+  // (EU/UK have different Stripe base rates than US/CA). When undefined
+  // callers fall back to 'US'. API may or may not populate it — the field
+  // is optional and the fallback path is the runtime guarantee.
+  country?: string;
 }
 
 export interface Organization {

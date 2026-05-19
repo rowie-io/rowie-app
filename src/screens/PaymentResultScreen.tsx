@@ -434,7 +434,7 @@ export function PaymentResultScreen() {
       }
     } catch (error: any) {
       logger.error('[ManualCard] Payment error:', error);
-      Alert.alert(t('paymentErrorTitle'), error.message || t('manualCardPaymentErrorMessage'));
+      Alert.alert(t('paymentFailedTitle'), error.message || t('manualCardPaymentErrorMessage'));
     } finally {
       setProcessingCard(false);
     }

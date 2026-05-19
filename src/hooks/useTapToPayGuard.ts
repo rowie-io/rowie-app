@@ -33,8 +33,10 @@ export function useTapToPayGuard() {
       return true;
     }
 
-    // Android: skip education screen — TTP setup is handled silently via auto-warm
-    if (Platform.OS === 'android') {
+    // Android: skip education screen — TTP setup is handled silently via auto-warm.
+    // Web: there is no Tap to Pay on web at all, so the education screen makes no
+    // sense — let the dev/QA web build use the existing Cash + manual entry paths.
+    if (Platform.OS === 'android' || Platform.OS === 'web') {
       return true;
     }
 

@@ -344,6 +344,11 @@ export function TransactionsScreen() {
     }, [queryClient])
   );
 
+  // History shows all the org's transactions — not just whichever catalog
+  // happens to be selected on the Menu tab. Filtering by selectedCatalog hid
+  // most of the user's history (the default catalog frequently has zero sales
+  // while every other one has plenty), so users opened History expecting a
+  // full audit log and saw "No transactions yet" instead.
   const {
     data,
     isLoading,
@@ -353,12 +358,11 @@ export function TransactionsScreen() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['transactions', selectedCatalog?.id, filter],
+    queryKey: ['transactions', filter],
     queryFn: ({ pageParam }) =>
       transactionsApi.list({
         limit: 25,
         starting_after: pageParam,
-        catalog_id: selectedCatalog?.id,
         status: filter,
       }),
     getNextPageParam: (lastPage) => {

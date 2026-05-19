@@ -20,6 +20,17 @@ import { eventsApi, type OrgEvent, type RecentScan } from '../lib/api';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { fonts } from '../lib/fonts';
 import { useTranslations } from '../lib/i18n';
+import * as Haptics from 'expo-haptics';
+
+// Minimum gap between two camera reads firing the API. Even for distinct
+// codes, prevents back-to-back scans from feeling like spam.
+const SCAN_COOLDOWN_MS = 1500;
+
+// Deliberate pause between camera read and API call. Without it the result
+// flashes too fast for door staff to perceive the "Verifying..." state, which
+// makes the scanner feel jittery. ~400ms is the sweet spot — long enough to
+// register as a discrete action, short enough not to feel laggy.
+const SCAN_PROCESS_DELAY_MS = 400;
 // Dynamically import expo-camera (may not be installed)
 let CameraView: any = null;
 let useCameraPermissions: any = null;
@@ -61,10 +72,22 @@ export function EventsScannerScreen() {
   const [recentScans, setRecentScans] = useState<ScanRecord[]>([]);
   const [loadingScans, setLoadingScans] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const lastScannedRef = useRef<string>('');
+  // Each unique QR code is processed at most once per event session. Prior
+  // implementation used a single-string ref reset on a 3s timer, so holding
+  // a code in frame would re-fire after the result animation and spam the
+  // door staff with "already scanned" / "failed to verify" cards.
+  const seenCodesRef = useRef<Set<string>>(new Set());
+  // Hard floor between any two API calls, even for distinct codes. Keeps the
+  // door flow predictable when patrons are queued back-to-back.
+  const cooldownUntilRef = useRef<number>(0);
 
   // Fetch recent scans when event is selected
   useEffect(() => {
+    // Reset per-code dedupe whenever the active event changes — a code that
+    // was scanned for last weekend's event must be allowed to scan today's.
+    seenCodesRef.current = new Set();
+    cooldownUntilRef.current = 0;
+
     if (!selectedEvent) {
       setRecentScans([]);
       return;
@@ -150,42 +173,80 @@ export function EventsScannerScreen() {
       }),
     ]).start(() => {
       setLastScan(null);
-      lastScannedRef.current = '';
     });
   }, [resultAnim]);
 
   const handleBarCodeScanned = useCallback(async ({ data }: { data: string }) => {
-    if (processing || data === lastScannedRef.current || !selectedEvent) return;
+    if (!selectedEvent || processing) return;
+    // Per-code dedupe: each unique QR is processed at most once per event
+    // session. The camera fires onBarcodeScanned at frame rate while a code
+    // is in view, so this is what stops the spam.
+    if (seenCodesRef.current.has(data)) return;
+    // Global cooldown floor — even distinct codes can't fire faster than
+    // SCAN_COOLDOWN_MS apart. Door staff get predictable pacing when scanning
+    // a queue of patrons.
+    const now = Date.now();
+    if (now < cooldownUntilRef.current) return;
 
-    lastScannedRef.current = data;
+    seenCodesRef.current.add(data);
+    cooldownUntilRef.current = now + SCAN_COOLDOWN_MS;
     setProcessing(true);
 
+    // Light haptic on every read so staff know the camera "saw" the code,
+    // even when the result is suppressed silently (random QRs etc.). Fired
+    // immediately so it lines up with the visible "Verifying..." flash.
+    Haptics.selectionAsync().catch(() => {});
+
     try {
+      // Brief deliberate pause so the "Verifying..." hint registers visually
+      // before the result card replaces it. Pure UX pacing — does not affect
+      // dedupe or cooldown logic.
+      await new Promise((resolve) => setTimeout(resolve, SCAN_PROCESS_DELAY_MS));
+
       const result = await eventsApi.scan(data, selectedEvent.id, deviceId);
-      const record: ScanRecord = {
-        id: Date.now().toString(),
-        customerName: result.customerName ?? null,
-        tierName: result.tierName || t('unknownTier'),
-        timestamp: new Date(),
-        valid: result.valid,
-        message: result.message,
-        ticketEvent: result.ticketEvent,
-      };
-      showResult(record);
-    } catch (err: any) {
-      const record: ScanRecord = {
-        id: Date.now().toString(),
-        customerName: null,
-        tierName: t('unknownTier'),
-        timestamp: new Date(),
-        valid: false,
-        message: err?.error || t('failedToVerifyTicketMessage'),
-      };
-      showResult(record);
+
+      // Categorise the API outcome:
+      //   valid=true                    → green success card + success haptic
+      //   valid=false reason=ALREADY_USED → red "already scanned" card + warning haptic
+      //   anything else (INVALID, WRONG_EVENT, EVENT_CANCELLED, parse fails)
+      //     → silent. These are the noise-makers when a customer hands over
+      //       a non-ticket QR (loyalty card, random URL, last week's event).
+      //       Door staff don't need a screen-flash for those.
+      if (result.valid) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        showResult({
+          id: Date.now().toString(),
+          customerName: result.customerName ?? null,
+          tierName: result.tierName || t('unknownTier'),
+          timestamp: new Date(),
+          valid: true,
+          message: result.message,
+          ticketEvent: result.ticketEvent,
+        });
+      } else if (result.reason === 'ALREADY_USED') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+        showResult({
+          id: Date.now().toString(),
+          customerName: result.customerName ?? null,
+          tierName: result.tierName || t('unknownTier'),
+          timestamp: new Date(),
+          valid: false,
+          message: result.message,
+          ticketEvent: result.ticketEvent,
+        });
+      }
+      // else: silent. Code stays in seenCodesRef so re-reading the same QR
+      // won't re-call the API.
+    } catch {
+      // Network / HTTP failure — silent. Don't paint the screen red because
+      // the patron's phone briefly dropped a frame; staff would learn to
+      // ignore the alert. Code stays in seenCodesRef so re-reads don't
+      // pile up retry calls; if they want to retry, they re-present the
+      // ticket after navigating away and back (which clears the set).
     } finally {
       setProcessing(false);
     }
-  }, [processing, showResult, selectedEvent, deviceId]);
+  }, [processing, showResult, selectedEvent, deviceId, t]);
 
   // Format event date/time for display
   const formatEventDateTime = (event: OrgEvent) => {
@@ -355,7 +416,7 @@ export function EventsScannerScreen() {
               onPress={() => {
                 setSelectedEvent(null);
                 setRecentScans([]);
-                lastScannedRef.current = '';
+                // The seen-codes set is reset by the selectedEvent effect.
               }}
               activeOpacity={0.7}
               accessibilityRole="button"
@@ -465,7 +526,7 @@ export function EventsScannerScreen() {
                       {item.customerName || item.message}
                     </Text>
                     <Text style={styles.recentMeta} maxFontSizeMultiplier={1.5}>
-                      {item.tierName} — {item.timestamp.toLocaleTimeString()}
+                      {item.tierName} · {item.timestamp.toLocaleTimeString()}
                     </Text>
                   </View>
                 </View>
