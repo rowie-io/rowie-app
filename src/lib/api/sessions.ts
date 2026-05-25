@@ -147,6 +147,15 @@ export const sessionsApi = {
   removeItem: (sessionId: string, itemId: string) =>
     apiClient.delete<{ success: boolean }>(`/sessions/${sessionId}/items/${itemId}`),
 
+  // Per-item edit (qty / notes) on an open session — used by SessionDetail to
+  // adjust the order before close-out. PATCH route only accepts quantity +
+  // notes; status updates go through the bulk endpoint below.
+  updateItem: (
+    sessionId: string,
+    itemId: string,
+    data: { quantity?: number; notes?: string | null },
+  ) => apiClient.patch<{ item: SessionItem }>(`/sessions/${sessionId}/items/${itemId}`, data),
+
   updateItemStatus: (sessionId: string, itemIds: string[], status: ItemStatus) =>
     apiClient.patch<{ success: boolean }>(`/sessions/${sessionId}/items/status`, { itemIds, status }),
 

@@ -28,6 +28,7 @@ import { useSocketEvent, SocketEvents } from '../context/SocketContext';
 import { authService } from '../lib/api/auth';
 import { billingService, SubscriptionInfo } from '../lib/api/billing';
 import { Subscription } from '../lib/api';
+import { floorPlansApi } from '../lib/api/sessions';
 import { formatCents } from '../utils/currency';
 import { PRICING } from '../lib/pricing';
 import {
@@ -148,6 +149,23 @@ export function SettingsScreen() {
   // pick the site they're charging from.
   const currentLocation = accessibleLocations.find((l) => l.id === currentLocationId) || null;
   const showLocationRow = accessibleLocations.length > 1;
+
+  // Floor plans are location-scoped (the client auto-attaches X-Location-Id).
+  // If the current location has none, Table Service mode has nothing to point
+  // at, so we disable the option and snap any stale persisted preference back
+  // to quick_service.
+  const { data: floorPlansData } = useQuery({
+    queryKey: ['floor-plans', currentLocationId],
+    queryFn: floorPlansApi.list,
+    enabled: !!currentLocationId,
+  });
+  const hasFloorPlans = (floorPlansData?.floorPlans?.length ?? 0) > 0;
+  const floorPlansLoaded = floorPlansData !== undefined;
+  useEffect(() => {
+    if (floorPlansLoaded && !hasFloorPlans && serviceMode === 'table_service') {
+      setServiceMode('quick_service');
+    }
+  }, [floorPlansLoaded, hasFloorPlans, serviceMode, setServiceMode]);
 
   // Refresh biometric status when screen is focused
   useFocusEffect(
@@ -739,20 +757,25 @@ export function SettingsScreen() {
               <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>POS Mode</Text>
               <View style={styles.card}>
                 <TouchableOpacity
-                  style={styles.row}
-                  onPress={() => setServiceMode('table_service')}
+                  style={[styles.row, !hasFloorPlans && { opacity: 0.5 }]}
+                  onPress={() => hasFloorPlans && setServiceMode('table_service')}
+                  disabled={!hasFloorPlans}
                   accessibilityRole="button"
                   accessibilityLabel="Table service mode"
-                  accessibilityState={{ selected: serviceMode === 'table_service' }}
+                  accessibilityState={{ selected: serviceMode === 'table_service', disabled: !hasFloorPlans }}
                 >
                   <View style={styles.rowLeft}>
                     <Ionicons name="restaurant-outline" size={20} color={colors.textSecondary} style={styles.rowIcon} />
-                    <View>
+                    <View style={styles.rowTextBlock}>
                       <Text style={styles.label} maxFontSizeMultiplier={1.5}>Table Service</Text>
-                      <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>Pick a table before each order. Orders attribute to tables.</Text>
+                      <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>
+                        {hasFloorPlans
+                          ? 'Pick a table before each order. Orders attribute to tables.'
+                          : 'No floor plans set up for this location. Add one in the vendor portal to enable.'}
+                      </Text>
                     </View>
                   </View>
-                  {serviceMode === 'table_service' && (
+                  {serviceMode === 'table_service' && hasFloorPlans && (
                     <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
                   )}
                 </TouchableOpacity>
@@ -766,7 +789,7 @@ export function SettingsScreen() {
                 >
                   <View style={styles.rowLeft}>
                     <Ionicons name="flash-outline" size={20} color={colors.textSecondary} style={styles.rowIcon} />
-                    <View>
+                    <View style={styles.rowTextBlock}>
                       <Text style={styles.label} maxFontSizeMultiplier={1.5}>Quick Service</Text>
                       <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>Counter/QSR/food-truck mode. Orders go straight to checkout, no table.</Text>
                     </View>
@@ -1065,6 +1088,10 @@ const createStyles = (colors: any, isDark: boolean) => {
     rowIcon: {
       marginRight: 14,
       width: 22,
+    },
+    rowTextBlock: {
+      flex: 1,
+      paddingRight: 12,
     },
     rowHint: {
       fontSize: 13,

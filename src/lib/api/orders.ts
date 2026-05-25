@@ -60,10 +60,6 @@ export interface CreateOrderParams {
   tableId?: string; // optional table attribution (Table Service mode)
 }
 
-export interface HeldOrdersResponse {
-  orders: Order[];
-}
-
 export interface CashPaymentResponse {
   order: Order;
   changeAmount: number;
@@ -137,43 +133,7 @@ export const ordersApi = {
     apiClient.get<Order>(`/orders/${orderId}`),
 
   // ============================================
-  // Held Orders (Open Tabs)
-  // ============================================
-
-  /**
-   * Put an order on hold (open tab)
-   * Optionally update order fields when re-holding a resumed order
-   */
-  hold: (orderId: string, holdName?: string, updates?: {
-    tipAmount?: number;
-    taxAmount?: number;
-    subtotal?: number;
-    totalAmount?: number;
-    paymentMethod?: string;
-    customerEmail?: string;
-    notes?: string | null;
-  }) =>
-    apiClient.post<Order>(`/orders/${orderId}/hold`, { holdName, ...updates }),
-
-  /**
-   * Resume a held order
-   */
-  resume: (orderId: string) =>
-    apiClient.post<Order>(`/orders/${orderId}/resume`, {}),
-
-  /**
-   * List held orders for the organization
-   */
-  listHeld: (deviceId?: string) => {
-    const searchParams = new URLSearchParams();
-    if (deviceId) searchParams.append('deviceId', deviceId);
-    const query = searchParams.toString();
-    return apiClient.get<HeldOrdersResponse>(`/orders/held${query ? `?${query}` : ''}`);
-  },
-
-  /**
-   * Cancel/delete a pending or held order
-   */
+  // Cancel/delete a pending order
   cancel: (orderId: string) =>
     apiClient.delete<{ success: boolean; message: string }>(`/orders/${orderId}`),
 

@@ -27,12 +27,32 @@ export function TabsScreen() {
   const queryClient = useQueryClient();
   const t = useTranslations('tabs');
 
-  const { data, isLoading, refetch, isRefetching, isError } = useQuery({
+  const tabsQuery = useQuery({
     queryKey: ['sessions', 'tabs'],
     queryFn: sessionsApi.listTabs,
   });
 
-  const tabs = data?.tabs || [];
+  // Held sessions (source='hold' + status='open'). Listed alongside tabs so
+  // staff can find a paused/saved order in one place after the held-orders
+  // path was retired in favour of sessions.
+  const holdsQuery = useQuery({
+    queryKey: ['sessions', { source: 'hold', status: 'open' }],
+    queryFn: () => sessionsApi.list({ status: 'open', limit: 50 }),
+  });
+
+  const isLoading = tabsQuery.isLoading || holdsQuery.isLoading;
+  const isRefetching = tabsQuery.isRefetching || holdsQuery.isRefetching;
+  const isError = tabsQuery.isError || holdsQuery.isError;
+  const refetch = useCallback(async () => {
+    await Promise.all([tabsQuery.refetch(), holdsQuery.refetch()]);
+  }, [tabsQuery, holdsQuery]);
+
+  const tabs = useMemo(() => {
+    const liveTabs = tabsQuery.data?.tabs ?? [];
+    const holds = (holdsQuery.data?.sessions ?? []).filter((s) => s.source === 'hold');
+    // Holds first so freshly-paused orders sit at the top; live tabs follow.
+    return [...holds, ...liveTabs];
+  }, [tabsQuery.data, holdsQuery.data]);
 
   // Defense-in-depth: ignore SESSION_* emits for other orgs so a future
   // room-scoping regression can't silently invalidate this device's open
@@ -50,6 +70,7 @@ export function TabsScreen() {
   const handleSessionChange = useCallback((data: any) => {
     if (!isMyOrg(data)) return;
     queryClient.invalidateQueries({ queryKey: ['sessions', 'tabs'] });
+    queryClient.invalidateQueries({ queryKey: ['sessions', { source: 'hold', status: 'open' }] });
   }, [queryClient, isMyOrg]);
 
   useSocketEvent(SocketEvents.SESSION_CREATED, handleSessionChange);
@@ -92,7 +113,7 @@ export function TabsScreen() {
           accessibilityLabel={t('openTabAccessibilityLabel')}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Ionicons name="add" size={18} color="#1C1917" />
+          <Ionicons name="add" size={18} color="#fff" />
           <Text style={styles.newButtonText} maxFontSizeMultiplier={1.3}>
             {t('newButton')}
           </Text>
@@ -120,7 +141,7 @@ export function TabsScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('retryAccessibilityLabel')}
           >
-            <Ionicons name="refresh" size={18} color="#1C1917" />
+            <Ionicons name="refresh" size={18} color="#fff" />
             <Text style={styles.emptyButtonText} maxFontSizeMultiplier={1.3}>
               {t('retryButton')}
             </Text>
@@ -158,7 +179,7 @@ export function TabsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={t('openTabAccessibilityLabel')}
               >
-                <Ionicons name="add" size={18} color="#1C1917" />
+                <Ionicons name="add" size={18} color="#fff" />
                 <Text style={styles.emptyButtonText} maxFontSizeMultiplier={1.3}>
                   {t('emptyButton')}
                 </Text>
@@ -184,6 +205,7 @@ const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabC
   const displayName = session.holdName || session.customerName || session.sessionNumber;
   const itemWord = session.itemCount === 1 ? t('itemSingular') : t('itemPlural');
   const amount = formatCurrency(session.subtotal, currency);
+  const isHold = session.source === 'hold';
   const itemCountText =
     session.itemCount === 1
       ? t('itemCountSingular', { count: session.itemCount })
@@ -203,16 +225,33 @@ const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabC
     >
       <View style={styles.cardLeft}>
         <View style={[styles.cardIcon, { backgroundColor: colors.primary + '20' }]}>
-          <Ionicons name="wallet" size={20} color={colors.primary} />
+          <Ionicons name={isHold ? 'pause' : 'wallet'} size={20} color={colors.primary} />
         </View>
         <View style={styles.cardInfo}>
-          <Text
-            style={[styles.cardName, { color: colors.text }]}
-            maxFontSizeMultiplier={1.3}
-            numberOfLines={1}
-          >
-            {displayName}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text
+              style={[styles.cardName, { color: colors.text, flexShrink: 1 }]}
+              maxFontSizeMultiplier={1.3}
+              numberOfLines={1}
+            >
+              {displayName}
+            </Text>
+            {isHold && (
+              <View style={{
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 6,
+                backgroundColor: colors.primary + '20',
+              }}>
+                <Text
+                  style={{ color: colors.primary, fontFamily: fonts.bold, fontSize: 10 }}
+                  maxFontSizeMultiplier={1.3}
+                >
+                  HELD
+                </Text>
+              </View>
+            )}
+          </View>
           <Text
             style={[styles.cardMeta, { color: colors.textMuted }]}
             maxFontSizeMultiplier={1.5}
@@ -265,7 +304,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     minHeight: 44,
   },
-  newButtonText: { fontSize: 14, fontFamily: fonts.bold, color: '#1C1917' },
+  newButtonText: { fontSize: 14, fontFamily: fonts.bold, color: '#fff' },
   listContent: { padding: 16, gap: 12, flexGrow: 1 },
   card: {
     flexDirection: 'row',
@@ -311,5 +350,5 @@ const styles = StyleSheet.create({
     minHeight: 44,
     marginTop: 8,
   },
-  emptyButtonText: { fontSize: 15, fontFamily: fonts.bold, color: '#1C1917' },
+  emptyButtonText: { fontSize: 15, fontFamily: fonts.bold, color: '#fff' },
 });

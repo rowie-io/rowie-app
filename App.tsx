@@ -79,7 +79,6 @@ import { FloorPlanScreen } from './src/screens/FloorPlanScreen';
 import { SessionDetailScreen } from './src/screens/SessionDetailScreen';
 import { TabsScreen } from './src/screens/TabsScreen';
 import { OpenTabScreen } from './src/screens/OpenTabScreen';
-import { AddItemsToSessionScreen } from './src/screens/AddItemsToSessionScreen';
 
 // Education screens
 import { TapToPayEducationScreen } from './src/screens/TapToPayEducationScreen';
@@ -429,14 +428,6 @@ function AuthenticatedNavigator() {
       <Stack.Screen
         name="OpenTab"
         component={OpenTabScreen}
-        options={{
-          presentation: 'modal',
-          animation: 'slide_from_bottom',
-        }}
-      />
-      <Stack.Screen
-        name="AddItemsToSession"
-        component={AddItemsToSessionScreen}
         options={{
           presentation: 'modal',
           animation: 'slide_from_bottom',

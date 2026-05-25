@@ -227,66 +227,22 @@ export function TransactionsScreen() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<FilterType>('all');
-  const [showHeld, setShowHeld] = useState(false);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const wasConnectedRef = useRef(isConnected);
   const hasEverConnectedRef = useRef(false);
-
-  // Held orders state - seed from prefetch cache if available
-  const prefetchedHeld = queryClient.getQueryData<{ orders: Order[] }>(['held-orders', deviceId]);
-  const [heldOrders, setHeldOrders] = useState<Order[]>(prefetchedHeld?.orders || []);
-  const [isLoadingHeld, setIsLoadingHeld] = useState(false);
-  const [isRefreshingHeld, setIsRefreshingHeld] = useState(false);
-  const hasFetchedHeldRef = useRef(!!prefetchedHeld);
-
-  // Handle initialTab route param
-  useEffect(() => {
-    const initialTab = route.params?.initialTab;
-    if (initialTab === 'held') {
-      setShowHeld(true);
-      fetchHeldOrders();
-    }
-    if (initialTab) {
-      navigation.setParams({ initialTab: undefined });
-    }
-  }, [route.params?.initialTab, navigation]);
-
-  // Fetch held orders
-  const fetchHeldOrders = useCallback(async () => {
-    try {
-      const response = await ordersApi.listHeld(deviceId || undefined);
-      hasFetchedHeldRef.current = true;
-      setHeldOrders(response.orders);
-    } catch (error: any) {
-      // Held orders are a soft secondary feature — log but don't disrupt the
-      // main transactions list. The badge simply doesn't appear.
-      logger.error('[TransactionsScreen] Failed to load held orders:', error);
-    } finally {
-      setIsLoadingHeld(false);
-      setIsRefreshingHeld(false);
-    }
-  }, [deviceId]);
-
-  // Load held orders eagerly on mount
-  useEffect(() => {
-    if (!hasFetchedHeldRef.current) {
-      fetchHeldOrders();
-    }
-  }, []);
 
   // Refetch when socket REconnects (not initial connection)
   useEffect(() => {
     if (isConnected && !wasConnectedRef.current && hasEverConnectedRef.current) {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
-      fetchHeldOrders();
     }
     if (isConnected) hasEverConnectedRef.current = true;
     wasConnectedRef.current = isConnected;
-  }, [isConnected, queryClient, fetchHeldOrders]);
+  }, [isConnected, queryClient]);
 
   // Defense-in-depth: ignore ORDER_*/SESSION_* emits for other orgs so a
   // future room-scoping regression can't silently invalidate transactions
-  // or mutate held-orders state with another org's payload.
+  // with another org's payload.
   const orgIdRef = useRef(organization?.id);
   useEffect(() => {
     orgIdRef.current = organization?.id;
@@ -307,35 +263,6 @@ export function TransactionsScreen() {
   useSocketEvent(SocketEvents.ORDER_REFUNDED, handlePaymentEvent);
   useSocketEvent(SocketEvents.SESSION_SETTLED, handlePaymentEvent);
   useSocketEvent(SocketEvents.SESSION_CANCELLED, handlePaymentEvent);
-
-  // Listen for held order updates via socket
-  const handleHeldOrderUpdated = useCallback((data: any) => {
-    if (!isMyOrg(data)) return;
-    // Refresh held orders when any order is held or resumed
-    if (data.status === 'held' || data.status === 'pending') {
-      fetchHeldOrders();
-    }
-  }, [fetchHeldOrders, isMyOrg]);
-
-  const handleHeldOrderCreated = useCallback((data: any) => {
-    if (!isMyOrg(data)) return;
-    // Refresh if a new held order is created
-    if (data.status === 'held') {
-      fetchHeldOrders();
-    }
-  }, [fetchHeldOrders, isMyOrg]);
-
-  const handleHeldOrderDeleted = useCallback((data: any) => {
-    if (!isMyOrg(data)) return;
-    // Remove the deleted order from the list
-    if (data.orderId) {
-      setHeldOrders(prev => prev.filter(o => o.id !== data.orderId));
-    }
-  }, [isMyOrg]);
-
-  useSocketEvent(SocketEvents.ORDER_UPDATED, handleHeldOrderUpdated);
-  useSocketEvent(SocketEvents.ORDER_CREATED, handleHeldOrderCreated);
-  useSocketEvent(SocketEvents.ORDER_DELETED, handleHeldOrderDeleted);
 
   // Refetch stale data when the tab gains focus (catches any missed socket events)
   useFocusEffect(
@@ -479,47 +406,6 @@ export function TransactionsScreen() {
     setIsManualRefreshing(false);
   };
 
-  const handleRefreshHeld = async () => {
-    setIsRefreshingHeld(true);
-    await fetchHeldOrders();
-  };
-
-  const handleResumeOrder = async (order: Order) => {
-    if (!guardCheckout()) return;
-    try {
-      const resumedOrder = await ordersApi.resume(order.id);
-      navigation.navigate('Checkout', {
-        resumedOrderId: order.id,
-        resumedOrder: resumedOrder,
-      });
-    } catch (error: any) {
-      Alert.alert(t('errorTitle'), error.error || error.message || t('errorResumeOrder'));
-    }
-  };
-
-  const handleCancelOrder = async (order: Order) => {
-    Alert.alert(
-      t('cancelOrder'),
-      t('cancelOrderConfirmMessage', { name: order.holdName || t('orderHashPrefix', { orderNumber: order.orderNumber }) }),
-      [
-        { text: t('cancelOrderKeep'), style: 'cancel' },
-        {
-          text: t('cancelOrderConfirm'),
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await ordersApi.cancel(order.id);
-              setHeldOrders(prev => prev.filter(o => o.id !== order.id));
-            } catch (error: any) {
-              // ordersApi.cancel throws ApiError {error, ...} — prefer `.error`.
-              Alert.alert(t('errorTitle'), error?.error || error?.message || t('errorCancelOrder'));
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const formatTimeAgo = (dateString: string): string => {
     const date = new Date(dateString);
     const now = new Date();
@@ -534,98 +420,13 @@ export function TransactionsScreen() {
     return t('timeAgoDays', { days: diffDays });
   };
 
-  const renderHeldOrder = ({ item }: { item: Order }) => {
-    const itemCount = item.itemCount || item.items?.length || 0;
-
-    const renderRightActions = () => (
-      <TouchableOpacity
-        style={styles.heldDeleteAction}
-        onPress={() => handleCancelOrder(item)}
-        accessibilityRole="button"
-        accessibilityLabel={t('cancelAccessibilityLabel', { name: item.holdName || t('orderHashPrefix', { orderNumber: item.orderNumber }) })}
-      >
-        <Ionicons name="trash-outline" size={22} color="#fff" />
-        <Text maxFontSizeMultiplier={1.3} style={styles.heldDeleteText}>{tc('cancel')}</Text>
-      </TouchableOpacity>
-    );
-
-    return (
-      <Swipeable
-        renderRightActions={renderRightActions}
-        overshootRight={false}
-      >
-        <TouchableOpacity
-          style={styles.heldOrderItem}
-          onPress={() => handleResumeOrder(item)}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-          accessibilityLabel={t('heldOrderAccessibilityLabel', { name: item.holdName || t('orderHashPrefix', { orderNumber: item.orderNumber }), count: itemCount, itemWord: itemCount === 1 ? tc('item') : tc('items'), total: formatCents(item.totalAmount, currency) })}
-          accessibilityHint={t('heldOrderAccessibilityHint')}
-        >
-          <View style={styles.heldOrderLeft}>
-            <Ionicons name="time-outline" size={20} color={colors.primary} />
-            <View style={styles.heldOrderInfo}>
-              <Text maxFontSizeMultiplier={1.5} style={styles.heldOrderName} numberOfLines={1}>
-                {item.holdName || t('orderHashPrefix', { orderNumber: item.orderNumber })}
-              </Text>
-              <Text maxFontSizeMultiplier={1.5} style={styles.heldOrderMeta}>
-                {itemCount === 1 ? t('itemCount', { count: itemCount }) : t('itemCountPlural', { count: itemCount })} • {item.heldAt ? formatTimeAgo(item.heldAt) : ''}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.heldOrderRight}>
-            <Text maxFontSizeMultiplier={1.3} style={styles.heldOrderTotal}>
-              {formatCents(item.totalAmount, currency)}
-            </Text>
-            <Text maxFontSizeMultiplier={1.5} style={styles.heldOrderTapText}>{t('tapToResume')}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
-        </TouchableOpacity>
-      </Swipeable>
-    );
-  };
-
-  const renderEmptyHeld = () => (
-    <View style={styles.emptyHeldContainer}>
-      <Ionicons name="pause-circle-outline" size={64} color={colors.textMuted} />
-      <Text maxFontSizeMultiplier={1.3} style={styles.emptyHeldTitle}>{t('noHeldOrdersTitle')}</Text>
-      <Text maxFontSizeMultiplier={1.5} style={styles.emptyHeldSubtitle}>
-        {t('noHeldOrdersSubtitle')}
-      </Text>
-    </View>
-  );
-
   return (
     <View style={{ flex: 1 }}>
       <View style={[styles.container, { paddingTop: insets.top }]}>
         {/* Header */}
         <View style={styles.headerContainer}>
           <Text maxFontSizeMultiplier={1.3} style={styles.title}>{t('historyTitle')}</Text>
-          {/* Held orders badge — tap to expand */}
-          {heldOrders.length > 0 && (
-            <TouchableOpacity
-              onPress={() => setShowHeld(!showHeld)}
-              style={[styles.heldBadge, { backgroundColor: colors.chipBg, borderColor: colors.border }]}
-              accessibilityRole="button"
-              accessibilityLabel={t('heldBadgeAccessibilityLabel', { count: heldOrders.length })}
-            >
-              <Ionicons name="pause-circle" size={16} color={colors.primary} />
-              <Text maxFontSizeMultiplier={1.3} style={[styles.heldBadgeText, { color: colors.text }]}>{t('heldBadgeLabel', { count: heldOrders.length })}</Text>
-              <Ionicons name={showHeld ? 'chevron-up' : 'chevron-down'} size={14} color={colors.textMuted} />
-            </TouchableOpacity>
-          )}
         </View>
-
-        {/* Held orders inline section */}
-        {showHeld && heldOrders.length > 0 && (
-          <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>
-            {heldOrders.map((item, index) => (
-              <View key={item.id}>
-                {renderHeldOrder({ item, index } as any)}
-              </View>
-            ))}
-          </View>
-        )}
 
         {/* Filter row */}
         <View style={styles.filterContainer}>

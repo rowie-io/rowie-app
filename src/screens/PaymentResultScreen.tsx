@@ -27,6 +27,7 @@ import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { useQueryClient } from '@tanstack/react-query';
 import { stripeTerminalApi, ordersApi, transactionsApi } from '../lib/api';
+import { sessionsApi } from '../lib/api/sessions';
 import logger from '../lib/logger';
 import { isValidEmail } from '../lib/validation';
 import { useTranslations } from '../lib/i18n';
@@ -47,6 +48,12 @@ type RouteParams = {
     paymentMethod?: PaymentMethodType;
     cashTendered?: number; // Cash tendered in smallest currency unit
     changeAmount?: number; // Change due in smallest currency unit
+    // Session settle path: when set, a successful manual-card-entry fallback
+    // here must call /sessions/{id}/settle (PaymentProcessing handles this
+    // for the Terminal flow). Without this, a session stays open after a
+    // successful manual-entry charge.
+    sessionId?: string;
+    sessionTipAmount?: number;
   };
 };
 
@@ -62,7 +69,7 @@ export function PaymentResultScreen() {
   const insets = useSafeAreaInsets();
 
   const queryClient = useQueryClient();
-  const { success, amount, paymentIntentId, orderId, orderNumber, customerEmail, errorMessage, skipToCardEntry, preorderId, paymentMethod, cashTendered, changeAmount } = route.params;
+  const { success, amount, paymentIntentId, orderId, orderNumber, customerEmail, errorMessage, skipToCardEntry, preorderId, paymentMethod, cashTendered, changeAmount, sessionId, sessionTipAmount } = route.params;
 
   // Resolve the payment method (PaymentProcessingScreen may not pass it explicitly)
   const resolvedMethod: PaymentMethodType = paymentMethod || 'tap_to_pay';
@@ -377,8 +384,10 @@ export function PaymentResultScreen() {
       });
 
       // Link to existing order if we have one
-      // Mark as 'card' (manual entry) since this is the fallback flow
-      if (orderId) {
+      // Mark as 'card' (manual entry) since this is the fallback flow.
+      // Sessions don't have an order yet (settle creates it below), so skip
+      // this link step for session flows.
+      if (orderId && !sessionId) {
         await ordersApi.linkPaymentIntent(orderId, paymentIntent.id, 'card');
       }
 
@@ -407,6 +416,30 @@ export function PaymentResultScreen() {
       }
 
       if (confirmedIntent?.status === 'Succeeded') {
+        // For session flows, the card charged but the session is still open —
+        // call /sessions/{id}/settle with the confirmed PI so the API creates
+        // the order and marks the session settled. Failure here means the
+        // card cleared but the session didn't close; surface that loudly.
+        let resolvedOrderId = orderId;
+        let resolvedOrderNumber = orderNumber;
+        if (sessionId) {
+          try {
+            const res = await sessionsApi.settle(sessionId, {
+              paymentMethod: 'tap_to_pay',
+              tipAmount: sessionTipAmount || 0,
+              stripePaymentIntentId: paymentIntent.id,
+            });
+            resolvedOrderId = res.order.id;
+            resolvedOrderNumber = res.order.orderNumber;
+          } catch (settleErr: any) {
+            logger.error('[ManualCard] Session settle after charge failed:', settleErr);
+            Alert.alert(
+              t('paymentFailedTitle'),
+              `Card charged but session settle failed: ${settleErr?.error || settleErr?.message || 'unknown error'}. Check the session in the dashboard.`,
+            );
+            return;
+          }
+        }
         // Success! Reset navigation to show fresh success screen
         clearCart();
         navigation.dispatch(
@@ -420,10 +453,12 @@ export function PaymentResultScreen() {
                   success: true,
                   amount,
                   paymentIntentId: paymentIntent.id,
-                  orderId,
-                  orderNumber,
+                  orderId: resolvedOrderId,
+                  orderNumber: resolvedOrderNumber,
                   customerEmail,
                   preorderId,
+                  sessionId,
+                  sessionTipAmount,
                 },
               },
             ],

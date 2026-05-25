@@ -22,7 +22,9 @@ import { useCatalog } from '../context/CatalogContext';
 import { useSocketEvent } from '../context/SocketContext';
 import { SocketEvents } from '../context/SocketContext';
 import { sessionsApi, type SessionItem, type ItemStatus } from '../lib/api/sessions';
-import { formatCurrency, toSmallestUnit, isZeroDecimal } from '../utils/currency';
+import { stripeTerminalApi } from '../lib/api';
+import { useTerminal } from '../context/StripeTerminalContext';
+import { formatCurrency, toSmallestUnit, fromSmallestUnit, isZeroDecimal } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { useTranslations } from '../lib/i18n';
@@ -30,10 +32,6 @@ import { useTranslations } from '../lib/i18n';
 type RouteParams = {
   SessionDetail: {
     sessionId: string;
-    // Set by AddItemsToSessionScreen's "Pay now" path so the operator drops
-    // directly into the settle modal after a round is fired to the kitchen.
-    // Consumed once on mount, then ignored.
-    autoOpenSettle?: boolean;
   };
 };
 
@@ -52,9 +50,9 @@ export function SessionDetailScreen() {
   const { currency, organization } = useAuth();
   const { selectedCatalog } = useCatalog();
   const queryClient = useQueryClient();
-  const { sessionId, autoOpenSettle } = route.params;
+  const { sessionId } = route.params;
   const t = useTranslations('sessionDetail');
-  const autoOpenSettleConsumedRef = useRef(false);
+  const { preferredReader } = useTerminal();
 
   // Tip modal state
   const [tipModalOpen, setTipModalOpen] = useState(false);
@@ -66,7 +64,7 @@ export function SessionDetailScreen() {
   // the previous one-click "always cash, no tip" path. Modal is opened from
   // the Settle button; submits via settleMutation below.
   const [settleModalOpen, setSettleModalOpen] = useState(false);
-  const [settleMethod, setSettleMethod] = useState<'cash' | 'tap_to_pay' | 'split'>('cash');
+  const [settleMethod, setSettleMethod] = useState<'cash' | 'tap_to_pay' | 'split'>('tap_to_pay');
   const [settleTipText, setSettleTipText] = useState(''); // base-unit digits
   const [settleCashTenderedText, setSettleCashTenderedText] = useState(''); // base-unit digits
   const [settleSplitPieces, setSettleSplitPieces] = useState<Array<{ method: 'cash' | 'tap_to_pay'; amount: number }>>([]);
@@ -130,6 +128,37 @@ export function SessionDetailScreen() {
       sessionsApi.updateItemStatus(sessionId, itemIds, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
+    },
+  });
+
+  // Edit-item state: long-pressing an item opens an action sheet that routes
+  // into one of these modals (qty / notes) or fires removeItemMutation
+  // directly with a confirm step.
+  const [editingItem, setEditingItem] = useState<SessionItem | null>(null);
+  const [editMode, setEditMode] = useState<'qty' | 'notes' | null>(null);
+  const [qtyInput, setQtyInput] = useState('1');
+  const [notesInput, setNotesInput] = useState('');
+
+  const updateItemMutation = useMutation({
+    mutationFn: ({ itemId, data }: { itemId: string; data: { quantity?: number; notes?: string | null } }) =>
+      sessionsApi.updateItem(sessionId, itemId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
+      setEditingItem(null);
+      setEditMode(null);
+    },
+    onError: (err: any) => {
+      Alert.alert('Update failed', err?.error || err?.message || 'Could not update the item.');
+    },
+  });
+
+  const removeItemMutation = useMutation({
+    mutationFn: (itemId: string) => sessionsApi.removeItem(sessionId, itemId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
+    },
+    onError: (err: any) => {
+      Alert.alert('Remove failed', err?.error || err?.message || 'Could not remove the item.');
     },
   });
 
@@ -271,7 +300,7 @@ export function SessionDetailScreen() {
     return false; // tap_to_pay: enabled (reader interaction is out-of-scope v1)
   })();
 
-  const handleSubmitSettle = useCallback(() => {
+  const handleSubmitSettle = useCallback(async () => {
     // tipAmount on /sessions/{id}/settle is in BASE units (dollars) — matches
     // sessions/orders DECIMAL columns and /menu/preorder. closeTab still uses
     // smallest units (see closeTabMutation above). cashTendered / split piece
@@ -296,18 +325,52 @@ export function SessionDetailScreen() {
       });
       return;
     }
-    // tap_to_pay
-    settleMutation.mutate({
-      paymentMethod: 'tap_to_pay',
-      tipAmount: settleTipBase,
-    });
-  }, [settleMethod, settleTipBase, settleCashTenderedSmallest, settleSplitPieces, settleMutation]);
+    // tap_to_pay — open the Terminal SDK flow. Mirror CheckoutScreen: create a
+    // PaymentIntent for (subtotal + tax + tip), then hand off to
+    // PaymentProcessing which runs the collect+confirm dance and (on success)
+    // calls /sessions/{id}/settle with the confirmed PI id.
+    if (!session) return;
+    const totalSmallest = settleTotalSmallest;
+    if (totalSmallest <= 0) {
+      Alert.alert('Nothing to charge', 'This session has a zero total.');
+      return;
+    }
+    try {
+      setSettleModalOpen(false);
+      const totalBase = fromSmallestUnit(totalSmallest, currency);
+      const idempotencyKey = `pi-session-${sessionId}-${totalSmallest}-${settleTipSmallest}`;
+      const paymentIntent = await stripeTerminalApi.createPaymentIntent({
+        amount: totalBase,
+        currency,
+        description: `Settle ${session.tableLabel || session.holdName || session.sessionNumber}`,
+        metadata: {
+          sessionId,
+          tableId: session.tableId || '',
+          catalogId: session.catalogId || '',
+          subtotal: session.subtotal.toString(),
+          taxAmount: session.taxAmount.toString(),
+          tipAmount: settleTipBase.toString(),
+        },
+      }, idempotencyKey);
+      navigation.navigate('PaymentProcessing', {
+        paymentIntentId: paymentIntent.id,
+        clientSecret: paymentIntent.clientSecret,
+        stripeAccountId: paymentIntent.stripeAccountId,
+        amount: totalSmallest,
+        sessionId,
+        sessionTipAmount: settleTipBase,
+      });
+    } catch (e: any) {
+      setSettleModalOpen(true);
+      Alert.alert('Could not start payment', e?.error || e?.message || 'Unable to create payment intent.');
+    }
+  }, [settleMethod, settleTipBase, settleTipSmallest, settleCashTenderedSmallest, settleSplitPieces, settleMutation, session, settleTotalSmallest, sessionId, currency, navigation]);
 
   const handleSettle = useCallback(() => {
     // Reset modal state on open so a previous failed attempt's values don't
-    // leak in. Default to cash + no tip — matches the most common in-person
-    // bar/restaurant flow.
-    setSettleMethod('cash');
+    // leak in. Default to Tap to Pay + no tip — matches the most common
+    // in-person bar/restaurant close-out.
+    setSettleMethod('tap_to_pay');
     setSettleTipText('');
     setSettleCashTenderedText('');
     setSettleSplitPieces([]);
@@ -316,22 +379,92 @@ export function SessionDetailScreen() {
     setSettleModalOpen(true);
   }, []);
 
-  // Auto-open settle modal for the "Pay now" route from AddItemsToSession.
-  // Wait for the session to load + still be open; consume the param once so
-  // re-renders from socket events don't re-trigger it.
-  useEffect(() => {
-    if (!autoOpenSettle || autoOpenSettleConsumedRef.current) return;
-    if (!session || session.status !== 'open') return;
-    autoOpenSettleConsumedRef.current = true;
-    handleSettle();
-  }, [autoOpenSettle, session, handleSettle]);
-
   const markRoundStatus = useCallback((roundItems: SessionItem[], status: ItemStatus) => {
     const itemIds = roundItems.filter(i => i.status !== status).map(i => i.id);
     if (itemIds.length > 0) {
       updateStatusMutation.mutate({ itemIds, status });
     }
   }, [updateStatusMutation]);
+
+  // Long-press on an item row → edit / remove action sheet. Disabled on
+  // settled/cancelled sessions (API would 409 anyway) and on items that the
+  // backend has marked uneditable (e.g. an already-charged tab pre-pay item
+  // would 409 on DELETE — let the server be source of truth, the UI just
+  // surfaces the error).
+  const handleItemLongPress = useCallback((item: SessionItem) => {
+    if (session?.status !== 'open') return;
+    Alert.alert(
+      `${item.quantity}× ${item.name}`,
+      'Adjust this item before close-out.',
+      [
+        {
+          text: 'Edit quantity',
+          onPress: () => {
+            setEditingItem(item);
+            setQtyInput(String(item.quantity));
+            setEditMode('qty');
+          },
+        },
+        {
+          text: 'Edit notes',
+          onPress: () => {
+            setEditingItem(item);
+            setNotesInput(item.notes || '');
+            setEditMode('notes');
+          },
+        },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Remove item?',
+              `Remove ${item.quantity}× ${item.name} from this session?`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Remove',
+                  style: 'destructive',
+                  onPress: () => removeItemMutation.mutate(item.id),
+                },
+              ],
+            );
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
+  }, [session?.status, removeItemMutation]);
+
+  const handleSubmitEdit = useCallback(() => {
+    if (!editingItem) return;
+    if (editMode === 'qty') {
+      const n = parseInt(qtyInput, 10);
+      if (!Number.isFinite(n) || n < 1) {
+        Alert.alert('Invalid quantity', 'Quantity must be at least 1. Use Remove to delete the item instead.');
+        return;
+      }
+      if (n === editingItem.quantity) {
+        setEditingItem(null);
+        setEditMode(null);
+        return;
+      }
+      updateItemMutation.mutate({ itemId: editingItem.id, data: { quantity: n } });
+      return;
+    }
+    if (editMode === 'notes') {
+      const trimmed = notesInput.trim();
+      if ((trimmed || null) === (editingItem.notes || null)) {
+        setEditingItem(null);
+        setEditMode(null);
+        return;
+      }
+      updateItemMutation.mutate({
+        itemId: editingItem.id,
+        data: { notes: trimmed.length > 0 ? trimmed : null },
+      });
+    }
+  }, [editingItem, editMode, qtyInput, notesInput, updateItemMutation]);
 
   const handleCancel = useCallback(() => {
     Alert.alert(
@@ -382,7 +515,7 @@ export function SessionDetailScreen() {
             accessibilityLabel={t('retryAccessibilityLabel')}
           >
             <Ionicons name="refresh" size={18} color="#1C1917" />
-            <Text style={{ fontSize: 15, fontFamily: fonts.bold, color: '#1C1917' }} maxFontSizeMultiplier={1.3}>
+            <Text style={{ fontSize: 15, fontFamily: fonts.bold, color: '#fff' }} maxFontSizeMultiplier={1.3}>
               {t('retryButton')}
             </Text>
           </TouchableOpacity>
@@ -504,7 +637,16 @@ export function SessionDetailScreen() {
                 {roundItems.map((item) => {
                   const config = STATUS_CONFIG[item.status] || STATUS_CONFIG.pending;
                   return (
-                    <View key={item.id} style={styles.itemRow}>
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.itemRow}
+                      onLongPress={() => handleItemLongPress(item)}
+                      disabled={!isOpen}
+                      delayLongPress={350}
+                      activeOpacity={0.7}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${item.quantity} ${item.name}. Long press to edit or remove.`}
+                    >
                       <View style={styles.itemInfo}>
                         <Text style={[styles.itemName, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
                           {item.quantity}× {item.name}
@@ -526,7 +668,7 @@ export function SessionDetailScreen() {
                           </Text>
                         </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   );
                 })}
               </View>
@@ -568,12 +710,14 @@ export function SessionDetailScreen() {
           </View>
         )}
 
-        {/* Add more items (only while open) */}
+        {/* Add more items (only while open). Routes to the Menu tab with this
+            session pre-targeted; the cart's "Send" CTA there will append a new
+            round directly to this session and return here. */}
         {isOpen && (
           <TouchableOpacity
-            onPress={() => navigation.navigate('AddItemsToSession', {
-              sessionId: session.id,
-              displayName: session.tableLabel || session.holdName || session.sessionNumber,
+            onPress={() => navigation.navigate('MainTabs', {
+              screen: 'Menu',
+              params: { screen: 'MenuHome', params: { sessionId: session.id } },
             })}
             style={[styles.addItemsButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
             accessibilityRole="button"
@@ -1076,6 +1220,111 @@ export function SessionDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Edit-item modal — qty or notes. Reuses the tip-modal sheet styling
+          so it doesn't introduce new visual primitives. */}
+      <Modal
+        visible={editingItem !== null && editMode !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { setEditingItem(null); setEditMode(null); }}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={[styles.tipModalContent, { backgroundColor: colors.card }]}>
+            <View style={styles.tipModalHeader}>
+              <Text style={[styles.tipModalTitle, { color: colors.text }]} maxFontSizeMultiplier={1.2}>
+                {editMode === 'qty' ? 'Edit quantity' : 'Edit notes'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => { setEditingItem(null); setEditMode(null); }}
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <Ionicons name="close" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {editingItem && (
+              <Text style={[styles.tipSubtotalLabel, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
+                {editingItem.name}
+              </Text>
+            )}
+
+            {editMode === 'qty' ? (
+              <TextInput
+                value={qtyInput}
+                onChangeText={setQtyInput}
+                keyboardType="number-pad"
+                maxLength={3}
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: colors.text,
+                  backgroundColor: colors.background,
+                  fontSize: 18,
+                  fontFamily: fonts.semiBold,
+                  marginTop: 12,
+                  textAlign: 'center',
+                }}
+                placeholder="Qty"
+                placeholderTextColor={colors.textMuted}
+                accessibilityLabel="Quantity"
+              />
+            ) : (
+              <TextInput
+                value={notesInput}
+                onChangeText={setNotesInput}
+                multiline
+                maxLength={500}
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: colors.text,
+                  backgroundColor: colors.background,
+                  fontSize: 15,
+                  fontFamily: fonts.regular,
+                  marginTop: 12,
+                  minHeight: 88,
+                  textAlignVertical: 'top',
+                }}
+                placeholder="Item notes (e.g. no onions)"
+                placeholderTextColor={colors.textMuted}
+                accessibilityLabel="Item notes"
+              />
+            )}
+
+            <TouchableOpacity
+              onPress={handleSubmitEdit}
+              disabled={updateItemMutation.isPending}
+              accessibilityRole="button"
+              accessibilityLabel="Save changes"
+              style={{
+                backgroundColor: updateItemMutation.isPending ? colors.border : colors.primary,
+                paddingVertical: 14,
+                borderRadius: 12,
+                alignItems: 'center',
+                marginTop: 16,
+              }}
+            >
+              {updateItemMutation.isPending ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={{ color: '#fff', fontFamily: fonts.bold, fontSize: 15 }} maxFontSizeMultiplier={1.3}>Save</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1120,7 +1369,7 @@ const styles = StyleSheet.create({
   cancelButton: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
   cancelButtonText: { fontSize: 16, fontFamily: fonts.semiBold },
   settleButton: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14 },
-  settleButtonText: { fontSize: 16, fontFamily: fonts.semiBold, color: '#1C1917' },
+  settleButtonText: { fontSize: 16, fontFamily: fonts.semiBold, color: '#fff' },
   emptyText: { fontSize: 16, fontFamily: fonts.semiBold, textAlign: 'center' },
   addItemsButton: {
     flexDirection: 'row',
@@ -1198,5 +1447,5 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     ...shadows.md,
   },
-  chargeButtonText: { fontSize: 16, fontFamily: fonts.bold, color: '#1C1917' },
+  chargeButtonText: { fontSize: 16, fontFamily: fonts.bold, color: '#fff' },
 });

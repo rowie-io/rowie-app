@@ -15,6 +15,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useTerminal } from '../context/StripeTerminalContext';
 import { stripeTerminalApi } from '../lib/api';
+import { sessionsApi } from '../lib/api/sessions';
 import { formatCents } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
@@ -33,6 +34,11 @@ type RouteParams = {
     orderNumber?: string;
     customerEmail?: string;
     preorderId?: string;
+    // Set by the session-settle path. When present, on success this screen
+    // calls /sessions/{id}/settle (paymentMethod='tap_to_pay') with the
+    // confirmed PI id so the session closes + an order is created server-side.
+    sessionId?: string;
+    sessionTipAmount?: number;
   };
 };
 
@@ -58,7 +64,7 @@ export function PaymentProcessingScreen() {
     clearTerminalPaymentResult,
   } = useTerminal();
 
-  const { paymentIntentId, clientSecret, stripeAccountId, amount, orderId, orderNumber, customerEmail, preorderId } = route.params;
+  const { paymentIntentId, clientSecret, stripeAccountId, amount, orderId, orderNumber, customerEmail, preorderId, sessionId, sessionTipAmount } = route.params;
   const [isCancelling, setIsCancelling] = useState(false);
   const [statusText, setStatusText] = useState(t('preparingPayment'));
   const isCancelledRef = useRef(false);
@@ -70,8 +76,31 @@ export function PaymentProcessingScreen() {
   // stack because clearCart() empties the cart, and Checkout's useEffect calls
   // goBack() when items.length === 0, which destroys the PaymentResult screen.
   // On FAILURE: keep Checkout so "Try Again" (goBack) returns there.
-  const navigateToResult = useCallback((params: Record<string, any>) => {
+  //
+  // For the session settle path, we call /sessions/{id}/settle on success
+  // BEFORE navigating so the session is closed + the order exists by the time
+  // PaymentResult mounts (it reads orderId for receipts).
+  const navigateToResult = useCallback(async (params: Record<string, any>) => {
     const fullParams: Record<string, any> = { ...params, paymentMethod: 'tap_to_pay' };
+    if (fullParams.success && sessionId) {
+      try {
+        const res = await sessionsApi.settle(sessionId, {
+          paymentMethod: 'tap_to_pay',
+          tipAmount: sessionTipAmount || 0,
+          stripePaymentIntentId: paymentIntentId,
+        });
+        // PaymentResult uses orderId for receipt email + transactions lookup.
+        fullParams.orderId = res.order.id;
+        fullParams.orderNumber = res.order.orderNumber;
+      } catch (e: any) {
+        // Card cleared but settle failed — show a failure card so the cashier
+        // sees something didn't match up. PI was confirmed already, so the
+        // money is captured; manual reconciliation needed in the dashboard.
+        logger.error('[PaymentProcessing] Settle after TTP confirm failed:', e);
+        fullParams.success = false;
+        fullParams.errorMessage = `Card charged but session settle failed: ${e?.error || e?.message || 'unknown error'}. Check the session in the dashboard.`;
+      }
+    }
     navigation.dispatch((state: any) => {
       let routes;
       if (fullParams.success) {
@@ -90,7 +119,7 @@ export function PaymentProcessingScreen() {
         routes,
       });
     });
-  }, [navigation]);
+  }, [navigation, sessionId, sessionTipAmount, paymentIntentId]);
 
   // Watch for server-driven payment results from Socket.IO
   useEffect(() => {
@@ -120,6 +149,8 @@ export function PaymentProcessingScreen() {
         orderNumber,
         customerEmail,
         preorderId,
+        sessionId,
+        sessionTipAmount,
       });
     } else {
       logger.log('[PaymentProcessing] Server-driven payment failed:', terminalPaymentResult.error);
@@ -133,9 +164,11 @@ export function PaymentProcessingScreen() {
         customerEmail,
         errorMessage: terminalPaymentResult.error || t('paymentFailedOnReader'),
         preorderId,
+        sessionId,
+        sessionTipAmount,
       });
     }
-  }, [terminalPaymentResult, isServerDriven, paymentIntentId, isCancelledRef, amount, orderId, orderNumber, customerEmail, preorderId, navigation, clearTerminalPaymentResult]);
+  }, [terminalPaymentResult, isServerDriven, paymentIntentId, isCancelledRef, amount, orderId, orderNumber, customerEmail, preorderId, sessionId, sessionTipAmount, navigation, clearTerminalPaymentResult]);
 
   useEffect(() => {
     if (isServerDriven) {
@@ -198,6 +231,8 @@ export function PaymentProcessingScreen() {
           orderNumber,
           customerEmail,
           preorderId,
+          sessionId,
+          sessionTipAmount,
         });
       } else {
         throw new Error(t('paymentStatus', { status: result.status }));
@@ -237,6 +272,8 @@ export function PaymentProcessingScreen() {
         customerEmail,
         errorMessage,
         preorderId,
+        sessionId,
+        sessionTipAmount,
       });
     }
   };
@@ -272,6 +309,8 @@ export function PaymentProcessingScreen() {
             customerEmail,
             errorMessage: t('paymentTimedOut'),
             preorderId,
+            sessionId,
+            sessionTipAmount,
           });
         }
       }, SERVER_DRIVEN_TIMEOUT_MS);
@@ -311,6 +350,8 @@ export function PaymentProcessingScreen() {
         customerEmail,
         errorMessage,
         preorderId,
+        sessionId,
+        sessionTipAmount,
       });
     }
   };

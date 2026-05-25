@@ -4,8 +4,8 @@ import { Product } from '../lib/api/products';
 import { useAuth } from './AuthContext';
 
 // Service mode picks the order-attribution path:
-// - 'table_service' = orders MUST be attributed to a table (server walks the floor)
-// - 'quick_service' = counter/QSR/food-truck mode, orders go straight to /orders with no table_id
+// - 'table_service' = cart is sent to a table session (picked at send-time on the floor plan)
+// - 'quick_service' = counter/QSR/food-truck mode, cart goes through CheckoutScreen → ordersApi
 export type ServiceMode = 'table_service' | 'quick_service';
 
 const SERVICE_MODE_KEY = 'rowie_service_mode';
@@ -44,12 +44,11 @@ interface CartContextType {
   setCustomTipAmount: (amount: string) => void;
   showCustomTipInput: boolean;
   setShowCustomTipInput: (show: boolean) => void;
-  // Service mode + table attribution
+  // Service mode (table_service vs quick_service). Table selection is no
+  // longer a cart concern — in table_service the FloorPlan picker handles it
+  // at send-time, so the cart stays table-agnostic.
   serviceMode: ServiceMode;
   setServiceMode: (mode: ServiceMode) => void;
-  tableId: string | null;
-  tableLabel: string | null;
-  setTable: (table: { id: string; label: string } | null) => void;
   addItem: (product: Product, quantity?: number, notes?: string) => void;
   removeItem: (cartKey: string) => void;
   updateQuantity: (cartKey: string, quantity: number) => void;
@@ -77,8 +76,6 @@ export function CartProvider({ children }: CartProviderProps) {
   const [customTipAmount, setCustomTipAmount] = useState<string>('');
   const [showCustomTipInput, setShowCustomTipInput] = useState<boolean>(false);
   const [serviceMode, setServiceModeState] = useState<ServiceMode>('quick_service');
-  const [tableId, setTableId] = useState<string | null>(null);
-  const [tableLabel, setTableLabel] = useState<string | null>(null);
 
   // Hydrate serviceMode from AsyncStorage on mount
   useEffect(() => {
@@ -89,25 +86,16 @@ export function CartProvider({ children }: CartProviderProps) {
     });
   }, []);
 
-  // Persist serviceMode changes. tableId/tableLabel are preserved across
-  // mode flips — the mode controls whether CheckoutScreen *sends* tableId
-  // on order create, not whether it's remembered. Lets a server toggle to
-  // QS to compare/quick-sell and come back without re-picking the table.
   const setServiceMode = useCallback((mode: ServiceMode) => {
     setServiceModeState(mode);
     AsyncStorage.setItem(SERVICE_MODE_KEY, mode);
-  }, []);
-
-  const setTable = useCallback((table: { id: string; label: string } | null) => {
-    setTableId(table?.id ?? null);
-    setTableLabel(table?.label ?? null);
   }, []);
 
   // Clear cart when user signs out
   const prevUserId = useRef(user?.id);
   useEffect(() => {
     if (prevUserId.current && !user?.id) {
-      // User was logged in, now logged out — clear cart + table attribution.
+      // User was logged in, now logged out — clear cart.
       // serviceMode preference persists across sign-outs (per-device setting).
       setItems([]);
       setOrderNotes('');
@@ -116,8 +104,6 @@ export function CartProvider({ children }: CartProviderProps) {
       setSelectedTipIndex(null);
       setCustomTipAmount('');
       setShowCustomTipInput(false);
-      setTableId(null);
-      setTableLabel(null);
     }
     prevUserId.current = user?.id;
   }, [user?.id]);
@@ -249,7 +235,7 @@ export function CartProvider({ children }: CartProviderProps) {
     });
   }, []);
 
-  // Clear all items, order notes, email, payment method, and table attribution.
+  // Clear all items, order notes, email, payment method.
   // serviceMode is intentionally NOT cleared — it's a per-device preference
   // that survives between orders.
   const clearCart = useCallback(() => {
@@ -260,8 +246,6 @@ export function CartProvider({ children }: CartProviderProps) {
     setSelectedTipIndex(null);
     setCustomTipAmount('');
     setShowCustomTipInput(false);
-    setTableId(null);
-    setTableLabel(null);
   }, []);
 
   // Get total quantity of specific product (across all notes variations)
@@ -300,9 +284,6 @@ export function CartProvider({ children }: CartProviderProps) {
     setShowCustomTipInput,
     serviceMode,
     setServiceMode,
-    tableId,
-    tableLabel,
-    setTable,
     addItem,
     removeItem,
     updateQuantity,
@@ -312,7 +293,7 @@ export function CartProvider({ children }: CartProviderProps) {
     clearCart,
     getItemQuantity,
     getItemByCartKey,
-  }), [items, itemCount, subtotal, orderNotes, setOrderNotes, customerEmail, setCustomerEmail, paymentMethod, setPaymentMethod, selectedTipIndex, setSelectedTipIndex, customTipAmount, setCustomTipAmount, showCustomTipInput, setShowCustomTipInput, serviceMode, setServiceMode, tableId, tableLabel, setTable, addItem, removeItem, updateQuantity, updateItemNotes, incrementItem, decrementItem, clearCart, getItemQuantity, getItemByCartKey]);
+  }), [items, itemCount, subtotal, orderNotes, setOrderNotes, customerEmail, setCustomerEmail, paymentMethod, setPaymentMethod, selectedTipIndex, setSelectedTipIndex, customTipAmount, setCustomTipAmount, showCustomTipInput, setShowCustomTipInput, serviceMode, setServiceMode, addItem, removeItem, updateQuantity, updateItemNotes, incrementItem, decrementItem, clearCart, getItemQuantity, getItemByCartKey]);
 
   return (
     <CartContext.Provider value={value}>

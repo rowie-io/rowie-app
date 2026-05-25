@@ -38,7 +38,7 @@ if (!isExpoGo) {
   ScaleDecorator = ({ children }: any) => children;
 }
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Gesture, GestureDetector, Directions } from 'react-native-gesture-handler';
@@ -60,6 +60,7 @@ import {
   UpdateCatalogData,
   LibraryProduct,
 } from '../lib/api';
+import { floorPlansApi, sessionsApi } from '../lib/api/sessions';
 import { formatCents } from '../utils/currency';
 import { useTranslations } from '../lib/i18n';
 import { openVendorDashboard } from '../lib/auth-handoff';
@@ -414,9 +415,14 @@ export function MenuScreen() {
   const t = useTranslations('menu');
   const tc = useTranslations('common');
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  // Set when the user arrived from SessionDetail's "Add items" affordance —
+  // the next 'Send to table' tap appends straight to this session instead of
+  // routing through the floor-plan picker.
+  const targetSessionId: string | undefined = route.params?.sessionId;
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
-  const { isLoading: authLoading, user, organization, completeOnboarding, subscription, currency, isPaymentReady } = useAuth();
+  const { isLoading: authLoading, user, organization, completeOnboarding, subscription, currency, isPaymentReady, currentLocationId } = useAuth();
   const { selectedCatalog, catalogs, isLoading: catalogsLoading, refreshCatalogs, setSelectedCatalog } = useCatalog();
   const {
     addItem,
@@ -426,7 +432,8 @@ export function MenuScreen() {
     subtotal,
     serviceMode,
     setServiceMode,
-    tableLabel,
+    items,
+    clearCart,
   } = useCart();
   const { guardCheckout } = useTapToPayGuard();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -450,6 +457,22 @@ export function MenuScreen() {
       setServiceMode('quick_service');
     }
   }, [subscription, serviceMode, setServiceMode]);
+
+  // Same snap when the current location has no floor plans — table_service
+  // has nothing to point at. The query is location-scoped via X-Location-Id,
+  // so switching location re-runs it and we re-evaluate.
+  const { data: floorPlansData } = useQuery({
+    queryKey: ['floor-plans', currentLocationId],
+    queryFn: floorPlansApi.list,
+    enabled: !!currentLocationId,
+  });
+  useEffect(() => {
+    if (!floorPlansData) return;
+    const hasPlans = (floorPlansData.floorPlans?.length ?? 0) > 0;
+    if (!hasPlans && serviceMode === 'table_service') {
+      setServiceMode('quick_service');
+    }
+  }, [floorPlansData, serviceMode, setServiceMode]);
 
   // Horizontal swipe-between-catalogs gesture. Fling (rather than Pan) keeps
   // the trigger high-velocity so it doesn't fight the vertical product-list
@@ -776,6 +799,29 @@ export function MenuScreen() {
       if (selectedCatalog) {
         queryClient.invalidateQueries({ queryKey: ['products', selectedCatalog.id] });
       }
+    },
+  });
+
+  // Used when the user came in from SessionDetail's "Add items" affordance —
+  // a one-shot send of the cart as a new round on a known session, no floor-
+  // plan visit. Success clears the cart and bounces back to SessionDetail.
+  const sendToSessionMutation = useMutation({
+    mutationFn: (sessionId: string) =>
+      sessionsApi.addItems(
+        sessionId,
+        items.map((it) => ({
+          catalogProductId: it.product.id,
+          quantity: it.quantity,
+          notes: it.notes,
+        })),
+      ),
+    onSuccess: () => {
+      clearCart();
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      if (navigation.canGoBack()) navigation.goBack();
+    },
+    onError: (err: any) => {
+      Alert.alert('Send failed', err?.error || err?.message || 'Could not add items to the session.');
     },
   });
 
@@ -1110,29 +1156,10 @@ export function MenuScreen() {
     [currentLayoutType, screenWidth]
   );
 
-  // In Table Service mode, an order MUST be attributed to a table. If no
-  // table is picked yet, route the server to the floor plan picker BEFORE
-  // anything enters the cart. Returns true if blocked (caller should bail).
-  const requireTableIfTableService = useCallback((): boolean => {
-    if (serviceMode === 'table_service' && !tableLabel) {
-      Alert.alert(
-        'Pick a table first',
-        'Table Service mode requires you to pick a table before adding items. Tap a table on the floor plan.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Open floor plan', onPress: () => navigation.navigate('FloorPlan' as never) },
-        ],
-      );
-      return true;
-    }
-    return false;
-  }, [serviceMode, tableLabel, navigation]);
-
   const handleAddToCart = (product: Product) => {
     if (isEditMode) {
       handleOpenProductModal(product);
     } else {
-      if (requireTableIfTableService()) return;
       addItem(product);
     }
   };
@@ -1140,7 +1167,6 @@ export function MenuScreen() {
   // Long-press opens notes modal
   const handleProductLongPress = (product: Product) => {
     if (!isEditMode) {
-      if (requireTableIfTableService()) return;
       setNotesProduct(product);
       setNotesModalVisible(true);
     }
@@ -1707,13 +1733,13 @@ export function MenuScreen() {
   if (catalogs.length === 0) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <SetupRequired type="no-catalogs" onQuickCharge={() => { if (!requireTableIfTableService()) setQuickChargeVisible(true); }} />
+        <SetupRequired type="no-catalogs" onQuickCharge={() => setQuickChargeVisible(true)} />
 
         {/* Quick Charge FAB - disabled without connected account */}
         <View style={[styles.bottomActions, styles.bottomActionsEmpty, { bottom: 8 }]}>
           <TouchableOpacity
             style={[styles.quickChargeFab, { backgroundColor: colors.text, opacity: isPaymentReady ? 1 : 0.35 }]}
-            onPress={() => { if (isPaymentReady && !requireTableIfTableService()) setQuickChargeVisible(true); }}
+            onPress={() => { if (isPaymentReady) setQuickChargeVisible(true); }}
             disabled={!isPaymentReady}
             activeOpacity={0.9}
             accessibilityRole="button"
@@ -1879,76 +1905,50 @@ export function MenuScreen() {
               {selectedCatalog.location ? (
                 <Text maxFontSizeMultiplier={1.5} style={styles.catalogLocation}>{selectedCatalog.location}</Text>
               ) : null}
-              {/* Service mode + table chip. Quick sale = no attribution.
-                  Table service = required table picker before cart use.
-                  Tap in quick_service flips to table_service + opens FloorPlan;
-                  tap in table_service navigates to FloorPlan to change/pick
-                  the active table.
-                  Pro-gated: free-tier users get an upgrade prompt instead so
-                  they discover the feature but can't activate it. */}
+              {/* Service-mode chip. The cart itself is table-agnostic — table
+                  selection happens at send-time on the floor plan — so this is
+                  just a service-mode indicator + an entry to the floor plan
+                  while the cart is empty. Free-tier users get an upgrade nudge. */}
               {(() => {
                 const isProTier =
                   subscription?.tier === 'pro' || subscription?.tier === 'enterprise';
-                const onChipPress = () => {
-                  if (!isProTier) {
-                    Alert.alert(
-                      'Table service is Pro',
-                      'Upgrade to Pro to manage floor plans, tables, and table-side ordering.',
-                      [
-                        { text: 'Not now', style: 'cancel' },
-                        { text: 'Upgrade', onPress: () => navigation.navigate('Upgrade' as never) },
-                      ],
-                    );
-                    return;
-                  }
-                  if (serviceMode === 'quick_service') setServiceMode('table_service');
-                  navigation.navigate('FloorPlan' as never);
-                };
+                if (!isProTier) {
+                  return (
+                    <TouchableOpacity
+                      style={styles.modeChip}
+                      onPress={() =>
+                        Alert.alert(
+                          'Table service is Pro',
+                          'Upgrade to Pro to manage floor plans, tables, and table-side ordering.',
+                          [
+                            { text: 'Not now', style: 'cancel' },
+                            { text: 'Upgrade', onPress: () => navigation.navigate('Upgrade' as never) },
+                          ],
+                        )
+                      }
+                      activeOpacity={0.8}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      accessibilityRole="button"
+                      accessibilityLabel="Quick sale. Table service requires Pro — tap to upgrade."
+                    >
+                      <Ionicons name="flash-outline" size={14} color={colors.textSecondary} />
+                      <Text maxFontSizeMultiplier={1.3} style={styles.modeChipText}>Quick sale</Text>
+                      <Ionicons name="diamond-outline" size={11} color={colors.primary} style={{ marginLeft: 2 }} />
+                    </TouchableOpacity>
+                  );
+                }
+                if (serviceMode !== 'table_service') return null;
                 return (
                   <TouchableOpacity
                     style={styles.modeChip}
-                    onPress={onChipPress}
+                    onPress={() => navigation.navigate('FloorPlan' as never)}
                     activeOpacity={0.8}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     accessibilityRole="button"
-                    accessibilityLabel={
-                      !isProTier
-                        ? 'Quick sale. Table service requires Pro — tap to upgrade.'
-                        : serviceMode === 'table_service'
-                        ? tableLabel
-                          ? `Current table ${tableLabel}, tap to change`
-                          : 'Pick a table'
-                        : 'Quick sale, tap to switch to table service'
-                    }
+                    accessibilityLabel="Open floor plan"
                   >
-                    <Ionicons
-                      name={
-                        !isProTier
-                          ? 'flash-outline'
-                          : serviceMode === 'table_service'
-                          ? 'restaurant-outline'
-                          : 'flash-outline'
-                      }
-                      size={14}
-                      color={colors.textSecondary}
-                    />
-                    <Text maxFontSizeMultiplier={1.3} style={styles.modeChipText}>
-                      {!isProTier
-                        ? 'Quick sale'
-                        : serviceMode === 'table_service'
-                        ? tableLabel
-                          ? tableLabel
-                          : 'Pick a table'
-                        : 'Quick sale'}
-                    </Text>
-                    {!isProTier && (
-                      <Ionicons
-                        name="diamond-outline"
-                        size={11}
-                        color={colors.primary}
-                        style={{ marginLeft: 2 }}
-                      />
-                    )}
+                    <Ionicons name="restaurant-outline" size={14} color={colors.textSecondary} />
+                    <Text maxFontSizeMultiplier={1.3} style={styles.modeChipText}>Floor plan</Text>
                   </TouchableOpacity>
                 );
               })()}
@@ -2263,7 +2263,7 @@ export function MenuScreen() {
           {/* Quick Charge FAB */}
           <TouchableOpacity
             style={[styles.quickChargeFab, { backgroundColor: colors.text }]}
-            onPress={() => { if (!requireTableIfTableService()) setQuickChargeVisible(true); }}
+            onPress={() => setQuickChargeVisible(true)}
             activeOpacity={0.9}
             accessibilityRole="button"
             accessibilityLabel={t('quickChargeAccessibilityLabel')}
@@ -2272,19 +2272,45 @@ export function MenuScreen() {
             <Ionicons name="flash" size={22} color={colors.background} />
           </TouchableOpacity>
 
-          {/* Go to Cart Button */}
+          {/* Cart action — three paths:
+              - targetSessionId set (came from SessionDetail "Add items"): send straight to that session.
+              - table_service mode: open FloorPlan in send-mode to pick a table.
+              - quick_service mode: go to Checkout for tip + payment. */}
           {itemCount > 0 && (
             <TouchableOpacity
               style={styles.goToCartButton}
-              onPress={() => { if (guardCheckout()) navigation.navigate('Checkout', { total: subtotal }); }}
+              disabled={sendToSessionMutation.isPending}
+              onPress={() => {
+                if (targetSessionId) {
+                  sendToSessionMutation.mutate(targetSessionId);
+                  return;
+                }
+                if (serviceMode === 'table_service') {
+                  navigation.navigate('FloorPlan' as never, { mode: 'send' } as never);
+                  return;
+                }
+                if (guardCheckout()) navigation.navigate('Checkout', { total: subtotal });
+              }}
               activeOpacity={0.9}
               accessibilityRole="button"
-              accessibilityLabel={itemCount === 1 ? t('goToCartAccessibilityLabelSingular', { count: itemCount }) : t('goToCartAccessibilityLabelPlural', { count: itemCount })}
+              accessibilityLabel={
+                targetSessionId
+                  ? `Send ${itemCount} item${itemCount === 1 ? '' : 's'} to this session`
+                  : serviceMode === 'table_service'
+                  ? `Send ${itemCount} item${itemCount === 1 ? '' : 's'} to a table`
+                  : itemCount === 1
+                  ? t('goToCartAccessibilityLabelSingular', { count: itemCount })
+                  : t('goToCartAccessibilityLabelPlural', { count: itemCount })
+              }
             >
               <View style={styles.goToCartBadge}>
                 <Text maxFontSizeMultiplier={1.3} style={styles.goToCartBadgeText}>{itemCount}</Text>
               </View>
-              <Text maxFontSizeMultiplier={1.3} style={styles.goToCartText}>{t('goToCartButton')}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.goToCartText}>
+                {targetSessionId
+                  ? sendToSessionMutation.isPending ? 'Sending…' : 'Send to session'
+                  : serviceMode === 'table_service' ? 'Send to table' : t('goToCartButton')}
+              </Text>
               <Ionicons name="chevron-forward" size={18} color="#fff" />
             </TouchableOpacity>
           )}

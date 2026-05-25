@@ -26,6 +26,7 @@ import { useCatalog } from '../context/CatalogContext';
 import { useAuth } from '../context/AuthContext';
 import { useTerminal } from '../context/StripeTerminalContext';
 import { stripeTerminalApi, ordersApi } from '../lib/api';
+import { sessionsApi } from '../lib/api/sessions';
 import { getDeviceId } from '../lib/device';
 import { shadows } from '../lib/shadows';
 import { fonts } from '../lib/fonts';
@@ -48,8 +49,6 @@ type RouteParams = {
     total: number;
     isQuickCharge?: boolean;
     quickChargeDescription?: string;
-    resumedOrderId?: string;
-    resumedOrder?: any;
   };
 };
 
@@ -58,11 +57,10 @@ export function CheckoutScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'Checkout'>>();
-  const { items, itemCount, clearCart, incrementItem, decrementItem, removeItem, subtotal: cartSubtotal, orderNotes, setOrderNotes, customerEmail, setCustomerEmail, paymentMethod, setPaymentMethod, selectedTipIndex, setSelectedTipIndex, customTipAmount, setCustomTipAmount, showCustomTipInput, setShowCustomTipInput, tableId, serviceMode } = useCart();
-  // Only attribute orders to a table when explicitly in Table Service mode;
-  // CartContext keeps tableId across mode flips for ergonomics, but Quick
-  // Service orders must NOT inherit a leftover table from a prior session.
-  const effectiveTableId = serviceMode === 'table_service' ? tableId : null;
+  const { items, itemCount, clearCart, incrementItem, decrementItem, removeItem, subtotal: cartSubtotal, orderNotes, setOrderNotes, customerEmail, setCustomerEmail, paymentMethod, setPaymentMethod, selectedTipIndex, setSelectedTipIndex, customTipAmount, setCustomTipAmount, showCustomTipInput, setShowCustomTipInput } = useCart();
+  // CheckoutScreen is only reachable in quick_service mode now — table_service
+  // sends carts straight to a table session via FloorPlan, so orders created
+  // here never carry a tableId.
   const { selectedCatalog } = useCatalog();
   const { isPaymentReady, connectLoading, connectStatus, currency } = useAuth();
   const { deviceCompatibility, isInitialized: isTerminalInitialized, isWarming, preferredReader } = useTerminal();
@@ -98,131 +96,25 @@ export function CheckoutScreen() {
   // Customer info section visibility (combines email + notes)
   const [showCustomerInfo, setShowCustomerInfo] = useState(false);
 
-  const { total: routeTotal, isQuickCharge, quickChargeDescription, resumedOrderId, resumedOrder } = route.params;
+  const { total: routeTotal, isQuickCharge, quickChargeDescription } = route.params;
   const styles = createStyles(colors, isDark);
 
-  // NOTE: Do NOT clear cart on unmount — only clear after explicit hold/delete/complete actions
+  // NOTE: Do NOT clear cart on unmount — only clear after explicit hold/complete actions
 
-  // Initialize state from resumed order
+  // Use cart subtotal for regular checkout, route total for quick charge.
+  const subtotal = isQuickCharge ? routeTotal : cartSubtotal;
+
+  // Navigate back if cart becomes empty (quick charge is exempt — it has no cart).
   useEffect(() => {
-    if (resumedOrder) {
-      // Set customer email
-      if (resumedOrder.customerEmail) {
-        setCustomerEmail(resumedOrder.customerEmail);
-      }
-
-      // Set order notes
-      if (resumedOrder.notes || resumedOrder.customerEmail) {
-        if (resumedOrder.notes) setOrderNotes(resumedOrder.notes);
-        setShowCustomerInfo(true);
-      }
-
-      // Set payment method
-      if (resumedOrder.paymentMethod) {
-        const methodMap: Record<string, PaymentMethodType> = {
-          tap_to_pay: 'tap_to_pay',
-          cash: 'cash',
-          card: 'tap_to_pay',
-          split: 'split',
-        };
-        setPaymentMethod(methodMap[resumedOrder.paymentMethod] || 'tap_to_pay');
-      }
-
-      // Note: Tip is already handled via the tipAmount/grandTotal calculation
-      // We don't need to set selectedTipIndex since we use the stored tipAmount directly
-    }
-  }, [resumedOrder]);
-
-  // Use cart subtotal for regular checkout (items can be modified), route total for quick charge
-  // For resumed orders, use the order's subtotal
-  const subtotal = resumedOrder
-    ? resumedOrder.subtotal
-    : isQuickCharge
-      ? routeTotal
-      : cartSubtotal;
-
-  // Navigate back if cart becomes empty (not for quick charge or resumed orders)
-  useEffect(() => {
-    if (!isQuickCharge && !resumedOrder && items.length === 0) {
+    if (!isQuickCharge && items.length === 0) {
       navigation.goBack();
     }
-  }, [items.length, isQuickCharge, resumedOrder, navigation]);
+  }, [items.length, isQuickCharge, navigation]);
 
-  // Track whether we're allowing navigation (set to true after user confirms in dialog)
+  // Set to true before any programmatic goBack() so the hold flow doesn't
+  // accidentally hit a beforeRemove guard later. Kept as a no-op ref for now;
+  // the legacy resume guard was removed with the held-orders retirement.
   const allowNavigationRef = useRef(false);
-
-  // Intercept back navigation for resumed orders (hardware back button, swipe gesture)
-  useEffect(() => {
-    if (!resumedOrder || !resumedOrderId) return;
-
-    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
-      // If navigation was allowed programmatically, let it happen
-      if (allowNavigationRef.current) {
-        allowNavigationRef.current = false;
-        return;
-      }
-
-      // Prevent default navigation
-      e.preventDefault();
-
-      // Show confirmation dialog
-      Alert.alert(
-        t('backNavigationTitle'),
-        t('backNavigationMessage'),
-        [
-          {
-            text: tc('cancel'),
-            style: 'cancel',
-          },
-          {
-            text: t('deleteOrderButton'),
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                await ordersApi.cancel(resumedOrderId);
-                clearCart();
-                allowNavigationRef.current = true;
-                navigation.dispatch(e.data.action);
-              } catch (error: any) {
-                logger.error('Delete order error:', error);
-                Alert.alert(t('errorTitle'), error.error || error.message || t('failedToDeleteOrder'));
-              }
-            },
-          },
-          {
-            text: t('holdOrderButton'),
-            onPress: async () => {
-              try {
-                const vals = currentValuesRef.current;
-                const emailValid = vals.customerEmail.trim() && isValidEmailOrEmpty(vals.customerEmail) ? vals.customerEmail.trim() : undefined;
-                const holdUpdates = {
-                  tipAmount: vals.tipAmount,
-                  taxAmount: vals.taxAmount,
-                  subtotal: vals.subtotal,
-                  totalAmount: vals.grandTotal,
-                  paymentMethod: vals.paymentMethod,
-                  customerEmail: emailValid,
-                  notes: vals.orderNotes || null,
-                };
-                logger.log('[RE-HOLD DEBUG] beforeRemove hold updates:', JSON.stringify(holdUpdates, null, 2));
-                logger.log('[RE-HOLD DEBUG] holdName:', vals.holdName || resumedOrder.holdName);
-                const result = await ordersApi.hold(resumedOrderId, vals.holdName || resumedOrder.holdName, holdUpdates);
-                logger.log('[RE-HOLD DEBUG] hold API result:', JSON.stringify({ id: result.id, paymentMethod: result.paymentMethod, tipAmount: result.tipAmount, totalAmount: result.totalAmount }));
-                clearCart();
-                allowNavigationRef.current = true;
-                navigation.dispatch(e.data.action);
-              } catch (error: any) {
-                logger.error('Re-hold order error:', error);
-                Alert.alert(t('errorTitle'), error.error || error.message || t('failedToHoldOrder'));
-              }
-            },
-          },
-        ]
-      );
-    });
-
-    return unsubscribe;
-  }, [resumedOrder, resumedOrderId, navigation, t, tc]);
 
   // Show setup required banner when charges aren't enabled
   const showSetupBanner = !connectLoading && connectStatus && !connectStatus.chargesEnabled;
@@ -236,21 +128,13 @@ export function CheckoutScreen() {
   const tipPercentages = selectedCatalog?.tipPercentages ?? [15, 18, 20, 25];
   const allowCustomTip = selectedCatalog?.allowCustomTip ?? true;
   // Tax rate stored as whole number percentage (e.g., 5 for 5%)
-  // For resumed orders, calculate from stored values
-  const taxRate = useMemo(() => {
-    if (resumedOrder && resumedOrder.subtotal > 0) {
-      // Calculate tax rate from stored tax amount and subtotal
-      return Math.round((resumedOrder.taxAmount / resumedOrder.subtotal) * 100);
-    }
-    return selectedCatalog?.taxRate ?? 0;
-  }, [resumedOrder, selectedCatalog?.taxRate]);
+  const taxRate = selectedCatalog?.taxRate ?? 0;
 
-  // Calculate tax amount (based on subtotal) - use resumed order's tax if available
+  // Calculate tax amount (based on subtotal)
   const taxAmount = useMemo(() => {
-    if (resumedOrder) return resumedOrder.taxAmount;
     if (taxRate <= 0) return 0;
     return Math.round(subtotal * (taxRate / 100));
-  }, [subtotal, taxRate, resumedOrder]);
+  }, [subtotal, taxRate]);
 
   // Build tip options
   const tipOptions: TipOption[] = useMemo(() => {
@@ -267,21 +151,8 @@ export function CheckoutScreen() {
     return options;
   }, [tipPercentages, allowCustomTip, t]);
 
-  // Calculate tip and grand total (subtotal + tax + tip) - use resumed order values if available
+  // Calculate tip and grand total (subtotal + tax + tip)
   const { tipAmount, grandTotal, tipPercentage } = useMemo(() => {
-    // For resumed orders, use the stored values
-    if (resumedOrder) {
-      // Calculate tip percentage from stored values
-      const calcTipPct = resumedOrder.subtotal > 0
-        ? Math.round((resumedOrder.tipAmount / resumedOrder.subtotal) * 100)
-        : 0;
-      return {
-        tipAmount: resumedOrder.tipAmount,
-        grandTotal: resumedOrder.totalAmount,
-        tipPercentage: calcTipPct,
-      };
-    }
-
     const subtotalWithTax = subtotal + taxAmount;
     if (!showTipScreen || selectedTipIndex === null) {
       return { tipAmount: 0, grandTotal: subtotalWithTax, tipPercentage: 0 };
@@ -301,7 +172,7 @@ export function CheckoutScreen() {
     // Tip is calculated on subtotal (before tax)
     const tip = Math.round(subtotal * tipPct);
     return { tipAmount: tip, grandTotal: subtotalWithTax + tip, tipPercentage: Math.round(tipPct * 100) };
-  }, [subtotal, taxAmount, selectedTipIndex, showTipScreen, tipOptions, customTipAmount, resumedOrder, currency]);
+  }, [subtotal, taxAmount, selectedTipIndex, showTipScreen, tipOptions, customTipAmount, currency]);
 
   // Keep refs in sync for the beforeRemove handler
   useEffect(() => {
@@ -328,137 +199,59 @@ export function CheckoutScreen() {
     }
   };
 
-  // Handle hold order
+  // Hold the current cart as a session (source='hold'). Replaces the legacy
+  // /orders/{id}/hold path — holds are sessions with no table, so they share
+  // the same edit + close-out UI as table sessions. Tip/tax are recomputed at
+  // settle time from the catalog and items, so we don't pass them here.
   const handleHoldOrder = async () => {
     if (isQuickCharge) return; // Can't hold quick charges
-
-    // Validate email if provided
+    if (!selectedCatalog) {
+      Alert.alert(t('errorTitle'), 'Pick a menu before holding an order.');
+      return;
+    }
+    if (items.length === 0) {
+      Alert.alert(t('errorTitle'), 'Add items to the cart before holding.');
+      return;
+    }
     if (customerEmail.trim() && !isValidEmailOrEmpty(customerEmail)) {
       setEmailError(t('pleaseEnterValidEmail'));
       return;
     }
 
-    logger.log('Hold order: Starting hold process', { isResumedOrder: !!resumedOrderId });
     setIsHolding(true);
     try {
-      let orderId: string;
-      let orderNumber: string;
+      const sessionItems = items.map((item) => ({
+        catalogProductId: item.product.id,
+        quantity: item.quantity,
+        notes: item.notes,
+      }));
+      const displayName = holdName.trim() || undefined;
+      await sessionsApi.create({
+        catalogId: selectedCatalog.id,
+        source: 'hold',
+        holdName: displayName,
+        customerEmail: customerEmail.trim() || undefined,
+        orderNotes: orderNotes || undefined,
+        items: sessionItems,
+      });
 
-      if (resumedOrderId) {
-        // Re-hold the existing resumed order with updated fields
-        const holdUpdates = {
-          tipAmount: tipAmount,
-          taxAmount: taxAmount,
-          subtotal: subtotal,
-          totalAmount: grandTotal,
-          paymentMethod: paymentMethod,
-          customerEmail: customerEmail.trim() || undefined,
-          notes: orderNotes || null,
-        };
-        logger.log('[RE-HOLD DEBUG] handleHoldOrder updates:', JSON.stringify(holdUpdates, null, 2));
-        logger.log('[RE-HOLD DEBUG] holdName:', holdName.trim() || resumedOrder?.holdName);
-
-        const heldOrder = await ordersApi.hold(resumedOrderId, holdName.trim() || resumedOrder?.holdName || undefined, holdUpdates);
-        logger.log('[RE-HOLD DEBUG] hold API result:', JSON.stringify({ id: heldOrder.id, paymentMethod: heldOrder.paymentMethod, tipAmount: heldOrder.tipAmount, totalAmount: heldOrder.totalAmount }));
-
-        orderId = heldOrder.id;
-        orderNumber = heldOrder.orderNumber;
-
-        logger.log('Hold order: Re-hold API returned', { orderId, status: heldOrder.status });
-
-        if (heldOrder.status !== 'held') {
-          throw new Error(`Order hold failed - status is ${heldOrder.status}`);
-        }
-      } else {
-        // New order: create then hold
-        const deviceId = await getDeviceId();
-        logger.log('Hold order: Got device ID:', deviceId);
-
-        const orderItems = items.map((item) => ({
-          productId: item.product.productId,
-          categoryId: item.product.categoryId || undefined,
-          name: item.product.name,
-          quantity: item.quantity,
-          unitPrice: item.product.price,
-          notes: item.notes,
-        }));
-
-        const createOrderParams = {
-          catalogId: selectedCatalog?.id,
-          items: orderItems,
-          subtotal: subtotal,
-          taxAmount: taxAmount,
-          tipAmount: tipAmount,
-          totalAmount: grandTotal,
-          paymentMethod: paymentMethod,
-          customerEmail: customerEmail.trim() || undefined,
-          deviceId,
-          notes: orderNotes || undefined,
-          holdName: holdName.trim() || undefined,
-          tableId: effectiveTableId || undefined,
-        };
-
-        logger.log('Hold order: Creating order with params:', JSON.stringify(createOrderParams, null, 2));
-
-        const order = await ordersApi.create(createOrderParams);
-        logger.log('Hold order: Order created', { orderId: order.id, orderNumber: order.orderNumber, status: order.status });
-
-        const heldOrder = await ordersApi.hold(order.id, holdName.trim() || undefined);
-        orderId = heldOrder.id;
-        orderNumber = heldOrder.orderNumber;
-
-        logger.log('Hold order: Hold API returned', { orderId, status: heldOrder.status });
-
-        if (heldOrder.status !== 'held') {
-          throw new Error(`Order hold failed - status is ${heldOrder.status}`);
-        }
-      }
-
-      logger.log('Order held successfully:', { orderId });
-
-      // Close modal first
       setShowHoldModal(false);
-
-      // Clear cart before navigating
       clearCart();
-
-      // Allow navigation past the beforeRemove guard for resumed orders
       allowNavigationRef.current = true;
-
-      // Close checkout screen and go back to menu
       navigation.goBack();
 
-      // Show confirmation
-      const displayName = holdName.trim() || resumedOrder?.holdName;
       Alert.alert(
         t('orderHeldTitle'),
         displayName
           ? t('orderHeldMessage', { name: displayName })
-          : t('orderHeldMessageFallback', { orderNumber })
+          : 'Order saved as a hold — find it in the Tabs tab.',
       );
     } catch (error: any) {
       logger.error('Hold order error:', error);
-      logger.error('Hold order error details:', {
-        message: error.message,
-        error: error.error,
-        statusCode: error.statusCode,
-        code: error.code,
-        details: error.details,
-      });
-
-      // Extract error message properly - error.error might be an object (ZodError)
-      let errorMessage = t('failedToHoldOrder');
-      if (typeof error.error === 'string') {
-        errorMessage = error.error;
-      } else if (error.error?.issues) {
-        // Zod validation error - extract the issues
-        const issues = error.error.issues;
-        logger.error('Zod validation issues:', JSON.stringify(issues, null, 2));
-        errorMessage = issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join(', ');
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-
+      const errorMessage =
+        (typeof error?.error === 'string' && error.error) ||
+        error?.message ||
+        t('failedToHoldOrder');
       Alert.alert(t('errorTitle'), errorMessage);
     } finally {
       setIsHolding(false);
@@ -520,17 +313,11 @@ export function CheckoutScreen() {
       const tipSuffix = tipAmount > 0 ? ` ${t('tipIncluded', { amount: formatCents(tipAmount, currency) })}` : '';
       const description = isQuickCharge
         ? `${quickChargeDescription || t('quickChargeDescription')}${tipSuffix}`
-        : resumedOrder
-          ? `${resumedOrder.holdName ? t('resumedOrderDescription', { holdName: resumedOrder.holdName, itemCount: resumedOrder.items?.length || 0 }) : t('resumedOrderDescriptionDefault', { itemCount: resumedOrder.items?.length || 0 })}${tipSuffix}`
-          : `${t('orderDescription', { itemCount: items.length })}${tipSuffix}`;
+        : `${t('orderDescription', { itemCount: items.length })}${tipSuffix}`;
 
-      // 1. Get or create order in database
+      // 1. Create the order
       let order;
-      if (resumedOrder) {
-        // Use existing resumed order
-        order = resumedOrder;
-      } else {
-        // Create new order
+      {
         const orderItems = isQuickCharge
           ? undefined
           : items.map((item) => ({
@@ -558,7 +345,6 @@ export function CheckoutScreen() {
           description: isQuickCharge ? quickChargeDescription : undefined,
           deviceId,
           notes: orderNotes || undefined, // Include order-level notes
-          tableId: effectiveTableId || undefined,
         });
       }
 
@@ -624,7 +410,6 @@ export function CheckoutScreen() {
           subtotal: subtotal.toString(),
           taxAmount: taxAmount.toString(),
           tipAmount: tipAmount.toString(),
-          ...(effectiveTableId ? { tableId: effectiveTableId } : {}),
         },
         receiptEmail,
       }, idempotencyKey);
@@ -697,11 +482,11 @@ export function CheckoutScreen() {
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>
-            {resumedOrder ? t('resumeOrderTitle') : t('checkoutTitle')}
+            {t('checkoutTitle')}
           </Text>
           <View style={styles.headerRight}>
-            {/* Hold Order Button (not for quick charge or resumed orders) */}
-            {!isQuickCharge && !resumedOrder && items.length > 0 && (
+            {/* Hold Order Button (not for quick charge) */}
+            {!isQuickCharge && items.length > 0 && (
               <TouchableOpacity
                 style={styles.holdButton}
                 onPress={() => {
@@ -720,7 +505,7 @@ export function CheckoutScreen() {
               </TouchableOpacity>
             )}
             {/* Clear Cart Button */}
-            {!isQuickCharge && !resumedOrder && items.length > 0 ? (
+            {!isQuickCharge && items.length > 0 ? (
               <TouchableOpacity
                 style={styles.clearButton}
                 onPress={() => {
@@ -751,8 +536,8 @@ export function CheckoutScreen() {
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
-        {/* 1. Tip Selection (first) - hide for resumed orders since tip is already set */}
-        {showTipScreen && !resumedOrder && (
+        {/* 1. Tip Selection (first) */}
+        {showTipScreen && (
           <View style={styles.tipSection}>
             <Text style={styles.tipTitle} maxFontSizeMultiplier={1.3}>{t('addTipTitle')}</Text>
             <View style={styles.tipOptions}>
@@ -996,60 +781,6 @@ export function CheckoutScreen() {
               <View style={styles.totalsSection}>
                 <View style={styles.totalsRow}>
                   <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('quickChargeLabel')}</Text>
-                  <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(subtotal, currency)}</Text>
-                </View>
-                {taxAmount > 0 && (
-                  <View style={styles.totalsRow}>
-                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('taxLabel', { rate: taxRate })}</Text>
-                    <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(taxAmount, currency)}</Text>
-                  </View>
-                )}
-                {tipAmount > 0 && (
-                  <View style={styles.totalsRow}>
-                    <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('tipLabel', { percentage: tipPercentage })}</Text>
-                    <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(tipAmount, currency)}</Text>
-                  </View>
-                )}
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel} maxFontSizeMultiplier={1.3}>{t('totalLabel')}</Text>
-                  <Text style={styles.totalAmount} maxFontSizeMultiplier={1.2} accessibilityRole="summary" accessibilityLabel={t('totalAccessibilityLabel', { amount: formatCents(grandTotal, currency) })}>{formatCents(grandTotal, currency)}</Text>
-                </View>
-              </View>
-            </>
-          ) : resumedOrder ? (
-            <>
-              {/* Resumed order items (read-only) */}
-              {resumedOrder.items?.map((item: any) => (
-                <View key={item.id} style={styles.itemRow}>
-                  <View style={styles.itemThumbnail}>
-                    {item.imageUrl ? (
-                      <Image source={{ uri: item.imageUrl }} style={styles.itemImage} />
-                    ) : (
-                      <View style={styles.itemImagePlaceholder}>
-                        <Ionicons name="cube-outline" size={14} color={colors.textMuted} />
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName} maxFontSizeMultiplier={1.5} numberOfLines={1}>{item.name}</Text>
-                    {item.notes ? (
-                      <Text style={styles.itemNotes} maxFontSizeMultiplier={1.5} numberOfLines={1}>{item.notes}</Text>
-                    ) : (
-                      <Text style={styles.itemUnitPrice} maxFontSizeMultiplier={1.5}>{t('unitPriceEach', { price: formatCents(item.unitPrice, currency) })}</Text>
-                    )}
-                  </View>
-                  <View style={styles.quantityControls}>
-                    <Text style={styles.quantityText} maxFontSizeMultiplier={1.5}>{t('quantityPrefix', { quantity: item.quantity })}</Text>
-                  </View>
-                  <Text style={styles.itemPrice} maxFontSizeMultiplier={1.5} numberOfLines={1} adjustsFontSizeToFit>
-                    {formatCents(item.unitPrice * item.quantity, currency)}
-                  </Text>
-                </View>
-              ))}
-              {/* Totals */}
-              <View style={styles.totalsSection}>
-                <View style={styles.totalsRow}>
-                  <Text style={styles.totalsLabel} maxFontSizeMultiplier={1.5}>{t('subtotalLabel')}</Text>
                   <Text style={styles.totalsValue} maxFontSizeMultiplier={1.5}>{formatCents(subtotal, currency)}</Text>
                 </View>
                 {taxAmount > 0 && (

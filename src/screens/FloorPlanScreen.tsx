@@ -25,7 +25,7 @@ import { TABLE_STATUS_COLORS, type TableStatus } from '../lib/tableStatus';
 
 type RouteParams = {
   FloorPlan: {
-    mode?: 'view' | 'assign';
+    mode?: 'view' | 'send';
     floorPlanId?: string;
   };
 };
@@ -41,9 +41,14 @@ export function FloorPlanScreen() {
   const { currentLocationId, subscription } = useAuth();
   const isProTier = subscription?.tier === 'pro' || subscription?.tier === 'enterprise';
   const { selectedCatalog } = useCatalog();
-  const { serviceMode, setTable } = useCart();
+  const { items: cartItems, itemCount: cartItemCount, clearCart } = useCart();
   const queryClient = useQueryClient();
   const t = useTranslations('floorPlan');
+
+  // "Send mode" — entered from MenuScreen's 'Send to table' CTA with items in
+  // the cart. While in this mode, a tap on any table commits the cart as a
+  // new round on that table's session (creating one if the table is empty).
+  const isSendMode = route.params?.mode === 'send' && cartItemCount > 0;
 
   const [selectedFloorPlanId, setSelectedFloorPlanId] = useState<string | null>(
     route.params?.floorPlanId || null
@@ -57,7 +62,8 @@ export function FloorPlanScreen() {
     setSelectedFloorPlanId(null);
   }, [currentLocationId]);
 
-  // Create a new session on an unoccupied table
+  // Create a new (empty) session on an unoccupied table — used outside of
+  // send-mode when a server just wants to seat people without ordering yet.
   const createSessionMutation = useMutation({
     mutationFn: (tableId: string) => {
       if (!selectedCatalog) throw new Error('No catalog selected');
@@ -81,6 +87,62 @@ export function FloorPlanScreen() {
         return;
       }
       Alert.alert(t('failedStartSessionTitle'), err?.error || err?.message || t('failedStartSessionMessage'));
+    },
+  });
+
+  // Send the current cart to a table as a new round. If the table already has
+  // an open session, append; otherwise create a fresh session with the items
+  // pre-loaded. On success we clear the cart and bounce back to Menu.
+  const sendMutation = useMutation({
+    mutationFn: async (table: Table) => {
+      if (!selectedCatalog) throw new Error('No catalog selected');
+      const payload = cartItems.map((it) => ({
+        catalogProductId: it.product.id,
+        quantity: it.quantity,
+        notes: it.notes,
+      }));
+      const existing = tableSessionMap.get(table.id);
+      if (existing) {
+        await sessionsApi.addItems(existing.id, payload);
+        return { tableLabel: table.label, sessionId: existing.id };
+      }
+      const result = await sessionsApi.create({
+        catalogId: selectedCatalog.id,
+        tableId: table.id,
+        source: 'pos',
+        items: payload,
+      });
+      return { tableLabel: table.label, sessionId: result.session.id };
+    },
+    onSuccess: ({ tableLabel }) => {
+      clearCart();
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['floor-plans'] });
+      if (navigation.canGoBack()) navigation.goBack();
+      Alert.alert('Sent', `Sent to ${tableLabel}.`);
+    },
+    onError: (err: any) => {
+      // Race: someone else opened a session on this table between our cache
+      // and the create call. Retry as addItems against the returned session.
+      const existingSessionId = err?.details?.existingSessionId;
+      if (err?.code === 'TABLE_ALREADY_HAS_SESSION' && existingSessionId) {
+        const payload = cartItems.map((it) => ({
+          catalogProductId: it.product.id,
+          quantity: it.quantity,
+          notes: it.notes,
+        }));
+        sessionsApi
+          .addItems(existingSessionId, payload)
+          .then(() => {
+            clearCart();
+            queryClient.invalidateQueries({ queryKey: ['sessions'] });
+            if (navigation.canGoBack()) navigation.goBack();
+            Alert.alert('Sent', 'Order sent to the existing tab on that table.');
+          })
+          .catch((e2) => Alert.alert('Send failed', e2?.error || e2?.message || 'Could not send items.'));
+        return;
+      }
+      Alert.alert('Send failed', err?.error || err?.message || 'Could not send items.');
     },
   });
 
@@ -198,25 +260,31 @@ export function FloorPlanScreen() {
       mergeMutation.mutate({ sessionId: mergeSessionId, tableId: table.id });
       return;
     }
+    // Send mode: tap shows a native confirm before committing. Prevents an
+    // accidental tap on the wrong table from firing a kitchen ticket. The
+    // existing session (if any) gets a new round; an empty table opens a
+    // fresh POS session with the cart items as round 1.
+    if (isSendMode) {
+      if (table.status === 'merged' || table.status === 'unavailable') return;
+      const existing = tableSessionMap.get(table.id);
+      const verb = existing ? 'Add to' : 'Start';
+      Alert.alert(
+        `${verb} ${table.label}?`,
+        `${verb === 'Add to' ? 'Append' : 'Send'} ${cartItemCount} item${cartItemCount === 1 ? '' : 's'} ${existing ? `to the open tab on ${table.label}` : `as a new session on ${table.label}`}.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: existing ? 'Add round' : 'Send', onPress: () => sendMutation.mutate(table) },
+        ],
+      );
+      return;
+    }
     const session = tableSessionMap.get(table.id);
     if (session) {
       navigation.navigate('SessionDetail', { sessionId: session.id });
       return;
     }
-    // In Table Service mode the table tap is "pick this table for the next
-    // order" — set cart attribution and bounce back to Menu. Sessions stay
-    // available via long-press / SessionDetail navigation elsewhere.
-    if (serviceMode === 'table_service') {
-      setTable({ id: table.id, label: table.label });
-      // goBack returns to whichever screen launched FloorPlan (typically the
-      // mode-chip tap from MenuScreen). Avoids a fragile `.navigate('Menu')`
-      // call that fails if the tab navigator isn't in scope.
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      }
-      return;
-    }
-    // Quick Service / management mode — offer to start a session
+    // Empty table, no send pending. Offer to start an empty session so the
+    // server can seat the party before taking any orders.
     if (!selectedCatalog) {
       Alert.alert(t('noMenuTitle'), t('noMenuMessage'));
       return;
@@ -229,7 +297,7 @@ export function FloorPlanScreen() {
         { text: t('startSessionAction'), onPress: () => createSessionMutation.mutate(table.id) },
       ],
     );
-  }, [navigation, tableSessionMap, selectedCatalog, createSessionMutation, serviceMode, setTable, t, mergeSessionId, mergeMutation]);
+  }, [navigation, tableSessionMap, selectedCatalog, createSessionMutation, t, mergeSessionId, mergeMutation, isSendMode, sendMutation, cartItemCount]);
 
   // Long-press on a table → per-table action sheet. For an occupied table the
   // primary action is "Merge with another table"; for a merged primary we
@@ -445,6 +513,7 @@ export function FloorPlanScreen() {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.tabsScroll}
           contentContainerStyle={styles.tabsContainer}
         >
           {floorPlans.map((fp) => (
@@ -474,6 +543,47 @@ export function FloorPlanScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+      )}
+
+      {/* Send-mode banner — when the user arrived here via 'Send to table'
+          with items in their cart. Tapping any table commits the cart as a
+          round on that table's session. Cancel exits without mutating. */}
+      {isSendMode && !mergeSessionId && (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: 'rgba(245, 158, 11, 0.15)',
+            borderColor: colors.primary,
+            borderWidth: 1,
+            borderRadius: 12,
+            marginHorizontal: 16,
+            marginBottom: 8,
+            paddingHorizontal: 14,
+            paddingVertical: 10,
+          }}
+          accessibilityRole="alert"
+        >
+          <Text
+            style={{ color: '#FDE68A', fontFamily: fonts.semiBold, fontSize: 13, flex: 1 }}
+            maxFontSizeMultiplier={1.5}
+          >
+            {`Tap a table to send ${cartItemCount} item${cartItemCount === 1 ? '' : 's'}.`}
+          </Text>
+          <TouchableOpacity
+            onPress={() => navigation.canGoBack() && navigation.goBack()}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel send"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={{ marginLeft: 12 }}
+            disabled={sendMutation.isPending}
+          >
+            <Text style={{ color: '#F5F5F4', fontFamily: fonts.bold, fontSize: 13 }} maxFontSizeMultiplier={1.3}>
+              {sendMutation.isPending ? 'Sending…' : 'Cancel'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Merge-mode banner — surfaces the pending merge so the operator can't
@@ -632,9 +742,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: fonts.bold,
   },
+  tabsScroll: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   tabsContainer: {
     paddingHorizontal: 16,
     paddingBottom: 12,
+    alignItems: 'center',
     gap: 8,
   },
   tab: {
