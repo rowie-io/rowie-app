@@ -16,6 +16,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTerminal } from '../context/StripeTerminalContext';
 import { stripeTerminalApi } from '../lib/api';
 import { sessionsApi } from '../lib/api/sessions';
+import { useQueryClient } from '@tanstack/react-query';
 import { formatCents } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
@@ -53,6 +54,7 @@ export function PaymentProcessingScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'PaymentProcessing'>>();
+  const queryClient = useQueryClient();
   const {
     connectReader,
     processPayment: terminalProcessPayment,
@@ -92,6 +94,13 @@ export function PaymentProcessingScreen() {
         // PaymentResult uses orderId for receipt email + transactions lookup.
         fullParams.orderId = res.order.id;
         fullParams.orderNumber = res.order.orderNumber;
+        // Refresh the FloorPlan and Tabs query caches so the now-settled
+        // table doesn't keep showing as occupied. SocketEventHandlers also
+        // listens for SESSION_SETTLED, but invalidate explicitly so the UI
+        // is correct even if the socket round-trip lags.
+        queryClient.invalidateQueries({ queryKey: ['sessions'] });
+        queryClient.invalidateQueries({ queryKey: ['floor-plans'] });
+        queryClient.invalidateQueries({ queryKey: ['transactions'] });
       } catch (e: any) {
         // Card cleared but settle failed — show a failure card so the cashier
         // sees something didn't match up. PI was confirmed already, so the
@@ -119,7 +128,7 @@ export function PaymentProcessingScreen() {
         routes,
       });
     });
-  }, [navigation, sessionId, sessionTipAmount, paymentIntentId]);
+  }, [navigation, sessionId, sessionTipAmount, paymentIntentId, queryClient]);
 
   // Watch for server-driven payment results from Socket.IO
   useEffect(() => {

@@ -514,7 +514,7 @@ export function SessionDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('retryAccessibilityLabel')}
           >
-            <Ionicons name="refresh" size={18} color="#1C1917" />
+            <Ionicons name="refresh" size={18} color="#fff" />
             <Text style={{ fontSize: 15, fontFamily: fonts.bold, color: '#fff' }} maxFontSizeMultiplier={1.3}>
               {t('retryButton')}
             </Text>
@@ -755,10 +755,10 @@ export function SessionDetailScreen() {
               accessibilityLabel={items.length === 0 ? t('closeTabAccessibilityNoItems') : t('closeTabAccessibility')}
             >
               {closeTabMutation.isPending ? (
-                <ActivityIndicator color="#1C1917" accessibilityLabel={t('chargingCardLabel')} />
+                <ActivityIndicator color="#fff" accessibilityLabel={t('chargingCardLabel')} />
               ) : (
                 <>
-                  <Ionicons name="wallet-outline" size={20} color="#1C1917" />
+                  <Ionicons name="wallet-outline" size={20} color="#fff" />
                   <Text style={styles.settleButtonText} maxFontSizeMultiplier={1.3}>{t('closeTabButton')}</Text>
                 </>
               )}
@@ -772,10 +772,10 @@ export function SessionDetailScreen() {
               accessibilityLabel={t('settleAccessibilityLabel')}
             >
               {settleMutation.isPending ? (
-                <ActivityIndicator color="#1C1917" accessibilityLabel={t('settlingLabel')} />
+                <ActivityIndicator color="#fff" accessibilityLabel={t('settlingLabel')} />
               ) : (
                 <>
-                  <Ionicons name="cash-outline" size={20} color="#1C1917" />
+                  <Ionicons name="cash-outline" size={20} color="#fff" />
                   <Text style={styles.settleButtonText} maxFontSizeMultiplier={1.3}>{t('settleButton')}</Text>
                 </>
               )}
@@ -934,10 +934,10 @@ export function SessionDetailScreen() {
               accessibilityLabel={t('chargeButtonAccessibility', { amount: formatCurrency(sessionPreTipTotal + computedTipBase, currency) })}
             >
               {closeTabMutation.isPending ? (
-                <ActivityIndicator color="#1C1917" accessibilityLabel={t('chargingCardLabel')} />
+                <ActivityIndicator color="#fff" accessibilityLabel={t('chargingCardLabel')} />
               ) : (
                 <>
-                  <Ionicons name="wallet-outline" size={20} color="#1C1917" />
+                  <Ionicons name="wallet-outline" size={20} color="#fff" />
                   <Text style={styles.chargeButtonText} maxFontSizeMultiplier={1.3}>
                     {t('chargeButton', { amount: formatCurrency(sessionPreTipTotal + computedTipBase, currency) })}
                   </Text>

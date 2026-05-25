@@ -431,6 +431,13 @@ export function PaymentResultScreen() {
             });
             resolvedOrderId = res.order.id;
             resolvedOrderNumber = res.order.orderNumber;
+            // Refresh FloorPlan + Tabs cache so the settled table doesn't
+            // keep showing as occupied. SocketEventHandlers does this too on
+            // SESSION_SETTLED, but invalidate explicitly so the UI is correct
+            // even if the socket round-trip lags.
+            queryClient.invalidateQueries({ queryKey: ['sessions'] });
+            queryClient.invalidateQueries({ queryKey: ['floor-plans'] });
+            queryClient.invalidateQueries({ queryKey: ['transactions'] });
           } catch (settleErr: any) {
             logger.error('[ManualCard] Session settle after charge failed:', settleErr);
             Alert.alert(

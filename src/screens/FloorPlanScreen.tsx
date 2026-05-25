@@ -10,7 +10,8 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../context/ThemeContext';
@@ -54,13 +55,31 @@ export function FloorPlanScreen() {
     route.params?.floorPlanId || null
   );
 
-  // When the active location changes, drop the selected floor plan so the
-  // auto-select effect picks the first plan from the new location's set.
-  // The /floor-plans query cache is already cleared by LocationPickerScreen,
-  // so the next query refetches against the new X-Location-Id.
+  // Persist the selected floor-plan tab per-location so going to SessionDetail
+  // (or any other screen) and coming back lands the user on the same plan
+  // they were viewing. The auto-select effect below validates the restored id
+  // against the freshly-fetched plans list — if the persisted plan was deleted
+  // or moved we silently fall back to the first available.
+  const flpStorageKey = currentLocationId ? `rowie_floor_plan_${currentLocationId}` : null;
+
+  // When the active location changes, drop the in-memory selection then load
+  // whatever was persisted for the new location. The /floor-plans query cache
+  // is already cleared by LocationPickerScreen, so the next query refetches
+  // against the new X-Location-Id.
   useEffect(() => {
     setSelectedFloorPlanId(null);
-  }, [currentLocationId]);
+    if (!flpStorageKey) return;
+    AsyncStorage.getItem(flpStorageKey).then((saved) => {
+      if (saved) setSelectedFloorPlanId(saved);
+    }).catch(() => {});
+  }, [currentLocationId, flpStorageKey]);
+
+  // Persist on every explicit pick. Wrap setter so the storage write is
+  // a single call-site update, not scattered across handlers.
+  const pickFloorPlan = useCallback((id: string) => {
+    setSelectedFloorPlanId(id);
+    if (flpStorageKey) AsyncStorage.setItem(flpStorageKey, id).catch(() => {});
+  }, [flpStorageKey]);
 
   // Create a new (empty) session on an unoccupied table — used outside of
   // send-mode when a server just wants to seat people without ordering yet.
@@ -154,11 +173,13 @@ export function FloorPlanScreen() {
 
   const floorPlans = useMemo(() => floorPlansData?.floorPlans || [], [floorPlansData]);
 
-  // Auto-select first floor plan once loaded
+  // Auto-select a floor plan once the list loads. If a persisted selection
+  // is still in the list, keep it. Otherwise (deleted/moved plan, or first
+  // visit), default to the first available so the canvas always renders.
   useEffect(() => {
-    if (!selectedFloorPlanId && floorPlans.length > 0) {
-      setSelectedFloorPlanId(floorPlans[0].id);
-    }
+    if (floorPlans.length === 0) return;
+    if (selectedFloorPlanId && floorPlans.some((fp) => fp.id === selectedFloorPlanId)) return;
+    setSelectedFloorPlanId(floorPlans[0].id);
   }, [floorPlans, selectedFloorPlanId]);
 
   // Fetch tables for selected floor plan
@@ -178,6 +199,20 @@ export function FloorPlanScreen() {
     refetchTables();
     refetchSessions();
   }, [refetchTables, refetchSessions]);
+
+  // Refetch on every focus. FloorPlan stays mounted underneath stacked
+  // screens like SessionDetail and PaymentProcessing, so refetchOnMount
+  // doesn't re-run when the user returns. Without this, a session settled
+  // on a stacked screen leaves the table looking active until the next
+  // pull-to-refresh / socket event. Socket events normally handle it, but
+  // the Terminal SDK flow occasionally drops the socket so this is a
+  // safety net.
+  useFocusEffect(
+    useCallback(() => {
+      refetchTables();
+      refetchSessions();
+    }, [refetchTables, refetchSessions]),
+  );
 
   const tables = floorPlanData?.tables || [];
   const floorPlanCanvasSize = useMemo(() => {
@@ -519,7 +554,7 @@ export function FloorPlanScreen() {
           {floorPlans.map((fp) => (
             <TouchableOpacity
               key={fp.id}
-              onPress={() => setSelectedFloorPlanId(fp.id)}
+              onPress={() => pickFloorPlan(fp.id)}
               style={[
                 styles.tab,
                 {
