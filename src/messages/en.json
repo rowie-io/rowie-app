@@ -1146,6 +1146,8 @@
     "headerTitle": "Tabs",
     "goBack": "Go back",
     "newButton": "New",
+    "heldBadge": "HELD",
+    "pickupBadge": "PICKUP",
     "openTabAccessibilityLabel": "Open a new tab",
     "loadingTabs": "Loading tabs",
     "emptyTitle": "No open tabs",

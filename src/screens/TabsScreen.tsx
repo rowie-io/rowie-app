@@ -32,27 +32,31 @@ export function TabsScreen() {
     queryFn: sessionsApi.listTabs,
   });
 
-  // Held sessions (source='hold' + status='open'). Listed alongside tabs so
-  // staff can find a paused/saved order in one place after the held-orders
-  // path was retired in favour of sessions.
-  const holdsQuery = useQuery({
-    queryKey: ['sessions', { source: 'hold', status: 'open' }],
+  // All open non-tab sessions. We pull once and partition in JS into pickup
+  // (source='qr_menu') and held (source='hold') so the operator has a single
+  // mobile surface for everything that isn't an active tab. qr_table sessions
+  // surface on the floor plan view, not here.
+  const openSessionsQuery = useQuery({
+    queryKey: ['sessions', { status: 'open' }],
     queryFn: () => sessionsApi.list({ status: 'open', limit: 50 }),
   });
 
-  const isLoading = tabsQuery.isLoading || holdsQuery.isLoading;
-  const isRefetching = tabsQuery.isRefetching || holdsQuery.isRefetching;
-  const isError = tabsQuery.isError || holdsQuery.isError;
+  const isLoading = tabsQuery.isLoading || openSessionsQuery.isLoading;
+  const isRefetching = tabsQuery.isRefetching || openSessionsQuery.isRefetching;
+  const isError = tabsQuery.isError || openSessionsQuery.isError;
   const refetch = useCallback(async () => {
-    await Promise.all([tabsQuery.refetch(), holdsQuery.refetch()]);
-  }, [tabsQuery, holdsQuery]);
+    await Promise.all([tabsQuery.refetch(), openSessionsQuery.refetch()]);
+  }, [tabsQuery, openSessionsQuery]);
 
   const tabs = useMemo(() => {
     const liveTabs = tabsQuery.data?.tabs ?? [];
-    const holds = (holdsQuery.data?.sessions ?? []).filter((s) => s.source === 'hold');
-    // Holds first so freshly-paused orders sit at the top; live tabs follow.
-    return [...holds, ...liveTabs];
-  }, [tabsQuery.data, holdsQuery.data]);
+    const allOpen = openSessionsQuery.data?.sessions ?? [];
+    // Pickup first — customer is actively waiting. Holds next (vendor-paused
+    // work in progress, not time-sensitive). Live tabs last.
+    const pickup = allOpen.filter((s) => s.source === 'qr_menu');
+    const holds = allOpen.filter((s) => s.source === 'hold');
+    return [...pickup, ...holds, ...liveTabs];
+  }, [tabsQuery.data, openSessionsQuery.data]);
 
   // Defense-in-depth: ignore SESSION_* emits for other orgs so a future
   // room-scoping regression can't silently invalidate this device's open
@@ -70,7 +74,7 @@ export function TabsScreen() {
   const handleSessionChange = useCallback((data: any) => {
     if (!isMyOrg(data)) return;
     queryClient.invalidateQueries({ queryKey: ['sessions', 'tabs'] });
-    queryClient.invalidateQueries({ queryKey: ['sessions', { source: 'hold', status: 'open' }] });
+    queryClient.invalidateQueries({ queryKey: ['sessions', { status: 'open' }] });
   }, [queryClient, isMyOrg]);
 
   useSocketEvent(SocketEvents.SESSION_CREATED, handleSessionChange);
@@ -206,10 +210,12 @@ const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabC
   const itemWord = session.itemCount === 1 ? t('itemSingular') : t('itemPlural');
   const amount = formatCurrency(session.subtotal, currency);
   const isHold = session.source === 'hold';
+  const isPickup = session.source === 'qr_menu';
   const itemCountText =
     session.itemCount === 1
       ? t('itemCountSingular', { count: session.itemCount })
       : t('itemCountPlural', { count: session.itemCount });
+  const cardIconName: keyof typeof Ionicons.glyphMap = isPickup ? 'bag-handle' : isHold ? 'pause' : 'wallet';
 
   return (
     <TouchableOpacity
@@ -225,7 +231,7 @@ const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabC
     >
       <View style={styles.cardLeft}>
         <View style={[styles.cardIcon, { backgroundColor: colors.primary + '20' }]}>
-          <Ionicons name={isHold ? 'pause' : 'wallet'} size={20} color={colors.primary} />
+          <Ionicons name={cardIconName} size={20} color={colors.primary} />
         </View>
         <View style={styles.cardInfo}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -236,7 +242,7 @@ const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabC
             >
               {displayName}
             </Text>
-            {isHold && (
+            {(isHold || isPickup) && (
               <View style={{
                 paddingHorizontal: 6,
                 paddingVertical: 2,
@@ -247,7 +253,7 @@ const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabC
                   style={{ color: colors.primary, fontFamily: fonts.bold, fontSize: 10 }}
                   maxFontSizeMultiplier={1.3}
                 >
-                  HELD
+                  {isPickup ? t('pickupBadge') : t('heldBadge')}
                 </Text>
               </View>
             )}
