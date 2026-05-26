@@ -527,12 +527,12 @@ export function SettingsScreen() {
                           {subscriptionInfo?.platform === 'manual' ? (
                             <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>{t('managedByRowie')}</Text>
                           ) : isPro ? (
-                            // Pro is priced at $24.99 USD globally — don't
-                            // reflect Stripe's per-currency conversion (€24.99,
-                            // £24.99, etc.) which confuses vendors. Mirror
-                            // vendor /billing's USD override. Non-Pro paid
-                            // plans (enterprise / custom) still show the
-                            // Stripe-reported price.
+                            // Pro is priced from the central PRICING config
+                            // (USD globally). Don't reflect Stripe's
+                            // per-currency conversion (€, £, etc.) since that
+                            // confuses vendors. Mirror vendor /billing's USD
+                            // override. Non-Pro paid plans (enterprise /
+                            // custom) still show the Stripe-reported price.
                             <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>
                               {t('perMonth', { price: PRICING.pro.monthlyPriceDisplay })}
                             </Text>

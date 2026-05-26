@@ -36,8 +36,8 @@ const TICKET_FEE_BY_CURRENCY: Record<string, number> = {
 
 export const PRICING = {
   pro: {
-    monthlyPriceCents: 2499,
-    monthlyPriceDisplay: '$24.99',
+    monthlyPriceCents: 2999,
+    monthlyPriceDisplay: '$29.99',
     period: '/mo',
     transactionFeeRate: 0.028,
     transactionFeeFixedCents: 16,
