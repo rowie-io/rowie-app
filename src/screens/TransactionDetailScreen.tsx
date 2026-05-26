@@ -19,7 +19,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useTranslations } from '../lib/i18n';
 import { transactionsApi, preordersApi } from '../lib/api';
-import { formatCents, formatCurrency } from '../utils/currency';
+import { formatCents, formatCurrency, fromSmallestUnit, toSmallestUnit, isZeroDecimal, getCurrencySymbol } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 
 type RouteParams = {
@@ -44,6 +44,11 @@ export function TransactionDetailScreen() {
   const [showReceiptInput, setShowReceiptInput] = useState(false);
   const [receiptEmail, setReceiptEmail] = useState('');
   const [sendingReceipt, setSendingReceipt] = useState(false);
+  // Partial-refund support: a free-entry amount the operator can edit. Stored
+  // as a string so the user can type "12.5" without us coercing it mid-edit.
+  // Defaults to the full remaining refundable balance whenever the modal opens.
+  const [refundAmountInput, setRefundAmountInput] = useState('');
+  const [refundAmountError, setRefundAmountError] = useState<string | null>(null);
 
   // Fetch order detail (default)
   const { data: transaction, isLoading: isLoadingTransaction } = useQuery({
@@ -62,7 +67,8 @@ export function TransactionDetailScreen() {
   const isLoading = sourceType === 'preorder' ? isLoadingPreorder : isLoadingTransaction;
 
   const refundMutation = useMutation({
-    mutationFn: () => transactionsApi.refund(id),
+    mutationFn: (amountCents: number | undefined) =>
+      transactionsApi.refund(id, amountCents !== undefined ? { amount: amountCents } : undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transaction', id] });
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
@@ -83,12 +89,39 @@ export function TransactionDetailScreen() {
     },
   });
 
+  // Max amount the operator is allowed to refund right now, in smallest units.
+  // For transactions this is total - already-refunded. For preorders the mobile
+  // shape doesn't track refunded state, so we assume the full total is
+  // refundable; the API will reject over-refunds anyway.
+  const refundableCents = sourceType === 'preorder'
+    ? (preorder ? toSmallestUnit(preorder.totalAmount, currency) : 0)
+    : (transaction ? Math.max(0, transaction.amount - transaction.amountRefunded) : 0);
+
   const handleRefund = () => {
+    // Pre-fill the input with the full refundable balance — most refunds are
+    // full, and Lewis explicitly wants the partial path to be opt-in.
+    const baseUnits = fromSmallestUnit(refundableCents, currency);
+    setRefundAmountInput(isZeroDecimal(currency) ? String(baseUnits) : baseUnits.toFixed(2));
+    setRefundAmountError(null);
     setShowRefundModal(true);
   };
 
   const confirmRefund = () => {
-    refundMutation.mutate();
+    const parsed = parseFloat(refundAmountInput);
+    if (isNaN(parsed) || parsed <= 0) {
+      setRefundAmountError(t('refundAmountInvalid'));
+      return;
+    }
+    const requestedCents = toSmallestUnit(parsed, currency);
+    if (requestedCents > refundableCents) {
+      setRefundAmountError(t('refundAmountTooHigh', { max: formatCents(refundableCents, currency) }));
+      return;
+    }
+    setRefundAmountError(null);
+    // Send the explicit amount even when it equals the full balance — the API
+    // tolerates an exact-match amount and this avoids any branch where we
+    // accidentally refund stale state from a re-fetch in flight.
+    refundMutation.mutate(requestedCents);
   };
 
   const handleViewReceipt = () => {
@@ -309,8 +342,24 @@ export function TransactionDetailScreen() {
               </View>
               <Text maxFontSizeMultiplier={1.3} style={styles.modalTitle}>{t('refundModalTitle')}</Text>
               <Text maxFontSizeMultiplier={1.5} style={styles.modalMessage}>
-                {t('refundModalMessagePreorder', { amount: formatCurrency(preorder.totalAmount, currency) })}
+                {t('refundAmountHint', { max: formatCents(refundableCents, currency) })}
               </Text>
+              <View style={styles.refundAmountRow}>
+                <Text maxFontSizeMultiplier={1.3} style={styles.refundAmountSymbol}>{getCurrencySymbol(currency)}</Text>
+                <TextInput
+                  value={refundAmountInput}
+                  onChangeText={(v) => { setRefundAmountInput(v); setRefundAmountError(null); }}
+                  keyboardType={isZeroDecimal(currency) ? 'number-pad' : 'decimal-pad'}
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textMuted}
+                  style={styles.refundAmountInput}
+                  accessibilityLabel={t('refundAmountLabel')}
+                  maxFontSizeMultiplier={1.3}
+                />
+              </View>
+              {refundAmountError ? (
+                <Text maxFontSizeMultiplier={1.5} style={styles.refundAmountError}>{refundAmountError}</Text>
+              ) : null}
               <View style={styles.modalButtons}>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.modalButtonCancel]}
@@ -652,8 +701,24 @@ export function TransactionDetailScreen() {
             </View>
             <Text maxFontSizeMultiplier={1.3} style={styles.modalTitle}>{t('refundModalTitle')}</Text>
             <Text maxFontSizeMultiplier={1.5} style={styles.modalMessage}>
-              {t('refundModalMessageTransaction')}
+              {t('refundAmountHint', { max: formatCents(refundableCents, currency) })}
             </Text>
+            <View style={styles.refundAmountRow}>
+              <Text maxFontSizeMultiplier={1.3} style={styles.refundAmountSymbol}>{getCurrencySymbol(currency)}</Text>
+              <TextInput
+                value={refundAmountInput}
+                onChangeText={(v) => { setRefundAmountInput(v); setRefundAmountError(null); }}
+                keyboardType={isZeroDecimal(currency) ? 'number-pad' : 'decimal-pad'}
+                placeholder="0.00"
+                placeholderTextColor={colors.textMuted}
+                style={styles.refundAmountInput}
+                accessibilityLabel={t('refundAmountLabel')}
+                maxFontSizeMultiplier={1.3}
+              />
+            </View>
+            {refundAmountError ? (
+              <Text maxFontSizeMultiplier={1.5} style={styles.refundAmountError}>{refundAmountError}</Text>
+            ) : null}
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonCancel]}
@@ -949,6 +1014,38 @@ const createStyles = (colors: any) => {
       color: colors.textSecondary,
       textAlign: 'center',
       lineHeight: 22,
+    },
+    refundAmountRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      marginTop: 16,
+      width: '100%',
+      backgroundColor: colors.background,
+    },
+    refundAmountSymbol: {
+      fontSize: 18,
+      fontFamily: fonts.semiBold,
+      color: colors.textSecondary,
+      marginRight: 6,
+    },
+    refundAmountInput: {
+      flex: 1,
+      fontSize: 18,
+      fontFamily: fonts.semiBold,
+      color: colors.text,
+      paddingVertical: 6,
+      minHeight: 36,
+    },
+    refundAmountError: {
+      marginTop: 8,
+      fontSize: 13,
+      color: colors.error,
+      textAlign: 'center',
     },
     modalButtons: {
       flexDirection: 'row',
