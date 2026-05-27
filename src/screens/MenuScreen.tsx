@@ -434,6 +434,8 @@ export function MenuScreen() {
     setServiceMode,
     items,
     clearCart,
+    orderNotes,
+    setOrderNotes,
   } = useCart();
   const { guardCheckout } = useTapToPayGuard();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -814,6 +816,9 @@ export function MenuScreen() {
           quantity: it.quantity,
           notes: it.notes,
         })),
+        // Cart's orderNotes doubles as the kitchen note for this round.
+        // Cleared by clearCart() on send so the next round starts fresh.
+        orderNotes.trim() || undefined,
       ),
     onSuccess: () => {
       clearCart();
@@ -2257,6 +2262,28 @@ export function MenuScreen() {
         </TouchableOpacity>
       )}
 
+      {/* Kitchen-bound notes input. Surfaces only when the cart has items
+          AND the next tap is going to a session (target session set, or
+          table-service send-mode). For quick-service mode the notes UI lives
+          inside the Checkout screen instead. */}
+      {!isEditMode && itemCount > 0 && (targetSessionId || serviceMode === 'table_service') && (
+        <View style={styles.kitchenNoteRow}>
+          <Ionicons name="restaurant-outline" size={16} color={colors.textMuted} />
+          <TextInput
+            value={orderNotes}
+            onChangeText={setOrderNotes}
+            placeholder={t('orderNotesPlaceholder')}
+            placeholderTextColor={colors.textMuted}
+            style={[styles.kitchenNoteInput, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
+            maxLength={500}
+            multiline
+            numberOfLines={1}
+            accessibilityLabel={t('orderNotesAccessibilityLabel')}
+            maxFontSizeMultiplier={1.3}
+          />
+        </View>
+      )}
+
       {/* Bottom Action Buttons (only when not in edit mode) */}
       {!isEditMode && (
         <View style={[styles.bottomActions, { bottom: 8 }, itemCount === 0 && styles.bottomActionsEmpty]}>
@@ -3243,6 +3270,26 @@ const createStyles = (colors: any, cardWidth: number, layoutType: CatalogLayoutT
       alignItems: 'center',
       justifyContent: 'center',
       ...shadows.lg,
+    },
+    kitchenNoteRow: {
+      position: 'absolute',
+      left: 20,
+      right: 20,
+      bottom: 66,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    kitchenNoteInput: {
+      flex: 1,
+      minHeight: 36,
+      maxHeight: 80,
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      fontSize: 13,
+      fontFamily: fonts.regular,
     },
     bottomActions: {
       position: 'absolute',

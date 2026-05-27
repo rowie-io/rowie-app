@@ -42,7 +42,7 @@ export function FloorPlanScreen() {
   const { currentLocationId, subscription } = useAuth();
   const isProTier = subscription?.tier === 'pro' || subscription?.tier === 'enterprise';
   const { selectedCatalog } = useCatalog();
-  const { items: cartItems, itemCount: cartItemCount, clearCart } = useCart();
+  const { items: cartItems, itemCount: cartItemCount, clearCart, orderNotes } = useCart();
   const queryClient = useQueryClient();
   const t = useTranslations('floorPlan');
 
@@ -120,9 +120,13 @@ export function FloorPlanScreen() {
         quantity: it.quantity,
         notes: it.notes,
       }));
+      // Kitchen note for this round — taken from cart's orderNotes which the
+      // Menu screen lets the operator edit before tapping Send. Empty string
+      // → undefined so we don't write blank notes rows.
+      const kitchenNote = orderNotes.trim() || undefined;
       const existing = tableSessionMap.get(table.id);
       if (existing) {
-        await sessionsApi.addItems(existing.id, payload);
+        await sessionsApi.addItems(existing.id, payload, kitchenNote);
         return { tableLabel: table.label, sessionId: existing.id };
       }
       const result = await sessionsApi.create({
@@ -130,6 +134,7 @@ export function FloorPlanScreen() {
         tableId: table.id,
         source: 'pos',
         items: payload,
+        roundNotes: kitchenNote,
       });
       return { tableLabel: table.label, sessionId: result.session.id };
     },
@@ -151,7 +156,7 @@ export function FloorPlanScreen() {
           notes: it.notes,
         }));
         sessionsApi
-          .addItems(existingSessionId, payload)
+          .addItems(existingSessionId, payload, orderNotes.trim() || undefined)
           .then(() => {
             clearCart();
             queryClient.invalidateQueries({ queryKey: ['sessions'] });

@@ -126,6 +126,8 @@ export const sessionsApi = {
     guestCount?: number;
     deviceId?: string;
     orderNotes?: string;
+    /** Round-1 notes for the kitchen display when items are submitted with create. */
+    roundNotes?: string;
     items?: { catalogProductId: string; quantity: number; notes?: string }[];
     settleImmediately?: boolean;
     tipAmount?: number;
