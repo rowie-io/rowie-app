@@ -50,7 +50,7 @@ export const PRICING = {
     monthlyPriceByCurrency: PRO_PRICE_BY_CURRENCY,
     period: '/mo',
     transactionFeeRate: 0.028,
-    transactionFeeFixedCents: 16,
+    transactionFeeFixedCents: 15,
     transactionFeeDisplay: '', // Computed dynamically per country — see stripe-rates.ts
     trialDays: 7,
   },
@@ -59,7 +59,7 @@ export const PRICING = {
     monthlyPriceDisplay: 'Free',
     period: '',
     transactionFeeRate: 0.029,
-    transactionFeeFixedCents: 18,
+    transactionFeeFixedCents: 17,
     transactionFeeDisplay: '', // Computed dynamically per country — see stripe-rates.ts
     trialDays: 0,
   },
