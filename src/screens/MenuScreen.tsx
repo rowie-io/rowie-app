@@ -15,6 +15,7 @@ import {
   useWindowDimensions,
   TextInput,
   Alert,
+  Keyboard,
 } from 'react-native';
 import Constants from 'expo-constants';
 
@@ -414,6 +415,7 @@ export function MenuScreen() {
   const { colors } = useTheme();
   const t = useTranslations('menu');
   const tc = useTranslations('common');
+  const tCheckout = useTranslations('checkout');
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   // Set when the user arrived from SessionDetail's "Add items" affordance —
@@ -443,6 +445,17 @@ export function MenuScreen() {
   const [isSearching, setIsSearching] = useState(false);
   const searchInputRef = useRef<TextInput>(null);
   const { width: screenWidth } = useWindowDimensions();
+
+  // Track keyboard height so the absolutely-positioned kitchen-note field can
+  // lift above the keyboard instead of being covered by it.
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  useEffect(() => {
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, (e) => setKeyboardHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   // Edit mode state
   const [isEditMode, setIsEditMode] = useState(false);
@@ -2267,18 +2280,18 @@ export function MenuScreen() {
           table-service send-mode). For quick-service mode the notes UI lives
           inside the Checkout screen instead. */}
       {!isEditMode && itemCount > 0 && (targetSessionId || serviceMode === 'table_service') && (
-        <View style={styles.kitchenNoteRow}>
-          <Ionicons name="restaurant-outline" size={16} color={colors.textMuted} />
+        <View style={[styles.kitchenNoteRow, keyboardHeight > 0 && { bottom: keyboardHeight + 8 }]}>
+          <Ionicons name="restaurant-outline" size={18} color={colors.primary} />
           <TextInput
             value={orderNotes}
             onChangeText={setOrderNotes}
-            placeholder={t('orderNotesPlaceholder')}
-            placeholderTextColor={colors.textMuted}
-            style={[styles.kitchenNoteInput, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.border }]}
+            placeholder={tCheckout('orderNotesPlaceholder')}
+            placeholderTextColor={colors.textSecondary}
+            style={[styles.kitchenNoteInput, { color: colors.text, backgroundColor: colors.surfaceElevated, borderColor: colors.primary }]}
             maxLength={500}
             multiline
             numberOfLines={1}
-            accessibilityLabel={t('orderNotesAccessibilityLabel')}
+            accessibilityLabel={tCheckout('orderNotesAccessibilityLabel')}
             maxFontSizeMultiplier={1.3}
           />
         </View>
@@ -3284,12 +3297,17 @@ const createStyles = (colors: any, cardWidth: number, layoutType: CatalogLayoutT
       flex: 1,
       minHeight: 36,
       maxHeight: 80,
-      borderWidth: 1,
+      borderWidth: 1.5,
       borderRadius: 12,
       paddingHorizontal: 12,
       paddingVertical: 8,
       fontSize: 13,
       fontFamily: fonts.regular,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 3,
     },
     bottomActions: {
       position: 'absolute',
