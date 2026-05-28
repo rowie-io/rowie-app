@@ -34,10 +34,20 @@ const TICKET_FEE_BY_CURRENCY: Record<string, number> = {
   huf: 28000, // 280 HUF  — scaled (1 HUF ≈ $0.003)
 };
 
+// Region-aware Pro monthly price display. Stripe holds a multi-currency price
+// (price_1Tby…) with matching 29.99 amounts in USD/EUR/GBP. Currencies not
+// listed fall back to the USD display + USD charge.
+const PRO_PRICE_BY_CURRENCY: Record<string, string> = {
+  usd: '$29.99',
+  eur: '€29.99',
+  gbp: '£29.99',
+};
+
 export const PRICING = {
   pro: {
     monthlyPriceCents: 2999,
     monthlyPriceDisplay: '$29.99',
+    monthlyPriceByCurrency: PRO_PRICE_BY_CURRENCY,
     period: '/mo',
     transactionFeeRate: 0.028,
     transactionFeeFixedCents: 16,
@@ -66,6 +76,12 @@ export const PRICING = {
     ticketFeeDisplay: '$0.75 per ticket',
   },
 } as const;
+
+/** Region-aware Pro monthly price display string, falling back to USD. */
+export function getProMonthlyDisplay(currency?: string | null): string {
+  const c = (currency ?? 'usd').toLowerCase();
+  return PRO_PRICE_BY_CURRENCY[c] ?? PRICING.pro.monthlyPriceDisplay;
+}
 
 /**
  * Returns the per-ticket platform fee in the smallest currency unit for a

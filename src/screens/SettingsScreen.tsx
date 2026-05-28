@@ -30,7 +30,7 @@ import { billingService, SubscriptionInfo } from '../lib/api/billing';
 import { Subscription } from '../lib/api';
 import { floorPlansApi } from '../lib/api/sessions';
 import { formatCents } from '../utils/currency';
-import { PRICING } from '../lib/pricing';
+import { PRICING, getProMonthlyDisplay } from '../lib/pricing';
 import {
   enableBiometricLogin,
   disableBiometricLogin,
@@ -527,14 +527,13 @@ export function SettingsScreen() {
                           {subscriptionInfo?.platform === 'manual' ? (
                             <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>{t('managedByRowie')}</Text>
                           ) : isPro ? (
-                            // Pro is priced from the central PRICING config
-                            // (USD globally). Don't reflect Stripe's
-                            // per-currency conversion (€, £, etc.) since that
-                            // confuses vendors. Mirror vendor /billing's USD
-                            // override. Non-Pro paid plans (enterprise /
-                            // custom) still show the Stripe-reported price.
+                            // Pro is 29.99 in the org's billing currency
+                            // (multi-currency Stripe price: USD/EUR/GBP all
+                            // 29.99). Show the symbol that matches the org
+                            // currency; falls back to USD for anything outside
+                            // those three.
                             <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>
-                              {t('perMonth', { price: PRICING.pro.monthlyPriceDisplay })}
+                              {t('perMonth', { price: getProMonthlyDisplay(currency) })}
                             </Text>
                           ) : subscriptionInfo?.current_plan?.price ? (
                             <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>
