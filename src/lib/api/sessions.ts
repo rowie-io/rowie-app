@@ -3,6 +3,7 @@ import { apiClient } from './client';
 export type SessionStatus = 'open' | 'settling' | 'settled' | 'cancelled';
 export type SessionSource = 'pos' | 'qr_table' | 'qr_menu' | 'hold' | 'tab';
 export type ItemStatus = 'pending' | 'sent' | 'preparing' | 'ready' | 'served';
+export type SessionPaymentType = 'pay_now' | 'pay_at_pickup' | 'pay_at_table' | 'tab' | null;
 
 export interface Session {
   id: string;
@@ -23,6 +24,9 @@ export interface Session {
   taxAmount: number;
   tipAmount: number;
   totalAmount: number;
+  paymentType: SessionPaymentType;
+  stripePaymentIntentId: string | null;
+  stripeChargeId: string | null;
   status: SessionStatus;
   openedBy: string | null;
   deviceId: string | null;
@@ -54,6 +58,13 @@ export interface SessionItem {
   roundNumber: number;
   status: ItemStatus;
   createdAt: string;
+}
+
+export interface SessionRound {
+  roundNumber: number;
+  notes: string | null;
+  createdAt: string | null;
+  sentAt: string | null;
 }
 
 export interface SessionStats {
@@ -106,7 +117,7 @@ export const sessionsApi = {
   },
 
   get: (id: string) =>
-    apiClient.get<{ session: Session; items: SessionItem[] }>(`/sessions/${id}`),
+    apiClient.get<{ session: Session; items: SessionItem[]; rounds: SessionRound[] }>(`/sessions/${id}`),
 
   getStats: (catalogId?: string) => {
     const params = catalogId ? `?catalogId=${catalogId}` : '';

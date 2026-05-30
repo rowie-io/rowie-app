@@ -211,6 +211,7 @@ const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabC
   const amount = formatCurrency(session.subtotal, currency);
   const isHold = session.source === 'hold';
   const isPickup = session.source === 'qr_menu';
+  const isPaidOnline = session.paymentType === 'pay_now' && !!session.stripeChargeId;
   const itemCountText =
     session.itemCount === 1
       ? t('itemCountSingular', { count: session.itemCount })
@@ -254,6 +255,21 @@ const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabC
                   maxFontSizeMultiplier={1.3}
                 >
                   {isPickup ? t('pickupBadge') : t('heldBadge')}
+                </Text>
+              </View>
+            )}
+            {isPaidOnline && (
+              <View style={{
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 6,
+                backgroundColor: '#22C55E20',
+              }}>
+                <Text
+                  style={{ color: '#22C55E', fontFamily: fonts.bold, fontSize: 10 }}
+                  maxFontSizeMultiplier={1.3}
+                >
+                  {t('paidBadge')}
                 </Text>
               </View>
             )}

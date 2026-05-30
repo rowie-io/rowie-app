@@ -84,6 +84,12 @@ export function SessionDetailScreen() {
 
   const session = data?.session;
   const items = data?.items || [];
+  const roundMeta = data?.rounds || [];
+
+  // Already-paid: customer paid online (qr_menu pay_now batch or tableless
+  // preorder pay_now). The API's settle handler detects this same condition
+  // and skips the charge step — staff just need to close the session out.
+  const alreadyPaid = !!session && session.paymentType === 'pay_now' && !!session.stripeChargeId;
 
   // Defense-in-depth: ignore SESSION_* emits for other orgs so a future
   // room-scoping regression can't silently refetch this device's session
@@ -121,6 +127,14 @@ export function SessionDetailScreen() {
     }
     return Array.from(map.entries()).sort(([a], [b]) => a - b);
   }, [items]);
+
+  const roundNotesByNumber = useMemo(() => {
+    const map = new Map<number, string>();
+    for (const r of roundMeta) {
+      if (r.notes && r.notes.trim().length > 0) map.set(r.roundNumber, r.notes);
+    }
+    return map;
+  }, [roundMeta]);
 
   // Mutations
   const updateStatusMutation = useMutation({
@@ -379,6 +393,23 @@ export function SessionDetailScreen() {
     setSettleModalOpen(true);
   }, []);
 
+  // Mark an already-paid session as picked up / complete. No tip, no payment
+  // method picker — the API's settle handler short-circuits the charge step
+  // when stripe_charge_id is set on a pay_now session and just closes the row.
+  const handleMarkComplete = useCallback(() => {
+    Alert.alert(
+      t('markCompleteConfirmTitle'),
+      t('markCompleteConfirmMessage'),
+      [
+        { text: t('cancel'), style: 'cancel' },
+        {
+          text: t('markCompleteConfirmAction'),
+          onPress: () => settleMutation.mutate({ paymentMethod: 'card', tipAmount: 0 }),
+        },
+      ],
+    );
+  }, [settleMutation, t]);
+
   const markRoundStatus = useCallback((roundItems: SessionItem[], status: ItemStatus) => {
     const itemIds = roundItems.filter(i => i.status !== status).map(i => i.id);
     if (itemIds.length > 0) {
@@ -570,10 +601,19 @@ export function SessionDetailScreen() {
             {session.sessionNumber} · {sourceLabel}
           </Text>
         </View>
-        <View style={[styles.statusBadge, { backgroundColor: isOpen ? '#22C55E20' : '#78716C20' }]}>
-          <Text style={[styles.statusText, { color: isOpen ? '#22C55E' : '#78716C' }]} maxFontSizeMultiplier={1.3}>
-            {statusLabel}
-          </Text>
+        <View style={styles.headerBadges}>
+          {alreadyPaid && (
+            <View style={[styles.statusBadge, { backgroundColor: '#22C55E20' }]}>
+              <Text style={[styles.statusText, { color: '#22C55E' }]} maxFontSizeMultiplier={1.3}>
+                {t('paidBadge')}
+              </Text>
+            </View>
+          )}
+          <View style={[styles.statusBadge, { backgroundColor: isOpen ? '#22C55E20' : '#78716C20' }]}>
+            <Text style={[styles.statusText, { color: isOpen ? '#22C55E' : '#78716C' }]} maxFontSizeMultiplier={1.3}>
+              {statusLabel}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -597,6 +637,7 @@ export function SessionDetailScreen() {
         {/* Items by round */}
         {rounds.map(([roundNum, roundItems]) => {
           const allServed = roundItems.every(i => i.status === 'served');
+          const roundNotes = roundNotesByNumber.get(roundNum);
           return (
             <View key={roundNum} style={styles.roundSection}>
               <View style={styles.roundHeader}>
@@ -634,6 +675,26 @@ export function SessionDetailScreen() {
               </View>
 
               <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                {roundNotes && (
+                  <View
+                    style={[
+                      styles.roundNotesBox,
+                      { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' },
+                    ]}
+                    accessibilityRole="text"
+                    accessibilityLabel={`${t('roundNotesLabel')}: ${roundNotes}`}
+                  >
+                    <Ionicons name="chatbox-ellipses-outline" size={14} color={colors.primary} />
+                    <View style={styles.roundNotesTextWrap}>
+                      <Text style={[styles.roundNotesLabel, { color: colors.primary }]} maxFontSizeMultiplier={1.3}>
+                        {t('roundNotesLabel')}
+                      </Text>
+                      <Text style={[styles.roundNotesText, { color: colors.text }]} maxFontSizeMultiplier={1.5}>
+                        {roundNotes}
+                      </Text>
+                    </View>
+                  </View>
+                )}
                 {roundItems.map((item) => {
                   const config = STATUS_CONFIG[item.status] || STATUS_CONFIG.pending;
                   return (
@@ -760,6 +821,23 @@ export function SessionDetailScreen() {
                 <>
                   <Ionicons name="wallet-outline" size={20} color="#fff" />
                   <Text style={styles.settleButtonText} maxFontSizeMultiplier={1.3}>{t('closeTabButton')}</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          ) : alreadyPaid ? (
+            <TouchableOpacity
+              onPress={handleMarkComplete}
+              disabled={settleMutation.isPending}
+              style={[styles.settleButton, { backgroundColor: '#22C55E' }, settleMutation.isPending && { opacity: 0.6 }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('markCompleteAccessibilityLabel')}
+            >
+              {settleMutation.isPending ? (
+                <ActivityIndicator color="#fff" accessibilityLabel={t('settlingLabel')} />
+              ) : (
+                <>
+                  <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+                  <Text style={styles.settleButtonText} maxFontSizeMultiplier={1.3}>{t('markCompleteButton')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -1336,6 +1414,7 @@ const styles = StyleSheet.create({
   headerCenter: { flex: 1 },
   headerTitle: { fontSize: 18, fontFamily: fonts.bold },
   headerSubtitle: { fontSize: 12, fontFamily: fonts.regular, marginTop: 2 },
+  headerBadges: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   statusText: { fontSize: 12, fontFamily: fonts.semiBold, textTransform: 'capitalize' },
   content: { flex: 1 },
@@ -1349,6 +1428,17 @@ const styles = StyleSheet.create({
   roundActions: { flexDirection: 'row', gap: 6 },
   roundActionBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   roundActionText: { fontSize: 11, fontFamily: fonts.semiBold },
+  roundNotesBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  roundNotesTextWrap: { flex: 1, gap: 2 },
+  roundNotesLabel: { fontSize: 11, fontFamily: fonts.semiBold, textTransform: 'uppercase', letterSpacing: 0.8 },
+  roundNotesText: { fontSize: 14, fontFamily: fonts.regular },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   itemInfo: { flex: 1, gap: 2 },
   itemName: { fontSize: 14, fontFamily: fonts.medium },
