@@ -80,6 +80,10 @@ import { SessionDetailScreen } from './src/screens/SessionDetailScreen';
 import { TabsScreen } from './src/screens/TabsScreen';
 import { OpenTabScreen } from './src/screens/OpenTabScreen';
 
+// Bookings
+import { BookingsScreen } from './src/screens/BookingsScreen';
+import { BookingDetailScreen } from './src/screens/BookingDetailScreen';
+
 // Education screens
 import { TapToPayEducationScreen } from './src/screens/TapToPayEducationScreen';
 
@@ -348,6 +352,16 @@ function AuthenticatedNavigator() {
       <Stack.Screen
         name="ReaderManagement"
         component={ReaderManagementScreen}
+        options={{ presentation: 'card' }}
+      />
+      <Stack.Screen
+        name="Bookings"
+        component={BookingsScreen}
+        options={{ presentation: 'card' }}
+      />
+      <Stack.Screen
+        name="BookingDetail"
+        component={BookingDetailScreen}
         options={{ presentation: 'card' }}
       />
       <Stack.Screen

@@ -76,6 +76,16 @@ export type { ConnectStatus } from './stripe-connect';
 export { eventsApi } from './events';
 export type { EventScanResult, OrgEvent, RecentScan } from './events';
 
+export { bookingsApi, isBookingPaid } from './bookings';
+export type {
+  Booking,
+  BookingStatus,
+  BookingPaymentType,
+  BookingListResponse,
+  BookingTerminalPaymentIntentResponse,
+  ListBookingsParams,
+} from './bookings';
+
 // Preorders replaced by sessions — see ./sessions
 export { sessionsApi, floorPlansApi } from './sessions';
 

@@ -483,6 +483,26 @@ export function SettingsScreen() {
 
                   <View style={styles.divider} />
 
+                  {/* Bookings — pay-at-appointment lookup + take payment in POS */}
+                  <TouchableOpacity
+                    style={styles.row}
+                    onPress={() => navigation.navigate('Bookings')}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('bookings')}
+                    accessibilityHint={t('bookingsAccessibilityHint')}
+                  >
+                    <View style={styles.rowLeft}>
+                      <Ionicons name="calendar-outline" size={20} color={colors.textSecondary} style={styles.rowIcon} />
+                      <View style={styles.labelContainer}>
+                        <Text style={styles.label} maxFontSizeMultiplier={1.3}>{t('bookings')}</Text>
+                        <Text style={styles.sublabel} maxFontSizeMultiplier={1.3}>{t('bookingsSubtitle')}</Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+                  </TouchableOpacity>
+
+                  <View style={styles.divider} />
+
                   {/* Subscription Plan */}
                   {!isPro ? (
                     <TouchableOpacity

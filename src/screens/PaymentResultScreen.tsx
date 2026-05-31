@@ -54,6 +54,11 @@ type RouteParams = {
     // successful manual-entry charge.
     sessionId?: string;
     sessionTipAmount?: number;
+    // Set when this result screen was reached from the booking pay-at-
+    // appointment flow. The booking is already marked paid server-side by
+    // the Connect webhook reading metadata.bookingId — this is just used
+    // so Done returns the vendor to the Bookings list.
+    bookingId?: string;
   };
 };
 
@@ -69,7 +74,7 @@ export function PaymentResultScreen() {
   const insets = useSafeAreaInsets();
 
   const queryClient = useQueryClient();
-  const { success, amount, paymentIntentId, orderId, orderNumber, customerEmail, errorMessage, skipToCardEntry, preorderId, paymentMethod, cashTendered, changeAmount, sessionId, sessionTipAmount } = route.params;
+  const { success, amount, paymentIntentId, orderId, orderNumber, customerEmail, errorMessage, skipToCardEntry, preorderId, paymentMethod, cashTendered, changeAmount, sessionId, sessionTipAmount, bookingId } = route.params;
 
   // Resolve the payment method (PaymentProcessingScreen may not pass it explicitly)
   const resolvedMethod: PaymentMethodType = paymentMethod || 'tap_to_pay';
@@ -334,6 +339,18 @@ export function PaymentResultScreen() {
     // Cancel any dangling PaymentIntent on failure path
     if (!success && paymentIntentId) {
       stripeTerminalApi.cancelPaymentIntent(paymentIntentId).catch(() => {});
+    }
+    // Booking pay-at-appointment success → return the vendor to the Bookings
+    // list (where the now-paid booking will show as Paid via the webhook +
+    // BOOKING_UPDATED). All other paths return to the main tabs.
+    if (success && bookingId) {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 1,
+          routes: [{ name: 'MainTabs' }, { name: 'Bookings' }],
+        })
+      );
+      return;
     }
     // Reset navigation to Menu tab
     navigation.dispatch(

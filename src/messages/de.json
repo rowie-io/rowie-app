@@ -708,7 +708,10 @@
     "platformRowie": "Rowie",
     "sectionSecurity": "SICHERHEIT",
     "changePassword": "Passwort ändern",
-    "changePasswordAccessibilityHint": "Aktualisiere dein Kontopasswort"
+    "changePasswordAccessibilityHint": "Aktualisiere dein Kontopasswort",
+    "bookings": "Bookings",
+    "bookingsSubtitle": "Take payment for pay-at-appointment bookings",
+    "bookingsAccessibilityHint": "Opens the bookings list"
   },
   "changePassword": {
     "title": "Passwort ändern",
@@ -1599,5 +1602,43 @@
       "defaultLabel": "Umschalten",
       "hint": "Doppeltippen zum Umschalten"
     }
+  },
+  "bookings": {
+    "headerTitle": "Bookings",
+    "goBack": "Go back",
+    "searchPlaceholder": "Search by customer name",
+    "searchAccessibilityLabel": "Search bookings by customer name",
+    "clearSearchAccessibilityLabel": "Clear search",
+    "loading": "Loading bookings",
+    "errorTitle": "Couldn't load bookings",
+    "errorSubtitle": "Check your connection and try again.",
+    "retryAccessibilityLabel": "Retry loading bookings",
+    "retryButton": "Retry",
+    "emptyTitle": "No upcoming bookings",
+    "emptySubtitle": "New bookings from your booking pages will show up here.",
+    "paidBadge": "Paid",
+    "unpaidBadge": "Unpaid",
+    "todayLabel": "Today",
+    "tomorrowLabel": "Tomorrow",
+    "detailHeaderTitle": "Booking",
+    "customerNotesLabel": "Customer note",
+    "paymentSummaryTitle": "Payment",
+    "subtotalLabel": "Subtotal",
+    "taxLabel": "Tax",
+    "totalLabel": "Total",
+    "paymentTypePayNow": "Paid online at booking time.",
+    "paymentTypePayAtAppointment": "Customer is paying at the appointment.",
+    "takePaymentButton": "Take payment {amount}",
+    "takePaymentAccessibilityLabel": "Take payment of {amount} with Tap to Pay",
+    "terminalNotReadyTitle": "Tap to Pay isn't ready",
+    "terminalNotReadyMessage": "Finish Tap to Pay setup before taking a card payment.",
+    "cancelButton": "Cancel",
+    "setUpTapToPayButton": "Set up Tap to Pay",
+    "accountUnderReviewTitle": "Account under review",
+    "accountUnderReviewMessage": "Payments are temporarily on hold while your account is being reviewed.",
+    "alreadyPaidTitle": "Already paid",
+    "alreadyPaidMessage": "This booking has already been paid.",
+    "paymentErrorTitle": "Couldn't start payment",
+    "paymentErrorMessage": "We couldn't start the payment. Please try again."
   }
 }

@@ -58,6 +58,11 @@ export const SocketEvents = {
   // Table/floor plan events
   TABLE_STATUS_CHANGED: 'table:status_changed',
   FLOOR_PLAN_UPDATED: 'floor_plan:updated',
+  // Booking events (appointments / reservations)
+  BOOKING_CREATED: 'booking:created',
+  BOOKING_UPDATED: 'booking:updated',
+  BOOKING_CANCELLED: 'booking:cancelled',
+  BOOKING_COMPLETED: 'booking:completed',
   // Terminal reader events (server-driven payments)
   TERMINAL_PAYMENT_SUCCEEDED: 'terminal:payment_succeeded',
   TERMINAL_PAYMENT_FAILED: 'terminal:payment_failed',

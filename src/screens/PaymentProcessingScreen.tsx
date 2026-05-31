@@ -40,6 +40,11 @@ type RouteParams = {
     // confirmed PI id so the session closes + an order is created server-side.
     sessionId?: string;
     sessionTipAmount?: number;
+    // Set by the booking pay-at-appointment path. Passed through to
+    // PaymentResult so its Done button can return to the Bookings list. The
+    // booking is marked paid server-side by the Connect webhook reading
+    // metadata.bookingId on the PaymentIntent.
+    bookingId?: string;
   };
 };
 
@@ -66,7 +71,7 @@ export function PaymentProcessingScreen() {
     clearTerminalPaymentResult,
   } = useTerminal();
 
-  const { paymentIntentId, clientSecret, stripeAccountId, amount, orderId, orderNumber, customerEmail, preorderId, sessionId, sessionTipAmount } = route.params;
+  const { paymentIntentId, clientSecret, stripeAccountId, amount, orderId, orderNumber, customerEmail, preorderId, sessionId, sessionTipAmount, bookingId } = route.params;
   const [isCancelling, setIsCancelling] = useState(false);
   const [statusText, setStatusText] = useState(t('preparingPayment'));
   const isCancelledRef = useRef(false);
@@ -160,6 +165,7 @@ export function PaymentProcessingScreen() {
         preorderId,
         sessionId,
         sessionTipAmount,
+        bookingId,
       });
     } else {
       logger.log('[PaymentProcessing] Server-driven payment failed:', terminalPaymentResult.error);
@@ -175,9 +181,10 @@ export function PaymentProcessingScreen() {
         preorderId,
         sessionId,
         sessionTipAmount,
+        bookingId,
       });
     }
-  }, [terminalPaymentResult, isServerDriven, paymentIntentId, isCancelledRef, amount, orderId, orderNumber, customerEmail, preorderId, sessionId, sessionTipAmount, navigation, clearTerminalPaymentResult]);
+  }, [terminalPaymentResult, isServerDriven, paymentIntentId, isCancelledRef, amount, orderId, orderNumber, customerEmail, preorderId, sessionId, sessionTipAmount, bookingId, navigation, clearTerminalPaymentResult]);
 
   useEffect(() => {
     if (isServerDriven) {
@@ -242,6 +249,7 @@ export function PaymentProcessingScreen() {
           preorderId,
           sessionId,
           sessionTipAmount,
+        bookingId,
         });
       } else {
         throw new Error(t('paymentStatus', { status: result.status }));
@@ -283,6 +291,7 @@ export function PaymentProcessingScreen() {
         preorderId,
         sessionId,
         sessionTipAmount,
+        bookingId,
       });
     }
   };
@@ -320,6 +329,7 @@ export function PaymentProcessingScreen() {
             preorderId,
             sessionId,
             sessionTipAmount,
+        bookingId,
           });
         }
       }, SERVER_DRIVEN_TIMEOUT_MS);
@@ -361,6 +371,7 @@ export function PaymentProcessingScreen() {
         preorderId,
         sessionId,
         sessionTipAmount,
+        bookingId,
       });
     }
   };
