@@ -8,7 +8,13 @@ export type BookingStatus =
   | 'cancelled'
   | 'no_show';
 
-export type BookingPaymentType = 'pay_now' | 'pay_at_appointment' | 'pay_at_pickup';
+// API-side these come from the bookings.payment_type column. 'pay_now' = paid
+// online at booking; 'pay_at_visit' / 'pay_at_event' = vendor takes payment
+// when the customer arrives (the case the in-app Take Payment flow targets).
+// Both visit/event values exist in the wild because the vendor portal saves
+// 'pay_at_event' as the config-level mode but booking-public.ts assigns
+// 'pay_at_visit' when a 'both' mode falls through to deferred payment.
+export type BookingPaymentType = 'pay_now' | 'pay_at_visit' | 'pay_at_event';
 
 export interface Booking {
   id: string;
