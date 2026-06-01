@@ -24,6 +24,7 @@ import { SocketEvents } from '../context/SocketContext';
 import { sessionsApi, type SessionItem, type ItemStatus } from '../lib/api/sessions';
 import { stripeTerminalApi } from '../lib/api';
 import { useTerminal } from '../context/StripeTerminalContext';
+import { useTapToPayGuard } from '../hooks/useTapToPayGuard';
 import { formatCurrency, toSmallestUnit, fromSmallestUnit, isZeroDecimal } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
@@ -53,6 +54,7 @@ export function SessionDetailScreen() {
   const { sessionId } = route.params;
   const t = useTranslations('sessionDetail');
   const { preferredReader } = useTerminal();
+  const { guardCheckout } = useTapToPayGuard();
 
   // Tip modal state
   const [tipModalOpen, setTipModalOpen] = useState(false);
@@ -344,6 +346,12 @@ export function SessionDetailScreen() {
     // PaymentProcessing which runs the collect+confirm dance and (on success)
     // calls /sessions/{id}/settle with the confirmed PI id.
     if (!session) return;
+    // Standard TTP gate: route the vendor to TapToPayEducation if the device
+    // hasn't completed the enable flow yet. Matches Checkout / QuickCharge.
+    if (!guardCheckout()) {
+      setSettleModalOpen(false);
+      return;
+    }
     const totalSmallest = settleTotalSmallest;
     if (totalSmallest <= 0) {
       Alert.alert('Nothing to charge', 'This session has a zero total.');

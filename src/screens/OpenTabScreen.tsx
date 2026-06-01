@@ -18,6 +18,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../context/CatalogContext';
 import { useTerminal } from '../context/StripeTerminalContext';
+import { useTapToPayGuard } from '../hooks/useTapToPayGuard';
 import { stripeTerminalApi } from '../lib/api';
 import { sessionsApi } from '../lib/api/sessions';
 import { getDeviceId } from '../lib/device';
@@ -32,6 +33,7 @@ export function OpenTabScreen() {
   const { user } = useAuth();
   const { selectedCatalog } = useCatalog();
   const { isConnected, processSetupIntent, isProcessing } = useTerminal();
+  const { guardCheckout } = useTapToPayGuard();
   const t = useTranslations('openTab');
 
   const [customerName, setCustomerName] = useState('');
@@ -47,6 +49,13 @@ export function OpenTabScreen() {
     const trimmedName = customerName.trim();
     if (!trimmedName) {
       Alert.alert(t('nameRequiredTitle'), t('nameRequiredMessage'));
+      return;
+    }
+
+    // Standard TTP gate: if the device hasn't completed the TTP education /
+    // enable flow yet, route to TapToPayEducation instead of failing on the
+    // SetupIntent collect. Matches Checkout / QuickCharge / BookingDetail.
+    if (!guardCheckout()) {
       return;
     }
 

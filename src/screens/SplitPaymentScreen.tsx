@@ -20,6 +20,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useTerminal } from '../context/StripeTerminalContext';
+import { useTapToPayGuard } from '../hooks/useTapToPayGuard';
 import { ordersApi, OrderPayment, stripeTerminalApi } from '../lib/api';
 import { formatCents, getCurrencySymbol, isZeroDecimal, fromSmallestUnit, toSmallestUnit, getStripeMinimumAmount } from '../utils/currency';
 import { fonts } from '../lib/fonts';
@@ -49,6 +50,7 @@ export function SplitPaymentScreen() {
   const route = useRoute<RouteProp<RouteParams, 'SplitPayment'>>();
   const { clearCart } = useCart();
   const { initializeTerminal, connectReader, processPayment: terminalProcessPayment, preferredReader, processServerDrivenPayment, waitForWarm } = useTerminal();
+  const { guardCheckout } = useTapToPayGuard();
   const { confirmPayment } = useConfirmPayment();
 
   const { orderId, orderNumber, totalAmount, customerEmail } = route.params;
@@ -125,6 +127,12 @@ export function SplitPaymentScreen() {
 
   // Process terminal payment (Tap to Pay, Bluetooth, or Internet/Smart reader)
   const processTapToPayPayment = async (amount: number) => {
+    // Standard TTP gate (no-op on Android/web/server-driven readers) — routes
+    // the vendor to TapToPayEducation on iOS when the device hasn't run the
+    // enable flow yet. Matches Checkout / QuickCharge / BookingDetail.
+    if (!guardCheckout()) {
+      return;
+    }
     setIsProcessing(true);
     try {
       const isServerDriven = preferredReader?.readerType === 'internet';
