@@ -16,6 +16,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useTerminal } from '../context/StripeTerminalContext';
 import { useSocketEvent, SocketEvents } from '../context/SocketContext';
+import { useTapToPayGuard } from '../hooks/useTapToPayGuard';
 import { bookingsApi, isBookingPaid, type Booking } from '../lib/api/bookings';
 import { formatCurrency } from '../utils/currency';
 import { fonts } from '../lib/fonts';
@@ -32,7 +33,8 @@ export function BookingDetailScreen() {
   const route = useRoute<RouteProp<RouteParams, 'BookingDetail'>>();
   const { bookingId } = route.params;
   const { currency } = useAuth();
-  const { isInitialized, isConnected, isProcessing: isTerminalProcessing } = useTerminal();
+  const { isProcessing: isTerminalProcessing } = useTerminal();
+  const { guardCheckout } = useTapToPayGuard();
   const queryClient = useQueryClient();
   const t = useTranslations('bookings');
 
@@ -60,18 +62,10 @@ export function BookingDetailScreen() {
   const handleTakePayment = useCallback(async () => {
     if (!booking) return;
 
-    if (!isInitialized || !isConnected) {
-      Alert.alert(
-        t('terminalNotReadyTitle'),
-        t('terminalNotReadyMessage'),
-        [
-          { text: t('cancelButton'), style: 'cancel' },
-          {
-            text: t('setUpTapToPayButton'),
-            onPress: () => navigation.navigate('TapToPaySettings'),
-          },
-        ],
-      );
+    // Same gate the Checkout flow uses: on iOS, if the device hasn't run the
+    // Tap to Pay education / enable flow yet, send the vendor there first.
+    // Android + web are no-ops in the guard.
+    if (!guardCheckout()) {
       return;
     }
 
@@ -100,7 +94,7 @@ export function BookingDetailScreen() {
     } finally {
       setIsCreatingPI(false);
     }
-  }, [booking, isInitialized, isConnected, navigation, queryClient, bookingId, t]);
+  }, [booking, guardCheckout, navigation, queryClient, bookingId, t]);
 
   if (bookingQuery.isLoading) {
     return (
