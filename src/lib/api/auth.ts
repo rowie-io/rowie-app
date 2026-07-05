@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { apiClient } from './client';
+import { getSecureItem, setSecureItem, removeSecureItem } from './secureStorage';
 import { organizationsService } from './organizations';
 import { isBiometricLoginEnabled, clearStoredCredentials } from '../biometricAuth';
 import { getDeviceId, getDeviceInfoForApi } from '../device';
@@ -113,12 +114,7 @@ class AuthService {
         const tokenParts = response.tokens.accessToken.split('.');
         if (tokenParts.length === 3) {
           const payload = JSON.parse(atob(tokenParts[1]));
-          logger.log('[AuthService] Token payload keys:', Object.keys(payload));
-          logger.log('[AuthService] cognito:username:', payload['cognito:username']);
-          logger.log('[AuthService] username:', payload.username);
-          logger.log('[AuthService] sub:', payload.sub);
           const cognitoUsername = payload['cognito:username'] || payload.username || payload.sub;
-          logger.log('[AuthService] Extracted cognitoUsername:', cognitoUsername);
           if (cognitoUsername) {
             response.user.cognitoUsername = cognitoUsername;
           }
@@ -127,7 +123,7 @@ class AuthService {
         logger.error('[AuthService] Error parsing token:', error);
       }
     }
-    logger.log('[AuthService] User after login:', JSON.stringify(response.user));
+    logger.log('[AuthService] Login complete', { hasUser: !!response.user });
 
     await this.saveAuthData(response);
 
@@ -189,9 +185,10 @@ class AuthService {
    * @param providedUsername - Optional cognitoUsername (for biometric login where user data is cleared)
    */
   async refreshTokensWithToken(refreshToken: string, providedUsername?: string): Promise<AuthTokens | null> {
-    logger.log('[AuthService] refreshTokensWithToken called');
-    logger.log('[AuthService] Token being used (first 50 chars):', refreshToken?.substring(0, 50));
-    logger.log('[AuthService] Provided username:', providedUsername);
+    logger.log('[AuthService] refreshTokensWithToken called', {
+      hasRefreshToken: !!refreshToken,
+      hasProvidedUsername: !!providedUsername,
+    });
 
     const accessToken = await this.getAccessToken();
 
@@ -216,7 +213,7 @@ class AuthService {
       }
     }
 
-    logger.log('[AuthService] Using cognitoUsername:', cognitoUsername);
+    logger.log('[AuthService] Resolved cognitoUsername', { hasUsername: !!cognitoUsername });
 
     try {
       logger.log('[AuthService] Calling /auth/refresh...');
@@ -226,7 +223,6 @@ class AuthService {
       });
 
       logger.log('[AuthService] Got new tokens, saving...');
-      logger.log('[AuthService] New access token:', tokens.accessToken?.substring(0, 20) + '...');
       await this.saveTokens(tokens);
 
       // Extract and save cognitoUsername from new access token
@@ -242,7 +238,7 @@ class AuthService {
               if (storedUser) {
                 storedUser.cognitoUsername = extractedUsername;
                 await this.saveUser(storedUser);
-                logger.log('[AuthService] Updated stored user with cognitoUsername:', extractedUsername);
+                logger.log('[AuthService] Updated stored user with cognitoUsername');
               }
             }
           }
@@ -253,7 +249,7 @@ class AuthService {
 
       // Verify tokens were saved
       const savedToken = await this.getAccessToken();
-      logger.log('[AuthService] Verified saved token:', savedToken?.substring(0, 20) + '...');
+      logger.log('[AuthService] Verified saved token', { hasToken: !!savedToken });
 
       return tokens;
     } catch (error: any) {
@@ -340,11 +336,11 @@ class AuthService {
   }
 
   async getAccessToken(): Promise<string | null> {
-    return AsyncStorage.getItem(AuthService.ACCESS_TOKEN_KEY);
+    return getSecureItem(AuthService.ACCESS_TOKEN_KEY);
   }
 
   async getRefreshToken(): Promise<string | null> {
-    return AsyncStorage.getItem(AuthService.REFRESH_TOKEN_KEY);
+    return getSecureItem(AuthService.REFRESH_TOKEN_KEY);
   }
 
   async getUser(): Promise<User | null> {
@@ -409,29 +405,33 @@ class AuthService {
   }
 
   async getSessionVersion(): Promise<number | null> {
-    const version = await AsyncStorage.getItem(AuthService.SESSION_VERSION_KEY);
+    const version = await getSecureItem(AuthService.SESSION_VERSION_KEY);
     return version ? parseInt(version, 10) : null;
   }
 
   private async saveSessionVersion(version: number): Promise<void> {
-    await AsyncStorage.setItem(AuthService.SESSION_VERSION_KEY, version.toString());
+    await setSecureItem(AuthService.SESSION_VERSION_KEY, version.toString());
   }
 
   private async saveTokens(tokens: AuthTokens): Promise<void> {
     await Promise.all([
-      AsyncStorage.setItem(AuthService.ACCESS_TOKEN_KEY, tokens.accessToken),
-      AsyncStorage.setItem(AuthService.REFRESH_TOKEN_KEY, tokens.refreshToken),
+      setSecureItem(AuthService.ACCESS_TOKEN_KEY, tokens.accessToken),
+      setSecureItem(AuthService.REFRESH_TOKEN_KEY, tokens.refreshToken),
     ]);
   }
 
   private async clearAuthData(): Promise<void> {
-    await AsyncStorage.multiRemove([
-      AuthService.ACCESS_TOKEN_KEY,
-      AuthService.REFRESH_TOKEN_KEY,
-      AuthService.USER_KEY,
-      AuthService.ORGANIZATION_KEY,
-      AuthService.SESSION_VERSION_KEY,
-      AuthService.SUBSCRIPTION_KEY,
+    await Promise.all([
+      // Sensitive keys live in SecureStore.
+      removeSecureItem(AuthService.ACCESS_TOKEN_KEY),
+      removeSecureItem(AuthService.REFRESH_TOKEN_KEY),
+      removeSecureItem(AuthService.SESSION_VERSION_KEY),
+      // Non-secret blobs remain in AsyncStorage.
+      AsyncStorage.multiRemove([
+        AuthService.USER_KEY,
+        AuthService.ORGANIZATION_KEY,
+        AuthService.SUBSCRIPTION_KEY,
+      ]),
     ]);
   }
 }

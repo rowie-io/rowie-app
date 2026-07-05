@@ -28,8 +28,10 @@ export interface BiometricCapabilities {
 
 export interface StoredCredentials {
   email: string;
-  // Note: We don't store the actual password - instead we store an encrypted
-  // refresh token or use a special biometric-only session
+  // NOTE: biometric login currently replays the stored email + password (kept
+  // in the encrypted Keychain/Keystore via expo-secure-store). Credentials are
+  // only persisted once the user has opted into biometric login. A future
+  // hardening step is to store a refresh token instead of the password.
   hasStoredSession: boolean;
 }
 

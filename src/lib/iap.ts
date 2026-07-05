@@ -7,9 +7,9 @@
  */
 
 import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { config } from './config';
 import logger from './logger';
+import { getSecureItem } from './api/secureStorage';
 
 // Storage key for access token (must match auth.ts)
 const ACCESS_TOKEN_KEY = 'accessToken';
@@ -424,7 +424,7 @@ class IAPService {
       logger.log('[IAP] Validating receipt for:', productId);
 
       // Get auth token for authenticated request
-      const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      const accessToken = await getSecureItem(ACCESS_TOKEN_KEY);
       if (!accessToken) {
         // No auth token - this is likely a signup flow where the user isn't logged in yet.
         // Skip client-side validation and return valid: true so the purchase can proceed.
@@ -472,7 +472,7 @@ class IAPService {
   async checkSubscriptionStatus(): Promise<SubscriptionStatus> {
     try {
       // Get auth token for authenticated request
-      const accessToken = await AsyncStorage.getItem(ACCESS_TOKEN_KEY);
+      const accessToken = await getSecureItem(ACCESS_TOKEN_KEY);
       if (!accessToken) {
         logger.log('[IAP] No access token, cannot check subscription status');
         return { isActive: false };

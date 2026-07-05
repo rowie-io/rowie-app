@@ -1,3 +1,5 @@
+// TODO(security): install expo-screen-capture and guard this screen with
+// usePreventScreenCapture() — it displays receipt / transaction amount details.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,

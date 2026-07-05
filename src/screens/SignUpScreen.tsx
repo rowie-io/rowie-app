@@ -24,7 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { Input } from '../components/Input';
 import { authService } from '../lib/api';
 import { iapService, SUBSCRIPTION_SKUS, SubscriptionProduct } from '../lib/iap';
-import { storeCredentials } from '../lib/biometricAuth';
+import { storeCredentials, isBiometricLoginEnabled } from '../lib/biometricAuth';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { config } from '../lib/config';
@@ -529,8 +529,11 @@ export function SignUpScreen() {
             const email = formData.email.trim().toLowerCase();
             await signIn(email, formData.password);
 
-            // Store credentials for biometric login (replaces any previous account's credentials)
-            await storeCredentials(email, formData.password);
+            // SECURITY: only persist credentials if biometric login is already
+            // enabled — not for every new account regardless of opt-in.
+            if (await isBiometricLoginEnabled()) {
+              await storeCredentials(email, formData.password);
+            }
 
             // Now link the IAP purchase so webhook can find the subscription
             // On Android, the receipt is the purchaseToken
@@ -587,8 +590,11 @@ export function SignUpScreen() {
       const email = formData.email.trim().toLowerCase();
       await signIn(email, formData.password);
 
-      // Store credentials for biometric login (replaces any previous account's credentials)
-      await storeCredentials(email, formData.password);
+      // SECURITY: only persist credentials if biometric login is already
+      // enabled — not for every new account regardless of opt-in.
+      if (await isBiometricLoginEnabled()) {
+        await storeCredentials(email, formData.password);
+      }
 
     } catch (error: any) {
       logger.error('Sign up error:', error);

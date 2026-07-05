@@ -142,8 +142,13 @@ export function LoginScreen() {
       const trimmedEmail = email.trim().toLowerCase();
       await signIn(trimmedEmail, password);
 
-      // Always store credentials securely for potential biometric use
-      await storeCredentials(trimmedEmail, password);
+      // SECURITY: only persist credentials for users who have ALREADY enabled
+      // biometric login (they've accepted that tradeoff). We no longer store
+      // them on every login regardless of opt-in. First-time users get their
+      // credentials stored at the moment they tap "Enable" in the prompt below.
+      if (await isBiometricLoginEnabled()) {
+        await storeCredentials(trimmedEmail, password);
+      }
 
       // After successful login, prompt for biometric setup if available
       promptForBiometricSetup();
@@ -190,9 +195,10 @@ export function LoginScreen() {
           {
             text: t('enable'),
             onPress: async () => {
-              // Credentials already stored, just enable biometric
               const success = await enableBiometricLogin();
               if (success) {
+                // Persist credentials only now that the user has opted in.
+                await storeCredentials(email.trim().toLowerCase(), password);
                 Alert.alert(
                   t('successTitle'),
                   t('biometricEnabledMessage', { biometricName: capabilities.biometricName })

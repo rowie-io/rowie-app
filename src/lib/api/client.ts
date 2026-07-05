@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { config } from '../config';
 import logger from '../logger';
+import { getSecureItem } from './secureStorage';
 
 export type ApiError = {
   error: string;
@@ -38,7 +39,7 @@ class ApiClient {
   }
 
   private async getAuthToken(): Promise<string | null> {
-    return AsyncStorage.getItem('accessToken');
+    return getSecureItem('accessToken');
   }
 
   private async processRequestQueue() {
@@ -76,7 +77,7 @@ class ApiClient {
         try {
           // Dynamic import to avoid circular dependency
           const { authService } = await import('./auth');
-          const refreshToken = await AsyncStorage.getItem('refreshToken');
+          const refreshToken = await getSecureItem('refreshToken');
 
           if (!refreshToken) {
             logger.log('[ApiClient] No refresh token available');
@@ -180,7 +181,7 @@ class ApiClient {
   ): Promise<T> {
     // Get fresh token after refresh
     const token = await this.getAuthToken();
-    logger.log('[ApiClient] Retry using token:', token ? token.substring(0, 50) + '...' : 'null');
+    logger.log('[ApiClient] Retry after refresh', { hasToken: !!token });
 
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       ...options,
@@ -193,7 +194,7 @@ class ApiClient {
   }
 
   private async getSessionVersion(): Promise<string | null> {
-    return AsyncStorage.getItem('sessionVersion');
+    return getSecureItem('sessionVersion');
   }
 
   private async getCurrentLocationId(): Promise<string | null> {

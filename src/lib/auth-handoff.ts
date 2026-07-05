@@ -27,26 +27,38 @@ export async function createVendorDashboardUrl(redirectPath?: string): Promise<s
       return null;
     }
 
-    // Build the auth callback URL with tokens in hash fragment
-    const params = new URLSearchParams({
-      accessToken,
-      refreshToken,
+    // SECURITY: never put the access/refresh token in the handoff URL — it
+    // would persist in the external browser's history and be readable by
+    // extensions. Instead exchange them for a single-use, 60-second opaque code
+    // (server-side, over TLS) and carry only that code in the URL fragment.
+    const resp = await fetch(`${config.apiUrl}/auth/handoff/create`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ refreshToken, user }),
     });
 
-    if (user) {
-      // Note: Don't use encodeURIComponent here - URLSearchParams handles encoding
-      params.append('user', JSON.stringify(user));
+    if (!resp.ok) {
+      logger.error('[AuthHandoff] Failed to create handoff code', { status: resp.status });
+      return null;
     }
 
-    // Add redirect path if provided
+    const data = (await resp.json()) as { code?: string };
+    if (!data?.code) {
+      logger.error('[AuthHandoff] Handoff response missing code');
+      return null;
+    }
+
+    // Only the opaque single-use code travels in the URL (hash fragment keeps
+    // it out of server logs / Referer as well).
+    const params = new URLSearchParams({ code: data.code });
     if (redirectPath) {
       params.append('redirect', redirectPath);
     }
 
-    // Use hash fragment for cross-origin compatibility
-    const authCallbackUrl = `${config.vendorDashboardUrl}/auth/callback#${params.toString()}`;
-
-    return authCallbackUrl;
+    return `${config.vendorDashboardUrl}/auth/callback#${params.toString()}`;
   } catch (error) {
     logger.error('[AuthHandoff] Error creating vendor dashboard URL:', error);
     return null;

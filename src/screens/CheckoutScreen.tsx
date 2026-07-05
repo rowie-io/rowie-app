@@ -1,3 +1,5 @@
+// TODO(security): install expo-screen-capture and guard this screen with
+// usePreventScreenCapture() — it displays transaction amounts / card details.
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   View,
