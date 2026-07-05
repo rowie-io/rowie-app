@@ -685,6 +685,7 @@
     "signOut": "Esci",
     "deleteAccount": "Elimina account",
     "version": "Rowie v{version}",
+    "biometricNeedsRelogin": "Esci e accedi di nuovo, quindi scegli Attiva quando richiesto per abilitare l'accesso biometrico.",
     "errorBiometricToggle": "Impossibile {action} l'accesso biometrico.",
     "deleteAccountAlertTitle": "Elimina account",
     "deleteAccountAlertMessage": "Il tuo account verrà disattivato immediatamente e eliminato permanentemente dopo 30 giorni. Tutti i tuoi dati verranno rimossi e questa azione è irreversibile.\n\nPuoi contattare support@rowie.io entro 30 giorni per annullare.",

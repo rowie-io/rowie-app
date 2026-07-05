@@ -685,6 +685,7 @@
     "signOut": "Terminar sessão",
     "deleteAccount": "Eliminar conta",
     "version": "Rowie v{version}",
+    "biometricNeedsRelogin": "Termine a sessão e inicie sessão novamente, depois escolha Ativar quando solicitado para ativar o início de sessão biométrico.",
     "errorBiometricToggle": "Falha ao {action} início de sessão biométrico.",
     "deleteAccountAlertTitle": "Eliminar conta",
     "deleteAccountAlertMessage": "A sua conta será desativada imediatamente e eliminada permanentemente após 30 dias. Todos os seus dados serão removidos e esta ação não pode ser revertida.\n\nPode contactar support@rowie.io dentro de 30 dias para cancelar.",

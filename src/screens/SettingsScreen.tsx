@@ -34,6 +34,7 @@ import { PRICING, getProMonthlyDisplay } from '../lib/pricing';
 import {
   enableBiometricLogin,
   disableBiometricLogin,
+  hasStoredCredentials,
 } from '../lib/biometricAuth';
 
 // Apple TTPOi 5.4: Region-correct terminology
@@ -187,6 +188,15 @@ export function SettingsScreen() {
 
     try {
       if (value) {
+        // Enabling from Settings requires credentials to already be stored — we
+        // don't have the password here. They're persisted only when a user opts
+        // in via the post-login prompt, so if none exist, guide the user to sign
+        // in again rather than silently failing to enable.
+        const hasCreds = await hasStoredCredentials();
+        if (!hasCreds) {
+          Alert.alert(tc('error'), t('biometricNeedsRelogin'));
+          return;
+        }
         // Enable biometric login (will prompt for biometric auth)
         const success = await enableBiometricLogin();
         if (success) {

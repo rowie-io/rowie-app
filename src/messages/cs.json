@@ -685,6 +685,7 @@
     "signOut": "Odhlásit se",
     "deleteAccount": "Smazat účet",
     "version": "Rowie v{version}",
+    "biometricNeedsRelogin": "Odhlaste se a znovu se přihlaste, poté po zobrazení výzvy zvolte Povolit pro zapnutí biometrického přihlášení.",
     "errorBiometricToggle": "Nepodařilo se {action} biometrické přihlášení.",
     "deleteAccountAlertTitle": "Smazat účet",
     "deleteAccountAlertMessage": "Váš účet bude okamžitě deaktivován a po 30 dnech trvale smazán. Všechna vaše data budou odstraněna a tuto akci nelze vrátit.\n\nMůžete kontaktovat support@rowie.io do 30 dnů pro zrušení.",

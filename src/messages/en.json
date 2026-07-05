@@ -684,6 +684,7 @@
     "signOutConfirmMessage": "You'll be returned to the login screen. Any in-progress cart on this device will be cleared.",
     "deleteAccount": "Delete Account",
     "version": "Rowie v{version}",
+    "biometricNeedsRelogin": "Please sign out and sign in again, then choose Enable when prompted to turn on biometric login.",
     "errorBiometricToggle": "Failed to {action} biometric login.",
     "deleteAccountAlertTitle": "Delete Account",
     "deleteAccountAlertMessage": "Your account will be deactivated immediately and permanently deleted after 30 days. All your data will be removed and this cannot be undone.\n\nYou can contact support@rowie.io within 30 days to cancel.",

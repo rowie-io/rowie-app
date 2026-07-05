@@ -685,6 +685,7 @@
     "signOut": "Logg ut",
     "deleteAccount": "Slett konto",
     "version": "Rowie v{version}",
+    "biometricNeedsRelogin": "Logg ut og inn igjen, og velg deretter Aktiver når du blir bedt om det for å slå på biometrisk pålogging.",
     "errorBiometricToggle": "Kunne ikke {action} biometrisk innlogging.",
     "deleteAccountAlertTitle": "Slett konto",
     "deleteAccountAlertMessage": "Kontoen din deaktiveres umiddelbart og slettes permanent etter 30 dager. Alle dataene dine fjernes, og dette kan ikke angres.\n\nDu kan kontakte support@rowie.io innen 30 dager for å avbryte.",

@@ -27,6 +27,7 @@ import {
   getBiometricCredentials,
   getStoredEmail,
   storeCredentials,
+  clearStoredCredentials,
   enableBiometricLogin,
   BiometricCapabilities,
 } from '../lib/biometricAuth';
@@ -195,14 +196,20 @@ export function LoginScreen() {
           {
             text: t('enable'),
             onPress: async () => {
+              // Persist credentials at the opt-in moment (password is in scope
+              // here). enableBiometricLogin() requires stored credentials to
+              // exist first, so store BEFORE enabling; if the biometric check
+              // is cancelled/fails, clear them again so we never leave a
+              // password behind for a user who didn't actually opt in.
+              await storeCredentials(email.trim().toLowerCase(), password);
               const success = await enableBiometricLogin();
               if (success) {
-                // Persist credentials only now that the user has opted in.
-                await storeCredentials(email.trim().toLowerCase(), password);
                 Alert.alert(
                   t('successTitle'),
                   t('biometricEnabledMessage', { biometricName: capabilities.biometricName })
                 );
+              } else {
+                await clearStoredCredentials();
               }
             },
           },

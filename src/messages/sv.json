@@ -685,6 +685,7 @@
     "signOut": "Logga ut",
     "deleteAccount": "Radera konto",
     "version": "Rowie v{version}",
+    "biometricNeedsRelogin": "Logga ut och logga in igen, välj sedan Aktivera när du uppmanas för att aktivera biometrisk inloggning.",
     "errorBiometricToggle": "Kunde inte {action} biometrisk inloggning.",
     "deleteAccountAlertTitle": "Radera konto",
     "deleteAccountAlertMessage": "Ditt konto inaktiveras omedelbart och raderas permanent efter 30 dagar. Alla dina data tas bort och detta kan inte ångras.\n\nDu kan kontakta support@rowie.io inom 30 dagar för att avbryta.",

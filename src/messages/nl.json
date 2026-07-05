@@ -685,6 +685,7 @@
     "signOut": "Uitloggen",
     "deleteAccount": "Account verwijderen",
     "version": "Rowie v{version}",
+    "biometricNeedsRelogin": "Meld je af en weer aan en kies Inschakelen wanneer daarom wordt gevraagd om biometrisch inloggen in te schakelen.",
     "errorBiometricToggle": "{action} van biometrische login mislukt.",
     "deleteAccountAlertTitle": "Account verwijderen",
     "deleteAccountAlertMessage": "Je account wordt onmiddellijk gedeactiveerd en na 30 dagen definitief verwijderd. Al je gegevens worden verwijderd en dit kan niet ongedaan worden gemaakt.\n\nJe kunt binnen 30 dagen contact opnemen met support@rowie.io om te annuleren.",

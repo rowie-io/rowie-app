@@ -685,6 +685,7 @@
     "signOut": "Kirjaudu ulos",
     "deleteAccount": "Poista tili",
     "version": "Rowie v{version}",
+    "biometricNeedsRelogin": "Kirjaudu ulos ja takaisin sisään, valitse sitten Ota käyttöön, kun sitä pyydetään, ottaaksesi biometrisen kirjautumisen käyttöön.",
     "errorBiometricToggle": "Biometrisen kirjautumisen {action} epäonnistui.",
     "deleteAccountAlertTitle": "Poista tili",
     "deleteAccountAlertMessage": "Tilisi deaktivoidaan välittömästi ja poistetaan pysyvästi 30 päivän kuluttua. Kaikki tietosi poistetaan eikä tätä voi kumota.\n\nVoit ottaa yhteyttä osoitteeseen support@rowie.io 30 päivän kuluessa peruuttaaksesi.",
