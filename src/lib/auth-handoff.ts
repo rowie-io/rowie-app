@@ -5,6 +5,7 @@
 
 import { Linking } from 'react-native';
 import { authService } from './api/auth';
+import { apiClient } from './api/client';
 import { config } from './config';
 import logger from './logger';
 
@@ -27,26 +28,35 @@ export async function createVendorDashboardUrl(redirectPath?: string): Promise<s
       return null;
     }
 
-    // Build the auth callback URL with tokens in hash fragment
-    const params = new URLSearchParams({
-      accessToken,
-      refreshToken,
-    });
-
-    if (user) {
-      // Note: Don't use encodeURIComponent here - URLSearchParams handles encoding
-      params.append('user', JSON.stringify(user));
+    // SECURITY: never put the access/refresh token in the handoff URL — it
+    // would persist in the external browser's history and be readable by
+    // extensions. Instead exchange them for a single-use, 60-second opaque code
+    // (server-side, over TLS) and carry only that code in the URL fragment.
+    // Sent via apiClient so X-Session-Version + 401 refresh-retry apply.
+    let data: { code?: string };
+    try {
+      data = await apiClient.post<{ code?: string }>('/auth/handoff/create', {
+        refreshToken,
+        user,
+      });
+    } catch (error: any) {
+      logger.error('[AuthHandoff] Failed to create handoff code', { status: error?.statusCode });
+      return null;
     }
 
-    // Add redirect path if provided
+    if (!data?.code) {
+      logger.error('[AuthHandoff] Handoff response missing code');
+      return null;
+    }
+
+    // Only the opaque single-use code travels in the URL (hash fragment keeps
+    // it out of server logs / Referer as well).
+    const params = new URLSearchParams({ code: data.code });
     if (redirectPath) {
       params.append('redirect', redirectPath);
     }
 
-    // Use hash fragment for cross-origin compatibility
-    const authCallbackUrl = `${config.vendorDashboardUrl}/auth/callback#${params.toString()}`;
-
-    return authCallbackUrl;
+    return `${config.vendorDashboardUrl}/auth/callback#${params.toString()}`;
   } catch (error) {
     logger.error('[AuthHandoff] Error creating vendor dashboard URL:', error);
     return null;

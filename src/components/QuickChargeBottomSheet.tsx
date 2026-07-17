@@ -1,11 +1,10 @@
-import React, { useState, useCallback, useMemo, memo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
   Alert,
-  Animated,
   Modal,
   useWindowDimensions,
   KeyboardAvoidingView,
@@ -18,11 +17,12 @@ import * as Haptics from 'expo-haptics';
 
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { formatCents, getCurrencySymbol, isZeroDecimal, fromSmallestUnit } from '../utils/currency';
+import { formatCents, getCurrencySymbol, isZeroDecimal, fromSmallestUnit, getStripeMinimumAmount } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { useTapToPayGuard } from '../hooks';
 import { useTranslations } from '../lib/i18n';
+import { KeypadButton } from './Keypad';
 
 const KEYPAD_ROWS = [
   ['1', '2', '3'],
@@ -30,104 +30,6 @@ const KEYPAD_ROWS = [
   ['7', '8', '9'],
   ['C', '0', 'DEL'],
 ];
-
-interface KeypadButtonProps {
-  keyValue: string;
-  onPress: (key: string) => void;
-  colors: any;
-  buttonSize: number;
-}
-
-const KeypadButton = memo(function KeypadButton({ keyValue, onPress, colors, buttonSize }: KeypadButtonProps) {
-  const scale = React.useRef(new Animated.Value(1)).current;
-
-  const numberFontSize = Math.round(buttonSize * 0.36);
-  const actionFontSize = Math.round(buttonSize * 0.22);
-  const iconSize = Math.round(buttonSize * 0.36);
-  const borderRadius = Math.round(buttonSize * 0.25);
-
-  const handlePressIn = useCallback(() => {
-    Animated.spring(scale, {
-      toValue: 0.9,
-      useNativeDriver: true,
-      tension: 150,
-      friction: 10,
-    }).start();
-  }, [scale]);
-
-  const handlePressOut = useCallback(() => {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 100,
-      friction: 8,
-    }).start();
-  }, [scale]);
-
-  const handlePress = useCallback(() => {
-    if (keyValue === 'C' || keyValue === 'DEL') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } else {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    onPress(keyValue);
-  }, [keyValue, onPress]);
-
-  const isAction = keyValue === 'C' || keyValue === 'DEL';
-
-  const buttonLabel =
-    keyValue === 'DEL'
-      ? 'Delete last digit'
-      : keyValue === 'C'
-        ? 'Clear amount'
-        : `Keypad ${keyValue}`;
-
-  return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <Pressable
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        onPress={handlePress}
-        accessibilityRole="button"
-        accessibilityLabel={buttonLabel}
-        style={({ pressed }) => [
-          {
-            width: buttonSize,
-            height: buttonSize,
-            borderRadius: borderRadius,
-            justifyContent: 'center',
-            alignItems: 'center',
-            backgroundColor: pressed
-              ? colors.card
-              : colors.background,
-            borderWidth: 1,
-            borderColor: pressed ? colors.borderLight : colors.border,
-            ...shadows.sm,
-          },
-        ]}
-      >
-        {keyValue === 'DEL' ? (
-          <Ionicons
-            name="backspace-outline"
-            size={iconSize}
-            color={colors.textSecondary}
-          />
-        ) : (
-          <Text
-            style={{
-              fontSize: isAction ? actionFontSize : numberFontSize,
-              fontFamily: isAction ? fonts.medium : fonts.semiBold,
-              color: isAction ? colors.textSecondary : colors.text,
-            }}
-            maxFontSizeMultiplier={1.3}
-          >
-            {keyValue}
-          </Text>
-        )}
-      </Pressable>
-    </Animated.View>
-  );
-});
 
 interface QuickChargeBottomSheetProps {
   visible: boolean;
@@ -157,12 +59,17 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
   const formatAmount = (value: string) => {
     const digits = value.replace(/\D/g, '');
     const rawCents = parseInt(digits || '0', 10);
-    return isZeroDecimal(currency) ? String(rawCents) : (rawCents / 100).toFixed(2);
+    const base = fromSmallestUnit(rawCents, currency);
+    return isZeroDecimal(currency) ? String(base) : base.toFixed(2);
   };
 
   const displayAmount = formatAmount(amount);
   const formattedAmount = formatCents(parseInt(amount || '0', 10), currency);
   const cents = parseInt(amount || '0', 10);
+
+  // Stripe's minimum charge varies by currency (e.g. $0.50 USD, £0.30 GBP,
+  // ¥50 JPY) — resolve per-currency instead of hardcoding the USD value.
+  const minChargeAmount = getStripeMinimumAmount(currency);
 
   const handleKeypadPress = useCallback((key: string) => {
     if (key === 'DEL') {
@@ -177,8 +84,8 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
   }, [amount.length]);
 
   const handleCharge = useCallback(() => {
-    if (cents < 50) {
-      Alert.alert(t('invalidAmountTitle'), t('minimumCharge', { amount: formatCents(50, currency) }));
+    if (cents < minChargeAmount) {
+      Alert.alert(t('invalidAmountTitle'), t('minimumCharge', { amount: formatCents(minChargeAmount, currency) }));
       return;
     }
 
@@ -199,14 +106,14 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
 
     // Reset form
     setAmount('');
-  }, [cents, displayAmount, navigation, onClose, guardCheckout]);
+  }, [cents, minChargeAmount, currency, formattedAmount, t, navigation, onClose, guardCheckout]);
 
   const handleClose = useCallback(() => {
     setAmount('');
     onClose();
   }, [onClose]);
 
-  const chargeDisabled = cents < 50;
+  const chargeDisabled = cents < minChargeAmount;
 
   const containerBg = isDark ? '#1C1917' : '#ffffff';
   const handleColor = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)';
@@ -223,13 +130,16 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.modalContainer}
       >
-        <Pressable
-          style={styles.overlay}
-          onPress={handleClose}
-          accessibilityRole="button"
-          accessibilityLabel="Close quick charge"
-        >
+        <View style={styles.overlay}>
+          {/* Backdrop keeps tap-to-dismiss but is hidden from VoiceOver/TalkBack
+              (sibling layer, not a parent, so the sheet itself stays focusable). */}
           <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleClose}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+          />
+          <View
             style={[
               styles.sheetContainer,
               {
@@ -237,7 +147,6 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
                 paddingBottom: insets.bottom + 16,
               },
             ]}
-            onPress={(e) => e.stopPropagation()}
             accessible={false}
             accessibilityRole="none"
           >
@@ -253,7 +162,7 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
                 onPress={handleClose}
                 hitSlop={12}
                 accessibilityRole="button"
-                accessibilityLabel="Close"
+                accessibilityLabel={t('closeAccessibilityLabel')}
               >
                 <Ionicons name="close" size={24} color={colors.textSecondary} />
               </Pressable>
@@ -276,6 +185,7 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
                       onPress={handleKeypadPress}
                       colors={colors}
                       buttonSize={buttonSize}
+                      accessibilityLabel={key === 'DEL' ? t('deleteKey') : key === 'C' ? t('clearAmount') : key}
                     />
                   ))}
                 </View>
@@ -293,7 +203,7 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
                 }}
                 disabled={chargeDisabled}
                 accessibilityRole="button"
-                accessibilityLabel={cents < 50 ? t('enterAmount') : t('chargeAmount', { amount: formattedAmount })}
+                accessibilityLabel={chargeDisabled ? t('enterAmount') : t('chargeAmount', { amount: formattedAmount })}
                 accessibilityState={{ disabled: chargeDisabled }}
                 style={({ pressed }) => [
                   styles.chargeButton,
@@ -317,16 +227,16 @@ export function QuickChargeBottomSheet({ visible, onClose }: QuickChargeBottomSh
                   ]}
                   maxFontSizeMultiplier={1.3}
                 >
-                  {cents < 50 ? t('enterAmount') : t('chargeAmount', { amount: formattedAmount })}
+                  {chargeDisabled ? t('enterAmount') : t('chargeAmount', { amount: formattedAmount })}
                 </Text>
               </Pressable>
 
-              <Text style={[styles.minimumHint, { color: colors.textMuted, opacity: cents > 0 && cents < 50 ? 1 : 0 }]} maxFontSizeMultiplier={1.5}>
-                {t('minimumCharge', { amount: formatCents(50, currency) })}
+              <Text style={[styles.minimumHint, { color: colors.textSecondary, opacity: cents > 0 && cents < minChargeAmount ? 1 : 0 }]} maxFontSizeMultiplier={1.5}>
+                {t('minimumCharge', { amount: formatCents(minChargeAmount, currency) })}
               </Text>
             </View>
-          </Pressable>
-        </Pressable>
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );

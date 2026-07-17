@@ -6,7 +6,8 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
+  ScrollView,
+  Animated,
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,16 +19,12 @@ import { useAuth } from '../context/AuthContext';
 import { useSocketEvent, SocketEvents } from '../context/SocketContext';
 import { bookingsApi, isBookingPaid, type Booking } from '../lib/api/bookings';
 import { formatCurrency } from '../utils/currency';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { fonts } from '../lib/fonts';
 import { useTranslations } from '../lib/i18n';
 
-function todayISO(): string {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
+// Number of single-day chips in the strip (Today, Tomorrow, +5 weekdays).
+const DAY_CHIP_COUNT = 7;
 
 function inDays(days: number): string {
   const d = new Date();
@@ -38,6 +35,46 @@ function inDays(days: number): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function todayISO(): string {
+  return inDays(0);
+}
+
+// Skeleton row while the list loads — same pulse pattern as the
+// Transactions screen so loading feels consistent across tabs.
+function SkeletonRow({ colors }: { colors: any }) {
+  const pulseAnim = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.7, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [pulseAnim]);
+
+  return (
+    <Animated.View
+      style={[
+        styles.card,
+        { backgroundColor: colors.card, borderColor: colors.border, opacity: pulseAnim },
+      ]}
+    >
+      <View style={styles.cardRow}>
+        <View style={[styles.iconBubble, { backgroundColor: colors.border }]} />
+        <View style={{ flex: 1, gap: 8 }}>
+          <View style={{ width: '55%', height: 14, borderRadius: 7, backgroundColor: colors.border }} />
+          <View style={{ width: '35%', height: 12, borderRadius: 6, backgroundColor: colors.border }} />
+        </View>
+        <View style={{ width: 56, height: 14, borderRadius: 7, backgroundColor: colors.border }} />
+      </View>
+    </Animated.View>
+  );
+}
+
+// 0..DAY_CHIP_COUNT-1 = single day offset from today; 'all' = next 30 days.
+type DaySelection = number | 'all';
+
 export function BookingsScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation<any>();
@@ -46,15 +83,40 @@ export function BookingsScreen() {
   const t = useTranslations('bookings');
 
   const [search, setSearch] = useState('');
+  // Debounced so the bookings query doesn't refire on every keystroke.
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
+  const [selectedDay, setSelectedDay] = useState<DaySelection>(0);
 
-  // Today + the next 30 days. Past bookings (older than today) are out of
-  // scope — vendors would settle them the same day if at all.
-  const dateFrom = useMemo(() => todayISO(), []);
-  const dateTo = useMemo(() => inDays(30), []);
+  // Day strip drives the date window: a single day per chip, or the full
+  // next-30-days view. Past bookings (older than today) are out of scope —
+  // vendors would settle them the same day if at all.
+  const { dateFrom, dateTo } = useMemo(() => {
+    if (selectedDay === 'all') {
+      return { dateFrom: todayISO(), dateTo: inDays(30) };
+    }
+    const day = inDays(selectedDay);
+    return { dateFrom: day, dateTo: day };
+  }, [selectedDay]);
+
+  const dayChips = useMemo(() => {
+    const chips: { key: DaySelection; label: string }[] = [];
+    for (let i = 0; i < DAY_CHIP_COUNT; i++) {
+      let label: string;
+      if (i === 0) label = t('todayLabel');
+      else if (i === 1) label = t('tomorrowLabel');
+      else {
+        const d = new Date(inDays(i) + 'T00:00:00');
+        label = d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
+      }
+      chips.push({ key: i, label });
+    }
+    chips.push({ key: 'all', label: t('next30DaysLabel') });
+    return chips;
+  }, [t]);
 
   const bookingsQuery = useQuery({
-    queryKey: ['bookings', { dateFrom, dateTo, search }],
-    queryFn: () => bookingsApi.list({ dateFrom, dateTo, search, limit: 100 }),
+    queryKey: ['bookings', { dateFrom, dateTo, search: debouncedSearch }],
+    queryFn: () => bookingsApi.list({ dateFrom, dateTo, search: debouncedSearch || undefined, limit: 100 }),
   });
 
   const isLoading = bookingsQuery.isLoading;
@@ -64,15 +126,13 @@ export function BookingsScreen() {
     await bookingsQuery.refetch();
   }, [bookingsQuery]);
 
-  // Sort: unpaid first (vendor's actionable items), then by date+time.
+  // Chronological by date + time — the natural run-of-show order for staff
+  // working a day. Paid state stays visible on each card's badge.
   const bookings = useMemo(() => {
     const list = bookingsQuery.data?.bookings ?? [];
     return [...list]
       .filter((b) => b.status !== 'cancelled')
       .sort((a, b) => {
-        const aPaid = isBookingPaid(a) ? 1 : 0;
-        const bPaid = isBookingPaid(b) ? 1 : 0;
-        if (aPaid !== bPaid) return aPaid - bPaid;
         const aKey = `${a.bookingDate} ${a.startTime}`;
         const bKey = `${b.bookingDate} ${b.startTime}`;
         return aKey.localeCompare(bKey);
@@ -108,6 +168,17 @@ export function BookingsScreen() {
     },
     [navigation],
   );
+
+  // Stable renderItem + stable onPress so BookingCard's memo isn't defeated on
+  // every socket-driven list refresh.
+  const renderBooking = useCallback(
+    ({ item }: { item: Booking }) => (
+      <BookingCard booking={item} currency={currency} onPress={handleBookingPress} />
+    ),
+    [currency, handleBookingPress],
+  );
+
+  const isSearching = debouncedSearch.length > 0;
 
   return (
     <SafeAreaView
@@ -155,9 +226,51 @@ export function BookingsScreen() {
         )}
       </View>
 
+      {/* Day strip — pick the day being worked; defaults to today */}
+      <View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.dayStrip}
+        >
+          {dayChips.map((chip) => {
+            const isActive = selectedDay === chip.key;
+            return (
+              <TouchableOpacity
+                key={String(chip.key)}
+                onPress={() => setSelectedDay(chip.key)}
+                accessibilityRole="button"
+                accessibilityLabel={chip.label}
+                accessibilityState={{ selected: isActive }}
+                style={[
+                  styles.dayChip,
+                  {
+                    backgroundColor: isActive ? colors.chipBgActive : colors.chipBg,
+                    borderColor: isActive ? colors.primary : colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  maxFontSizeMultiplier={1.3}
+                  style={[
+                    styles.dayChipText,
+                    { color: isActive ? colors.primary : colors.textSecondary },
+                    isActive && { fontFamily: fonts.semiBold },
+                  ]}
+                >
+                  {chip.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
       {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('loading')} />
+        <View style={styles.listContent}>
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <SkeletonRow key={i} colors={colors} />
+          ))}
         </View>
       ) : isError ? (
         <View style={styles.center}>
@@ -176,7 +289,7 @@ export function BookingsScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('retryAccessibilityLabel')}
           >
-            <Ionicons name="refresh" size={18} color="#fff" />
+            <Ionicons name="refresh" size={18} color={colors.onPrimary} />
             <Text style={styles.emptyButtonText} maxFontSizeMultiplier={1.3}>
               {t('retryButton')}
             </Text>
@@ -194,23 +307,18 @@ export function BookingsScreen() {
               tintColor={colors.primary}
             />
           }
-          renderItem={({ item }) => (
-            <BookingCard
-              booking={item}
-              currency={currency}
-              onPress={() => handleBookingPress(item)}
-            />
-          )}
+          renderItem={renderBooking}
+          removeClippedSubviews
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <View style={[styles.emptyIcon, { backgroundColor: colors.primary + '15' }]}>
-                <Ionicons name="calendar-outline" size={32} color={colors.primary} />
+                <Ionicons name={isSearching ? 'search-outline' : 'calendar-outline'} size={32} color={colors.primary} />
               </View>
               <Text style={[styles.emptyTitle, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-                {t('emptyTitle')}
+                {isSearching ? t('emptySearchTitle') : selectedDay === 'all' ? t('emptyTitle') : t('emptyDayTitle')}
               </Text>
               <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                {t('emptySubtitle')}
+                {isSearching ? t('emptySearchSubtitle') : selectedDay === 'all' ? t('emptySubtitle') : t('emptyDaySubtitle')}
               </Text>
             </View>
           }
@@ -223,7 +331,7 @@ export function BookingsScreen() {
 interface BookingCardProps {
   booking: Booking;
   currency: string;
-  onPress: () => void;
+  onPress: (booking: Booking) => void;
 }
 
 const BookingCard = React.memo(function BookingCard({ booking, currency, onPress }: BookingCardProps) {
@@ -237,7 +345,7 @@ const BookingCard = React.memo(function BookingCard({ booking, currency, onPress
 
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={() => onPress(booking)}
       style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
       accessibilityRole="button"
       accessibilityLabel={`${booking.customerName}, ${time}, ${amount}, ${paid ? t('paidBadge') : t('unpaidBadge')}`}
@@ -331,8 +439,25 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 12,
     borderWidth: 1,
+    minHeight: 44,
   },
   searchInput: { flex: 1, fontSize: 14, fontFamily: fonts.regular, paddingVertical: 4 },
+  dayStrip: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 8,
+    flexDirection: 'row',
+  },
+  dayChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayChipText: { fontSize: 13, fontFamily: fonts.medium },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   listContent: { padding: 16, gap: 10, flexGrow: 1 },
   card: {
@@ -367,5 +492,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingHorizontal: 18, paddingVertical: 12, borderRadius: 12,
   },
-  emptyButtonText: { color: '#fff', fontSize: 15, fontFamily: fonts.semiBold },
+  // Dark stone on amber fill — white fails contrast (see colors.onPrimary)
+  emptyButtonText: { color: '#1C1917', fontSize: 15, fontFamily: fonts.semiBold },
 });

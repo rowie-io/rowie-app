@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth, SKIP_BIOMETRIC_KEY } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Input } from '../components/Input';
+import { GradientButton } from '../components/ui/GradientButton';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { config } from '../lib/config';
@@ -27,6 +28,7 @@ import {
   getBiometricCredentials,
   getStoredEmail,
   storeCredentials,
+  clearStoredCredentials,
   enableBiometricLogin,
   BiometricCapabilities,
 } from '../lib/biometricAuth';
@@ -35,8 +37,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import logger from '../lib/logger';
 import { useTranslations } from '../lib/i18n';
 
-// Key to track if user has been asked about biometric setup
-const BIOMETRIC_PROMPT_SHOWN_KEY = 'biometric_prompt_shown';
+// Key to track if user has been asked about biometric setup.
+// Exported so SettingsScreen can clear the latch when it tells the user to
+// sign in again to enable biometrics — otherwise the prompt never re-fires.
+export const BIOMETRIC_PROMPT_SHOWN_KEY = 'biometric_prompt_shown';
 
 
 export function LoginScreen() {
@@ -56,6 +60,9 @@ export function LoginScreen() {
   const [biometricCapabilities, setBiometricCapabilities] = useState<BiometricCapabilities | null>(null);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [storedEmail, setStoredEmail] = useState<string | null>(null);
+
+  // Keyboard "next" chain: email → password → submit
+  const passwordInputRef = React.useRef<any>(null);
 
   const styles = createStyles(themeColors);
 
@@ -142,8 +149,13 @@ export function LoginScreen() {
       const trimmedEmail = email.trim().toLowerCase();
       await signIn(trimmedEmail, password);
 
-      // Always store credentials securely for potential biometric use
-      await storeCredentials(trimmedEmail, password);
+      // SECURITY: only persist credentials for users who have ALREADY enabled
+      // biometric login (they've accepted that tradeoff). We no longer store
+      // them on every login regardless of opt-in. First-time users get their
+      // credentials stored at the moment they tap "Enable" in the prompt below.
+      if (await isBiometricLoginEnabled()) {
+        await storeCredentials(trimmedEmail, password);
+      }
 
       // After successful login, prompt for biometric setup if available
       promptForBiometricSetup();
@@ -190,13 +202,20 @@ export function LoginScreen() {
           {
             text: t('enable'),
             onPress: async () => {
-              // Credentials already stored, just enable biometric
+              // Persist credentials at the opt-in moment (password is in scope
+              // here). enableBiometricLogin() requires stored credentials to
+              // exist first, so store BEFORE enabling; if the biometric check
+              // is cancelled/fails, clear them again so we never leave a
+              // password behind for a user who didn't actually opt in.
+              await storeCredentials(email.trim().toLowerCase(), password);
               const success = await enableBiometricLogin();
               if (success) {
                 Alert.alert(
                   t('successTitle'),
                   t('biometricEnabledMessage', { biometricName: capabilities.biometricName })
                 );
+              } else {
+                await clearStoredCredentials();
               }
             },
           },
@@ -260,6 +279,10 @@ export function LoginScreen() {
                     autoCapitalize="none"
                     autoCorrect={false}
                     autoComplete="email"
+                    textContentType="username"
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordInputRef.current?.focus()}
+                    blurOnSubmit={false}
                     accessibilityLabel={t('emailAccessibilityLabel')}
                   />
                 </View>
@@ -267,12 +290,16 @@ export function LoginScreen() {
                 <View style={styles.inputGroup}>
                   <Text maxFontSizeMultiplier={1.5} style={styles.label}>{t('passwordLabel')}</Text>
                   <Input
+                    ref={passwordInputRef}
                     icon="lock-closed-outline"
                     value={password}
                     onChangeText={setPassword}
                     placeholder={t('passwordPlaceholder')}
                     secureTextEntry={!showPassword}
                     autoComplete="password"
+                    textContentType="password"
+                    returnKeyType="go"
+                    onSubmitEditing={handleLogin}
                     accessibilityLabel={t('passwordAccessibilityLabel')}
                     rightIcon={
                       <TouchableOpacity
@@ -301,24 +328,14 @@ export function LoginScreen() {
                   <Text maxFontSizeMultiplier={1.3} style={styles.forgotPassword}>{t('forgotPasswordLink')}</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={[styles.button, loading && styles.buttonDisabled]}
+                <GradientButton
+                  label={loading ? t('signingInButton') : t('signInButton')}
                   onPress={handleLogin}
-                  disabled={loading}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
+                  loading={loading}
+                  size="lg"
+                  style={styles.button}
                   accessibilityLabel={loading ? t('signingInAccessibilityLabel') : t('signInAccessibilityLabel')}
-                  accessibilityState={{ disabled: loading, busy: loading }}
-                >
-                  {loading ? (
-                    <View style={styles.buttonContent}>
-                      <ActivityIndicator color={themeColors.text} size="small" accessibilityLabel={t('signingInAccessibilityLabel')} />
-                      <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>{t('signingInButton')}</Text>
-                    </View>
-                  ) : (
-                    <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>{t('signInButton')}</Text>
-                  )}
-                </TouchableOpacity>
+                />
 
                 {/* Apple TTPOi 1.7: Biometric login button */}
                 {biometricCapabilities?.isAvailable && biometricEnabled && (
@@ -478,24 +495,10 @@ const createStyles = (c: { [key: string]: any }) => StyleSheet.create({
     color: c.primary,
   },
   button: {
-    backgroundColor: c.primary,
-    borderRadius: 20,
-    paddingVertical: 16,
-    alignItems: 'center',
     marginTop: 8,
   },
   buttonDisabled: {
     opacity: 0.5,
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontFamily: fonts.semiBold,
-    color: '#fff',
   },
   footer: {
     flexDirection: 'row',

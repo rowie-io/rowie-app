@@ -1,3 +1,5 @@
+// TODO(security): install expo-screen-capture and guard this screen with
+// usePreventScreenCapture() — it displays receipt / transaction amount details.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
@@ -43,6 +45,9 @@ type RouteParams = {
     orderNumber?: string;
     customerEmail?: string;
     errorMessage?: string;
+    // Network/timeout drop mid-payment: the charge may have completed even
+    // though the app couldn't confirm — show a direct "Check History" action.
+    isNetworkDrop?: boolean;
     skipToCardEntry?: boolean; // Go directly to card entry page
     preorderId?: string; // If present, complete the preorder on success
     paymentMethod?: PaymentMethodType;
@@ -74,7 +79,7 @@ export function PaymentResultScreen() {
   const insets = useSafeAreaInsets();
 
   const queryClient = useQueryClient();
-  const { success, amount, paymentIntentId, orderId, orderNumber, customerEmail, errorMessage, skipToCardEntry, preorderId, paymentMethod, cashTendered, changeAmount, sessionId, sessionTipAmount, bookingId } = route.params;
+  const { success, amount, paymentIntentId, orderId, orderNumber, customerEmail, errorMessage, isNetworkDrop, skipToCardEntry, preorderId, paymentMethod, cashTendered, changeAmount, sessionId, sessionTipAmount, bookingId } = route.params;
 
   // Resolve the payment method (PaymentProcessingScreen may not pass it explicitly)
   const resolvedMethod: PaymentMethodType = paymentMethod || 'tap_to_pay';
@@ -96,8 +101,8 @@ export function PaymentResultScreen() {
         return {
           iconName: 'layers-outline' as const,
           iconColor: '#fff',
-          accentColor: '#8B5CF6', // Purple accent for split
-          bgColor: '#8B5CF6',
+          accentColor: colors.primary, // Brand amber accent for split
+          bgColor: colors.primary,
           title: t('splitComplete'),
           badgeText: t('splitMethodsBadge'),
           confettiColors: ['#8B5CF6', '#A78BFA', '#22C55E', '#F59E0B', '#4ECDC4'],
@@ -369,6 +374,13 @@ export function PaymentResultScreen() {
     navigation.goBack();
   };
 
+  // Network-drop failures: jump straight to the History tab so the cashier
+  // can verify whether the charge actually captured before retrying.
+  // Deliberately does NOT cancel the PaymentIntent — it may have succeeded.
+  const handleCheckHistory = () => {
+    navigation.navigate('MainTabs', { screen: 'History' });
+  };
+
   // Handle manual card payment - fallback when Tap to Pay fails
   // Note: Manual card entry has higher Stripe fees (2.9% + 30¢) vs Tap to Pay (2.7% + 5¢)
   const handleManualCardPayment = async () => {
@@ -388,6 +400,10 @@ export function PaymentResultScreen() {
       // Create a new payment intent for card payment (direct charge on connected account)
       const paymentIntent = await stripeTerminalApi.createPaymentIntent({
         amount: fromSmallestUnit(amount, currency), // API expects base currency unit
+        // Session settles carry the tip separately (base units) so the API
+        // excludes it from the platform-fee base. Order retries don't know
+        // the tip portion here — the API falls back to fee-on-full-amount.
+        tipAmount: sessionId ? sessionTipAmount || 0 : undefined,
         currency, // Multi-currency support — never assume USD
         description: preorderId ? t('preorderPaymentDescription') : t('orderPaymentDescription', { orderNumber: orderNumber || 'Payment' }),
         metadata: {
@@ -442,7 +458,9 @@ export function PaymentResultScreen() {
         if (sessionId) {
           try {
             const res = await sessionsApi.settle(sessionId, {
-              paymentMethod: 'tap_to_pay',
+              // This is the manual-card-entry fallback, not a Terminal tap —
+              // record it as 'card' so the payment method isn't misattributed.
+              paymentMethod: 'card',
               tipAmount: sessionTipAmount || 0,
               stripePaymentIntentId: paymentIntent.id,
             });
@@ -813,9 +831,9 @@ export function PaymentResultScreen() {
                         accessibilityState={{ disabled: sendingReceipt }}
                       >
                         {sendingReceipt ? (
-                          <ActivityIndicator size="small" color="#fff" accessibilityLabel={t('sendingReceiptAccessibility')} />
+                          <ActivityIndicator size="small" color={colors.onPrimary} accessibilityLabel={t('sendingReceiptAccessibility')} />
                         ) : (
-                          <Ionicons name="send" size={18} color="#fff" />
+                          <Ionicons name="send" size={18} color={colors.onPrimary} />
                         )}
                       </TouchableOpacity>
                     </View>
@@ -893,6 +911,18 @@ export function PaymentResultScreen() {
                   <Ionicons name="refresh" size={24} color={isDark ? '#1C1917' : '#fff'} />
                   <Text style={[styles.primaryButtonText, { color: isDark ? '#1C1917' : '#fff' }]} maxFontSizeMultiplier={1.3}>{tc('tryAgain')}</Text>
                 </TouchableOpacity>
+                {isNetworkDrop && (
+                  <TouchableOpacity
+                    style={styles.historyButton}
+                    onPress={handleCheckHistory}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('checkHistory')}
+                    accessibilityHint={t('paymentNetworkDropVerifyHistory')}
+                  >
+                    <Ionicons name="time-outline" size={20} color={colors.text} />
+                    <Text style={styles.historyButtonText} maxFontSizeMultiplier={1.3}>{t('checkHistory')}</Text>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity style={styles.secondaryButton} onPress={handleNewSale} accessibilityRole="button" accessibilityLabel={t('cancelOrder')}>
                   <Text style={styles.secondaryButtonText} maxFontSizeMultiplier={1.3}>{t('cancelOrder')}</Text>
                 </TouchableOpacity>
@@ -1272,7 +1302,7 @@ const createStyles = (colors: any, success: boolean, method: PaymentMethodType) 
     cardPayButtonText: {
       fontSize: 17,
       fontFamily: fonts.semiBold,
-      color: '#fff',
+      color: colors.onPrimary,
     },
     cardCancelButton: {
       alignItems: 'center',
@@ -1399,6 +1429,22 @@ const createStyles = (colors: any, success: boolean, method: PaymentMethodType) 
       color: '#fff',
       fontSize: 18,
       fontFamily: fonts.semiBold,
+    },
+    historyButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+      paddingVertical: 16,
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    historyButtonText: {
+      fontSize: 16,
+      fontFamily: fonts.semiBold,
+      color: colors.text,
     },
     secondaryButton: {
       alignItems: 'center',

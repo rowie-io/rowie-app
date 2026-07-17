@@ -119,10 +119,7 @@ export const sessionsApi = {
   get: (id: string) =>
     apiClient.get<{ session: Session; items: SessionItem[]; rounds: SessionRound[] }>(`/sessions/${id}`),
 
-  getStats: (catalogId?: string) => {
-    const params = catalogId ? `?catalogId=${catalogId}` : '';
-    return apiClient.get<SessionStats>(`/sessions/stats${params}`);
-  },
+  getStats: () => apiClient.get<SessionStats>('/sessions/stats'),
 
   getForTable: (tableId: string) =>
     apiClient.get<{ session: Session | null; items: SessionItem[] }>(`/sessions/table/${tableId}`),
@@ -141,10 +138,11 @@ export const sessionsApi = {
     roundNotes?: string;
     items?: { catalogProductId: string; quantity: number; notes?: string }[];
     settleImmediately?: boolean;
+    // Integer SMALLEST currency unit (cents) — unlike settle()'s tipAmount,
+    // which is in BASE units (dollars), per the API's Zod schemas.
     tipAmount?: number;
     paymentMethod?: string;
     stripePaymentIntentId?: string;
-    cashTendered?: number;
   }) => apiClient.post<{ session: Session; items: SessionItem[] }>('/sessions', data),
 
   addItems: (
@@ -169,10 +167,14 @@ export const sessionsApi = {
     data: { quantity?: number; notes?: string | null },
   ) => apiClient.patch<{ item: SessionItem }>(`/sessions/${sessionId}/items/${itemId}`, data),
 
-  updateItemStatus: (sessionId: string, itemIds: string[], status: ItemStatus) =>
+  // The API's bulk status route only accepts forward targets — 'pending' is an
+  // insert-time default, never a valid transition target.
+  updateItemStatus: (sessionId: string, itemIds: string[], status: 'sent' | 'preparing' | 'ready' | 'served') =>
     apiClient.patch<{ success: boolean }>(`/sessions/${sessionId}/items/status`, { itemIds, status }),
 
   settle: (sessionId: string, data: {
+    // BASE currency units (dollars) — unlike create()'s tipAmount, which is in
+    // integer smallest units (cents), per the API's Zod schemas.
     tipAmount?: number;
     paymentMethod: 'card' | 'cash' | 'tap_to_pay' | 'split';
     stripePaymentIntentId?: string;
@@ -204,8 +206,16 @@ export const sessionsApi = {
   openTab: (sessionId: string, data: { stripeSetupIntentId: string; stripePaymentMethodId: string; customerName?: string }) =>
     apiClient.post<{ success: boolean }>(`/sessions/${sessionId}/open-tab`, data),
 
+  // tipAmount here is in integer SMALLEST units (cents) per the API's Zod.
+  // `order`/`payment` are null (+ `empty: true`) when a tab with no items is
+  // closed without charging.
   closeTab: (sessionId: string, tipAmount?: number) =>
-    apiClient.post<{ session: Session; order: { id: string; orderNumber: string; totalAmount: number } }>(
+    apiClient.post<{
+      session: { id: string; status: string };
+      order: { id: string; orderNumber: string; totalAmount: number } | null;
+      payment: { paymentIntentId: string; amount: number; status: string } | null;
+      empty?: boolean;
+    }>(
       `/sessions/${sessionId}/close-tab`, { tipAmount: tipAmount || 0 }
     ),
 

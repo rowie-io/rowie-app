@@ -28,6 +28,8 @@ import { useTranslations } from '../lib/i18n';
 
 import { useTheme } from '../context/ThemeContext';
 import { useTerminal, ConfigurationStage } from '../context/StripeTerminalContext';
+import { ConfirmModal } from '../components/ConfirmModal';
+import { GradientButton } from '../components/ui/GradientButton';
 import { shadows } from '../lib/shadows';
 import { spacing, radius } from '../lib/spacing';
 import logger from '../lib/logger';
@@ -142,6 +144,7 @@ export function TapToPayEducationScreen() {
   };
 
   const [isEnabling, setIsEnabling] = useState(false);
+  const [showSkipConfirm, setShowSkipConfirm] = useState(false);
   const [enableError, setEnableError] = useState<string | null>(null);
   const [isConnectSetupError, setIsConnectSetupError] = useState(false);
   const [loadingTimedOut, setLoadingTimedOut] = useState(false);
@@ -332,6 +335,12 @@ export function TapToPayEducationScreen() {
   };
 
   const handleClose = () => {
+    // First-run / unregistered device on iOS: confirm before dismissing so the
+    // merchant knows Tap to Pay setup can be resumed later from Settings.
+    if (isIOS && !deviceAlreadyRegistered && !isEnabling) {
+      setShowSkipConfirm(true);
+      return;
+    }
     navigateBack();
   };
 
@@ -366,7 +375,8 @@ export function TapToPayEducationScreen() {
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>{t('educationHeaderTitleSettingUp')}</Text>
-          <View style={styles.skipButton} />
+          {/* Spacer balancing the close button so the title stays centered */}
+          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.androidCenterContent}>
           {isEnabling ? (
@@ -488,7 +498,8 @@ export function TapToPayEducationScreen() {
           <Ionicons name="close" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} maxFontSizeMultiplier={1.3}>{t('educationHeaderTitleSetup')}</Text>
-        <View style={styles.skipButton} />
+        {/* Spacer balancing the close button so the title stays centered */}
+        <View style={styles.headerSpacer} />
       </View>
 
       {/* Enable Screen */}
@@ -524,7 +535,7 @@ export function TapToPayEducationScreen() {
           <>
             <View style={styles.iconContainer}>
               <View style={[styles.iconGradient, { backgroundColor: colors.primary }]}>
-                <Ionicons name="wifi" size={64} color="#fff" style={styles.nfcIcon} />
+                <Ionicons name="wifi" size={64} color={colors.onPrimary} style={styles.nfcIcon} />
               </View>
             </View>
             <Text style={styles.slideTitle} maxFontSizeMultiplier={1.3}>{t('educationEnableTitle', { tapToPayName: TAP_TO_PAY_NAME })}</Text>
@@ -563,7 +574,7 @@ export function TapToPayEducationScreen() {
                     accessibilityLabel={t('educationSetUpPayments')}
                     accessibilityHint={t('educationSetUpPaymentsAccessibilityHint')}
                   >
-                    <Ionicons name="card-outline" size={18} color="#fff" />
+                    <Ionicons name="card-outline" size={18} color={colors.onPrimary} />
                     <Text style={styles.setupPaymentsButtonText} maxFontSizeMultiplier={1.3}>{t('educationSetUpPayments')}</Text>
                   </TouchableOpacity>
                 )}
@@ -575,28 +586,29 @@ export function TapToPayEducationScreen() {
 
       {/* Footer */}
       <View style={styles.footer}>
-        <TouchableOpacity
+        <GradientButton
+          label={getButtonText()}
           onPress={handleButtonPress}
-          activeOpacity={0.9}
+          loading={isEnabling}
           disabled={isButtonDisabled}
-          accessibilityRole="button"
+          icon={!isConnected && !isEnabling ? 'flash' : undefined}
+          size="lg"
           accessibilityLabel={getButtonText()}
-          accessibilityState={{ disabled: isButtonDisabled }}
-        >
-          <View style={[styles.nextButton, { backgroundColor: isButtonDisabled ? colors.gray600 : colors.primary }, isButtonDisabled && { opacity: 0.6 }]}>
-            {isEnabling ? (
-              <ActivityIndicator size="small" color="#fff" accessibilityLabel={t('educationButtonEnabling')} />
-            ) : (
-              <>
-                <Text style={styles.nextButtonText} maxFontSizeMultiplier={1.3}>{getButtonText()}</Text>
-                {!isConnected && (
-                  <Ionicons name="flash" size={20} color="#fff" />
-                )}
-              </>
-            )}
-          </View>
-        </TouchableOpacity>
+        />
       </View>
+
+      {/* Confirm before skipping first-run setup (Apple TTPOi onboarding) */}
+      <ConfirmModal
+        visible={showSkipConfirm}
+        title={t('educationSkipConfirmTitle')}
+        message={t('educationSkipConfirmMessage')}
+        confirmText={t('educationSkipConfirmConfirm')}
+        onConfirm={() => {
+          setShowSkipConfirm(false);
+          navigateBack();
+        }}
+        onCancel={() => setShowSkipConfirm(false)}
+      />
     </View>
     </View>
   );
@@ -633,9 +645,9 @@ const createStyles = (colors: any, isDark: boolean) =>
       fontWeight: '600',
       color: colors.text,
     },
-    skipButton: {
-      paddingHorizontal: 16,
-      paddingVertical: 10,
+    headerSpacer: {
+      width: 44,
+      height: 44,
     },
     slidesContainer: {
       flex: 1,
@@ -729,7 +741,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       ...shadows.md,
     },
     nextButtonText: {
-      color: '#fff',
+      color: colors.onPrimary,
       fontSize: 18,
       fontWeight: '600',
     },
@@ -832,7 +844,7 @@ const createStyles = (colors: any, isDark: boolean) =>
     setupPaymentsButtonText: {
       fontSize: 14,
       fontWeight: '600',
-      color: '#fff',
+      color: colors.onPrimary,
     },
     // Android-specific centered content layout
     androidCenterContent: {

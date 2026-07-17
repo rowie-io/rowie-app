@@ -102,6 +102,7 @@ export function ItemNotesModal({
               <TouchableOpacity
                 style={[styles.closeButton, { backgroundColor: colors.card }]}
                 onPress={onCancel}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
                 accessibilityRole="button"
                 accessibilityLabel={tc('close')}
               >
@@ -168,7 +169,7 @@ export function ItemNotesModal({
                 accessibilityLabel={t('addToCart')}
                 accessibilityHint={t('addToCart')}
               >
-                <Text style={[styles.buttonText, { color: '#FFFFFF' }]} maxFontSizeMultiplier={1.3}>
+                <Text style={[styles.buttonText, { color: colors.onPrimary }]} maxFontSizeMultiplier={1.3}>
                   {t('addToCart')}
                 </Text>
               </TouchableOpacity>
@@ -244,6 +245,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   quickNoteButton: {
+    minHeight: 44,
+    justifyContent: 'center',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,

@@ -11,6 +11,10 @@ export const brandGradientLight: [string, string] = ['#F59E0B', '#D97706'];
 // Primary amber palette (shared between themes)
 const primaryPalette = {
   primary: '#F59E0B',
+  // Text/icon color for content sitting on a solid `primary` (amber) fill.
+  // White on amber is ~2.1:1 — fails WCAG and Apple TTPOi review. Dark stone
+  // is ~9:1 on amber-500 and stays legible across the brand gradient.
+  onPrimary: '#1C1917',
   primary50: '#FFFBEB',
   primary100: '#FEF3C7',
   primary200: '#FDE68A',

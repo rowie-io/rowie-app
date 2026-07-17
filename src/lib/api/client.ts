@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { config } from '../config';
 import logger from '../logger';
+import { getSecureItem } from './secureStorage';
 
 export type ApiError = {
   error: string;
@@ -38,7 +39,7 @@ class ApiClient {
   }
 
   private async getAuthToken(): Promise<string | null> {
-    return AsyncStorage.getItem('accessToken');
+    return getSecureItem('accessToken');
   }
 
   private async processRequestQueue() {
@@ -76,7 +77,7 @@ class ApiClient {
         try {
           // Dynamic import to avoid circular dependency
           const { authService } = await import('./auth');
-          const refreshToken = await AsyncStorage.getItem('refreshToken');
+          const refreshToken = await getSecureItem('refreshToken');
 
           if (!refreshToken) {
             logger.log('[ApiClient] No refresh token available');
@@ -99,7 +100,12 @@ class ApiClient {
           logger.log('[ApiClient] Token refresh failed:', error?.message || error);
           this.isRefreshing = false;
           this.refreshPromise = null;
+          // Reject every queued waiter/request so callers don't hang forever
+          const queue = [...this.requestQueue];
           this.requestQueue = [];
+          for (const queueItem of queue) {
+            queueItem.reject(error);
+          }
           throw error;
         }
       })();
@@ -142,7 +148,7 @@ class ApiClient {
       }
 
       // Don't attempt refresh for auth endpoints
-      const authEndpoints = ['/auth/login', '/auth/refresh', '/auth/forgot-password', '/auth/reset-password'];
+      const authEndpoints = ['/auth/login', '/auth/refresh', '/auth/forgot-password', '/auth/reset-password', '/auth/logout'];
       const isAuthEndpoint = authEndpoints.some(auth => endpoint.includes(auth));
 
       // If we get a 401 and haven't retried yet, try to refresh the token
@@ -180,20 +186,23 @@ class ApiClient {
   ): Promise<T> {
     // Get fresh token after refresh
     const token = await this.getAuthToken();
-    logger.log('[ApiClient] Retry using token:', token ? token.substring(0, 50) + '...' : 'null');
+    logger.log('[ApiClient] Retry after refresh', { hasToken: !!token });
 
+    // FormData retries must re-send the original form body with multipart
+    // headers (rebuilt so the fresh token is used, no JSON content-type).
+    const isForm = data instanceof FormData;
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       ...options,
       method,
-      headers: await this.getHeaders(options?.headers),
-      body: data ? JSON.stringify(data) : undefined,
+      headers: isForm ? await this.getFormHeaders() : await this.getHeaders(options?.headers),
+      body: isForm ? data : data ? JSON.stringify(data) : undefined,
     });
 
     return this.handleResponse<T>(response, endpoint, retryCount, method, data, options);
   }
 
   private async getSessionVersion(): Promise<string | null> {
-    return AsyncStorage.getItem('sessionVersion');
+    return getSecureItem('sessionVersion');
   }
 
   private async getCurrentLocationId(): Promise<string | null> {
@@ -225,6 +234,31 @@ class ApiClient {
       headers['X-Session-Version'] = sessionVersion;
     }
 
+    if (locationId) {
+      headers['X-Location-Id'] = locationId;
+    }
+
+    return headers;
+  }
+
+  /**
+   * Headers for FormData requests — auth/session/location only.
+   * No Content-Type: fetch sets multipart/form-data with the boundary.
+   */
+  private async getFormHeaders(): Promise<Record<string, string>> {
+    const [token, sessionVersion, locationId] = await Promise.all([
+      this.getAuthToken(),
+      this.getSessionVersion(),
+      this.getCurrentLocationId(),
+    ]);
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    if (sessionVersion) {
+      headers['X-Session-Version'] = sessionVersion;
+    }
     if (locationId) {
       headers['X-Location-Id'] = locationId;
     }
@@ -288,28 +322,14 @@ class ApiClient {
       });
     }
 
-    const token = await this.getAuthToken();
-    const sessionVersion = await this.getSessionVersion();
-    const locationId = await this.getCurrentLocationId();
-
-    const headers: Record<string, string> = {};
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    if (sessionVersion) {
-      headers['X-Session-Version'] = sessionVersion;
-    }
-    if (locationId) {
-      headers['X-Location-Id'] = locationId;
-    }
-
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       method: 'POST',
-      headers,
+      headers: await this.getFormHeaders(),
       body: formData,
     });
 
-    return this.handleResponse<T>(response, endpoint, 0, 'POST', undefined, { headers });
+    // Pass the FormData through so a 401→refresh retry re-sends the body
+    return this.handleResponse<T>(response, endpoint, 0, 'POST', formData);
   }
 
   resetSessionKicked() {

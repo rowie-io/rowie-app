@@ -93,6 +93,15 @@ export function TabsScreen() {
     [navigation],
   );
 
+  // Stable renderItem + stable onPress so TabCard's memo isn't defeated on
+  // every socket-driven list refresh.
+  const renderTab = useCallback(
+    ({ item }: { item: Session }) => (
+      <TabCard session={item} currency={currency} onPress={handleTabPress} />
+    ),
+    [currency, handleTabPress],
+  );
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -117,7 +126,7 @@ export function TabsScreen() {
           accessibilityLabel={t('openTabAccessibilityLabel')}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Ionicons name="add" size={18} color="#fff" />
+          <Ionicons name="add" size={18} color={colors.onPrimary} />
           <Text style={styles.newButtonText} maxFontSizeMultiplier={1.3}>
             {t('newButton')}
           </Text>
@@ -145,7 +154,7 @@ export function TabsScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('retryAccessibilityLabel')}
           >
-            <Ionicons name="refresh" size={18} color="#fff" />
+            <Ionicons name="refresh" size={18} color={colors.onPrimary} />
             <Text style={styles.emptyButtonText} maxFontSizeMultiplier={1.3}>
               {t('retryButton')}
             </Text>
@@ -163,9 +172,8 @@ export function TabsScreen() {
               tintColor={colors.primary}
             />
           }
-          renderItem={({ item }) => (
-            <TabCard session={item} currency={currency} onPress={() => handleTabPress(item)} />
-          )}
+          renderItem={renderTab}
+          removeClippedSubviews
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <View style={[styles.emptyIcon, { backgroundColor: colors.primary + '15' }]}>
@@ -183,7 +191,7 @@ export function TabsScreen() {
                 accessibilityRole="button"
                 accessibilityLabel={t('openTabAccessibilityLabel')}
               >
-                <Ionicons name="add" size={18} color="#fff" />
+                <Ionicons name="add" size={18} color={colors.onPrimary} />
                 <Text style={styles.emptyButtonText} maxFontSizeMultiplier={1.3}>
                   {t('emptyButton')}
                 </Text>
@@ -199,7 +207,7 @@ export function TabsScreen() {
 interface TabCardProps {
   session: Session;
   currency: string;
-  onPress: () => void;
+  onPress: (session: Session) => void;
 }
 
 const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabCardProps) {
@@ -220,7 +228,7 @@ const TabCard = React.memo(function TabCard({ session, currency, onPress }: TabC
 
   return (
     <TouchableOpacity
-      onPress={onPress}
+      onPress={() => onPress(session)}
       style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
       accessibilityRole="button"
       accessibilityLabel={t('tabCardAccessibilityLabel', {
@@ -326,7 +334,8 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     minHeight: 44,
   },
-  newButtonText: { fontSize: 14, fontFamily: fonts.bold, color: '#fff' },
+  // Dark stone on amber fill — white fails contrast (see colors.onPrimary)
+  newButtonText: { fontSize: 14, fontFamily: fonts.bold, color: '#1C1917' },
   listContent: { padding: 16, gap: 12, flexGrow: 1 },
   card: {
     flexDirection: 'row',
@@ -372,5 +381,5 @@ const styles = StyleSheet.create({
     minHeight: 44,
     marginTop: 8,
   },
-  emptyButtonText: { fontSize: 15, fontFamily: fonts.bold, color: '#fff' },
+  emptyButtonText: { fontSize: 15, fontFamily: fonts.bold, color: '#1C1917' },
 });

@@ -31,9 +31,6 @@ export const SocketEvents = {
   CATEGORY_CREATED: 'category:created',
   CATEGORY_DELETED: 'category:deleted',
   CATEGORIES_REORDERED: 'categories:reordered',
-  // Transaction events
-  TRANSACTION_CREATED: 'transaction:created',
-  TRANSACTION_UPDATED: 'transaction:updated',
   // Order events
   ORDER_CREATED: 'order:created',
   ORDER_UPDATED: 'order:updated',
@@ -413,8 +410,10 @@ export function SocketProvider({ children }: SocketProviderProps) {
     }
     listenersRef.current.get(event)!.add(callback);
 
-    // If socket is connected, add listener immediately
-    if (socketRef.current?.connected) {
+    // Attach whenever a socket instance exists — .on() works pre-connect, and
+    // waiting for `connected` drops handlers subscribed mid-handshake (they'd
+    // sit in listenersRef but never attach, silently killing live updates).
+    if (socketRef.current) {
       socketRef.current.on(event, callback);
     }
 

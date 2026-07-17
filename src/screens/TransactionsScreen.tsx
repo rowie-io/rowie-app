@@ -1,15 +1,17 @@
+// TODO(security): install expo-screen-capture and guard this screen with
+// usePreventScreenCapture() — it lists card last4 and transaction amounts.
 import React, { useState, useRef, useCallback, useEffect, memo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
+  TextInput,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
   Animated,
   Pressable,
-  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -17,18 +19,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { useCatalog } from '../context/CatalogContext';
-import { useDevice } from '../context/DeviceContext';
 import { useSocketEvent, useSocket, SocketEvents } from '../context/SocketContext';
-import { transactionsApi, Transaction, ordersApi, Order } from '../lib/api';
-import { getDeviceId } from '../lib/device';
+import { apiClient, Transaction, TransactionsListResponse } from '../lib/api';
 import { formatCents } from '../utils/currency';
+import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
-import { brandGradient } from '../lib/colors';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Swipeable } from 'react-native-gesture-handler';
-import { useTapToPayGuard } from '../hooks';
 import { useTranslations } from '../lib/i18n';
 import logger from '../lib/logger';
 
@@ -110,6 +106,10 @@ const AnimatedTransactionItem = memo(function AnimatedTransactionItem({
 }) {
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
+  // Rows carry their own currency (multi-currency history); the org's
+  // current currency is only a fallback for older cached rows.
+  const itemCurrency = item.currency || currency;
+
   const handlePressIn = useCallback(() => {
     Animated.spring(scaleAnim, {
       toValue: 0.97,
@@ -163,7 +163,7 @@ const AnimatedTransactionItem = memo(function AnimatedTransactionItem({
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
       accessibilityRole="button"
-      accessibilityLabel={t('transactionAccessibilityLabel', { amount: formatCents(item.amount, currency), status: getStatusLabel(item.status), date: formatDate(item.created) }) + (item.sourceType === 'preorder' ? ', ' + t('preorderLabel').toLowerCase() : '')}
+      accessibilityLabel={t('transactionAccessibilityLabel', { amount: formatCents(item.amount, itemCurrency), status: getStatusLabel(item.status), date: formatDate(item.created) }) + (item.sourceType === 'preorder' ? ', ' + t('preorderLabel').toLowerCase() : '')}
       accessibilityHint={t('transactionAccessibilityHint')}
     >
       <Animated.View style={[styles.transactionItem, { transform: [{ scale: scaleAnim }] }]}>
@@ -177,7 +177,7 @@ const AnimatedTransactionItem = memo(function AnimatedTransactionItem({
           <View style={styles.transactionInfo}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Text maxFontSizeMultiplier={1.3} style={styles.transactionAmount}>
-                {formatCents(item.amount, currency)}
+                {formatCents(item.amount, itemCurrency)}
               </Text>
               {sourceBadge && (
                 <View style={{
@@ -218,15 +218,15 @@ export function TransactionsScreen() {
   const t = useTranslations('transactions');
   const tc = useTranslations('common');
   const { currency, organization } = useAuth();
-  const { selectedCatalog } = useCatalog();
-  const { deviceId } = useDevice();
   const { isConnected } = useSocket();
   const navigation = useNavigation<any>();
-  const { guardCheckout } = useTapToPayGuard();
   const route = useRoute<RouteProp<TransactionsScreenParams, 'History'>>();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<FilterType>('all');
+  const [search, setSearch] = useState('');
+  // Debounced so the transactions query doesn't refire on every keystroke.
+  const debouncedSearch = useDebouncedValue(search.trim(), 300);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
   const wasConnectedRef = useRef(isConnected);
   const hasEverConnectedRef = useRef(false);
@@ -285,18 +285,27 @@ export function TransactionsScreen() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['transactions', filter],
-    queryFn: ({ pageParam }) =>
-      transactionsApi.list({
-        limit: 25,
-        starting_after: pageParam,
-        status: filter,
-      }),
-    getNextPageParam: (lastPage) => {
-      if (!lastPage.hasMore || lastPage.data.length === 0) return undefined;
-      return lastPage.data[lastPage.data.length - 1].id;
+    queryKey: ['transactions', filter, debouncedSearch],
+    // Called directly through apiClient because the typed transactionsApi.list
+    // helper doesn't expose the API's `search` parameter (server-side ILIKE
+    // over customer name / email / receipt number, plus exact amount match).
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams();
+      params.set('limit', '25');
+      params.set('offset', String(pageParam));
+      params.set('status', filter);
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      return apiClient.get<TransactionsListResponse>(
+        `/stripe/connect/transactions?${params.toString()}`
+      );
     },
-    initialPageParam: undefined as string | undefined,
+    // The API paginates with offset (starting_after is accepted but ignored),
+    // so the next page's offset is simply how many rows we've loaded so far.
+    getNextPageParam: (lastPage, allPages) => {
+      if (!lastPage.hasMore || lastPage.data.length === 0) return undefined;
+      return allPages.reduce((sum, page) => sum + page.data.length, 0);
+    },
+    initialPageParam: 0,
   });
 
   // Filtering is now done server-side via the status query parameter
@@ -350,10 +359,14 @@ export function TransactionsScreen() {
   }, []);
 
   const handleTransactionPress = useCallback((item: Transaction) => {
+    // Detail/refund/receipt endpoints resolve the underlying source id
+    // (orders / table_sessions / tickets), not the unified row id. Fall back
+    // to `id` for older cached rows that predate sourceId.
+    const sourceId = item.sourceId ?? item.id;
     if (item.sourceType === 'preorder') {
-      navigation.navigate('TransactionDetail', { id: item.id, sourceType: 'preorder' });
+      navigation.navigate('TransactionDetail', { id: sourceId, sourceType: 'preorder' });
     } else {
-      navigation.navigate('TransactionDetail', { id: item.id });
+      navigation.navigate('TransactionDetail', { id: sourceId });
     }
   }, [navigation]);
 
@@ -406,26 +419,39 @@ export function TransactionsScreen() {
     setIsManualRefreshing(false);
   };
 
-  const formatTimeAgo = (dateString: string): string => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMins < 1) return t('timeAgoJustNow');
-    if (diffMins < 60) return t('timeAgoMinutes', { minutes: diffMins });
-    if (diffHours < 24) return t('timeAgoHours', { hours: diffHours });
-    return t('timeAgoDays', { days: diffDays });
-  };
-
   return (
     <View style={{ flex: 1 }}>
       <View style={[styles.container, { paddingTop: insets.top }]}>
         {/* Header */}
         <View style={styles.headerContainer}>
           <Text maxFontSizeMultiplier={1.3} style={styles.title}>{t('historyTitle')}</Text>
+        </View>
+
+        {/* Search — amount, receipt number, customer name or email */}
+        <View style={styles.searchRow}>
+          <Ionicons name="search" size={18} color={colors.textSecondary} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder={t('searchPlaceholder')}
+            placeholderTextColor={colors.textSecondary}
+            style={styles.searchInput}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+            accessibilityLabel={t('searchAccessibilityLabel')}
+            maxFontSizeMultiplier={1.5}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearch('')}
+              accessibilityRole="button"
+              accessibilityLabel={t('clearSearchAccessibilityLabel')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Filter row */}
@@ -478,11 +504,19 @@ export function TransactionsScreen() {
                 onAction={() => refetch()}
               />
             ) : transactions.length === 0 ? (
-              <EmptyState
-                icon="receipt-outline"
-                title={t('emptyTitle')}
-                subtitle={t('emptySubtitle')}
-              />
+              debouncedSearch.length > 0 ? (
+                <EmptyState
+                  icon="search-outline"
+                  title={t('noResultsTitle')}
+                  subtitle={t('noResultsSubtitle')}
+                />
+              ) : (
+                <EmptyState
+                  icon="receipt-outline"
+                  title={t('emptyTitle')}
+                  subtitle={t('emptySubtitle')}
+                />
+              )
             ) : (
               <FlatList
                 data={transactions}
@@ -490,6 +524,10 @@ export function TransactionsScreen() {
                 keyExtractor={(item) => `${item.sourceType || 'order'}-${item.id}`}
                 contentContainerStyle={[styles.list, { flexGrow: 1 }]}
                 style={styles.listContainer}
+                removeClippedSubviews
+                // No getItemLayout: rows carry Dynamic Type text
+                // (maxFontSizeMultiplier up to 1.5) + a wrap-capable meta line,
+                // so row height is not fixed across accessibility font sizes.
                 refreshControl={
                   <RefreshControl
                     refreshing={isManualRefreshing}
@@ -544,6 +582,27 @@ const createStyles = (colors: any, isDark: boolean) => {
       fontSize: 13,
       fontFamily: fonts.semiBold,
     },
+    searchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginHorizontal: 20,
+      marginTop: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: cardBorder,
+      backgroundColor: cardBackground,
+      minHeight: 44,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 14,
+      fontFamily: fonts.regular,
+      color: colors.text,
+      paddingVertical: 4,
+    },
     filterContainer: {
       flexDirection: 'row',
       paddingHorizontal: 20,
@@ -552,9 +611,12 @@ const createStyles = (colors: any, isDark: boolean) => {
     },
     filterTab: {
       paddingHorizontal: 14,
-      paddingVertical: 7,
-      borderRadius: 20,
+      paddingVertical: 10,
+      borderRadius: 22,
       borderWidth: 1,
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     filterText: {
       fontSize: 13,
@@ -602,7 +664,9 @@ const createStyles = (colors: any, isDark: boolean) => {
     transactionMeta: {
       fontSize: 13,
       fontFamily: fonts.regular,
-      color: colors.textMuted,
+      // textSecondary, not textMuted — this line carries the payment method
+      // (brand + last4) which staff actively read when reconciling.
+      color: colors.textSecondary,
     },
     transactionRight: {
       alignItems: 'flex-end',

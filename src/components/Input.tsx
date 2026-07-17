@@ -22,7 +22,7 @@ interface InputProps extends Omit<TextInputProps, 'style'>, AccessibilityProps {
   error?: string;
 }
 
-export const Input = memo(function Input({
+export const Input = memo(React.forwardRef<TextInput, InputProps>(function Input({
   icon,
   rightIcon,
   containerStyle,
@@ -35,7 +35,7 @@ export const Input = memo(function Input({
   accessibilityLabel,
   accessibilityHint,
   ...props
-}: InputProps) {
+}: InputProps, ref) {
   const { colors } = useTheme();
   const [isFocused, setIsFocused] = useState(false);
 
@@ -69,6 +69,7 @@ export const Input = memo(function Input({
         />
       )}
       <TextInput
+        ref={ref}
         style={[
           styles.input,
           { color: colors.inputText },
@@ -91,7 +92,7 @@ export const Input = memo(function Input({
       {rightIcon}
     </View>
   );
-});
+}));
 
 const styles = StyleSheet.create({
   container: {

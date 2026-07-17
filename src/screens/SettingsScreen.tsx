@@ -34,12 +34,15 @@ import { PRICING, getProMonthlyDisplay } from '../lib/pricing';
 import {
   enableBiometricLogin,
   disableBiometricLogin,
+  hasStoredCredentials,
 } from '../lib/biometricAuth';
 
 // Apple TTPOi 5.4: Region-correct terminology
 const TAP_TO_PAY_NAME = Platform.OS === 'ios' ? 'Tap to Pay on iPhone' : 'Tap to Pay';
 import { createVendorDashboardUrl } from '../lib/auth-handoff';
 import { config } from '../lib/config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BIOMETRIC_PROMPT_SHOWN_KEY } from './LoginScreen';
 import { Toggle } from '../components/Toggle';
 import { ProfileEditModal } from '../components/ProfileEditModal';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -101,13 +104,16 @@ export function SettingsScreen() {
 
   useSocketEvent(SocketEvents.SUBSCRIPTION_UPDATED, handleSubscriptionUpdated);
 
-  // Fetch detailed billing info for all users - needed to check platform (Stripe vs Apple/Google)
-  // and to show appropriate manage subscription options
+  // Fetch detailed billing info - needed to check platform (Stripe vs Apple/Google)
+  // and to show appropriate manage subscription options.
+  // /billing/subscription-info is owner/admin-only (403 for staff), so gate on role.
+  const canViewBilling = user?.role === 'owner' || user?.role === 'admin';
   const { data: subscriptionInfo, isLoading: subscriptionLoading } = useQuery<SubscriptionInfo>({
     queryKey: ['subscription-info'],
     queryFn: () => billingService.getSubscriptionInfo(),
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
+    enabled: canViewBilling,
   });
 
   // Check Pro status from both AuthContext (may be stale) and API response (always fresh)
@@ -187,6 +193,19 @@ export function SettingsScreen() {
 
     try {
       if (value) {
+        // Enabling from Settings requires credentials to already be stored — we
+        // don't have the password here. They're persisted only when a user opts
+        // in via the post-login prompt, so if none exist, guide the user to sign
+        // in again rather than silently failing to enable.
+        const hasCreds = await hasStoredCredentials();
+        if (!hasCreds) {
+          // Clear the "already asked" latch so the advice below actually works:
+          // the post-login biometric prompt only fires when this key is unset,
+          // and it's what stores the credentials we're missing here.
+          await AsyncStorage.removeItem(BIOMETRIC_PROMPT_SHOWN_KEY).catch(() => {});
+          Alert.alert(tc('error'), t('biometricNeedsRelogin'));
+          return;
+        }
         // Enable biometric login (will prompt for biometric auth)
         const success = await enableBiometricLogin();
         if (success) {
@@ -243,7 +262,7 @@ export function SettingsScreen() {
               );
             } catch (error: any) {
               logger.error('[SettingsScreen] Account deletion request error:', error);
-              if (error?.status === 409) {
+              if (error?.statusCode === 409) {
                 Alert.alert(t('deleteAccountAlreadyScheduledTitle'), t('deleteAccountAlreadyScheduledMessage'));
               } else {
                 Alert.alert(t('deleteAccountErrorTitle'), t('deleteAccountErrorMessage'));
@@ -773,24 +792,24 @@ export function SettingsScreen() {
 
             {/* POS Mode Section — table service vs quick service */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>POS Mode</Text>
+              <Text style={styles.sectionTitle} maxFontSizeMultiplier={1.5}>{t('posModeSectionTitle')}</Text>
               <View style={styles.card}>
                 <TouchableOpacity
                   style={[styles.row, !hasFloorPlans && { opacity: 0.5 }]}
                   onPress={() => hasFloorPlans && setServiceMode('table_service')}
                   disabled={!hasFloorPlans}
                   accessibilityRole="button"
-                  accessibilityLabel="Table service mode"
+                  accessibilityLabel={t('posModeTableServiceAccessibilityLabel')}
                   accessibilityState={{ selected: serviceMode === 'table_service', disabled: !hasFloorPlans }}
                 >
                   <View style={styles.rowLeft}>
                     <Ionicons name="restaurant-outline" size={20} color={colors.textSecondary} style={styles.rowIcon} />
                     <View style={styles.rowTextBlock}>
-                      <Text style={styles.label} maxFontSizeMultiplier={1.5}>Table Service</Text>
+                      <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('posModeTableService')}</Text>
                       <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>
                         {hasFloorPlans
-                          ? 'Pick a table before each order. Orders attribute to tables.'
-                          : 'No floor plans set up for this location. Add one in the vendor portal to enable.'}
+                          ? t('posModeTableServiceSubtitle')
+                          : t('posModeTableServiceDisabledSubtitle')}
                       </Text>
                     </View>
                   </View>
@@ -803,14 +822,14 @@ export function SettingsScreen() {
                   style={styles.row}
                   onPress={() => setServiceMode('quick_service')}
                   accessibilityRole="button"
-                  accessibilityLabel="Quick service mode"
+                  accessibilityLabel={t('posModeQuickServiceAccessibilityLabel')}
                   accessibilityState={{ selected: serviceMode === 'quick_service' }}
                 >
                   <View style={styles.rowLeft}>
                     <Ionicons name="flash-outline" size={20} color={colors.textSecondary} style={styles.rowIcon} />
                     <View style={styles.rowTextBlock}>
-                      <Text style={styles.label} maxFontSizeMultiplier={1.5}>Quick Service</Text>
-                      <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>Counter/QSR/food-truck mode. Orders go straight to checkout, no table.</Text>
+                      <Text style={styles.label} maxFontSizeMultiplier={1.5}>{t('posModeQuickService')}</Text>
+                      <Text style={styles.sublabel} maxFontSizeMultiplier={1.5}>{t('posModeQuickServiceSubtitle')}</Text>
                     </View>
                   </View>
                   {serviceMode === 'quick_service' && (
@@ -930,7 +949,7 @@ export function SettingsScreen() {
 
                 <TouchableOpacity
                   style={styles.row}
-                  onPress={() => Linking.openURL('mailto:support@rowie.io?subject=Rowie Support')}
+                  onPress={() => Linking.openURL(`mailto:${config.supportEmail}?subject=Rowie Support`)}
                   accessibilityRole="link"
                   accessibilityLabel={t('contactSupport')}
                   accessibilityHint={t('contactSupportAccessibilityHint')}
@@ -1259,7 +1278,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     upgradeButtonText: {
       fontSize: 13,
       fontFamily: fonts.semiBold,
-      color: '#fff',
+      color: colors.onPrimary,
     },
 
     // Sign out

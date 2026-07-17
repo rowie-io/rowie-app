@@ -276,15 +276,30 @@ function TapToPayOnboardingWrapper() {
     navigation.navigate('StripeOnboarding', { returnTo: 'education' });
   }, [navigation]);
 
-  // Navigate to education screen when Connect is already set up
+  // Navigate to education screen when Connect is already set up — but never
+  // while another flow (payment processing/result, checkout, session detail)
+  // is on top: connectStatus can refresh mid-sale and this used to hijack the
+  // payment result screen. Only fire when MainTabs is the focused root route;
+  // otherwise wait for navigation to settle back to the tabs.
+  const tryNavigateToEducation = useCallback(() => {
+    const rootState = navigation.getState();
+    const focused = rootState?.routes?.[rootState.index ?? 0]?.name;
+    if (focused !== 'MainTabs') return false;
+    // Mark as complete for this session only (to prevent re-triggering)
+    // Don't mark education as seen yet - that happens when user finishes TapToPayEducation
+    setHasCompletedOnboarding(true);
+    navigation.navigate('TapToPayEducation');
+    return true;
+  }, [navigation]);
+
   useEffect(() => {
-    if (shouldNavigateToEducation) {
-      // Mark as complete for this session only (to prevent re-triggering)
-      // Don't mark education as seen yet - that happens when user finishes TapToPayEducation
-      setHasCompletedOnboarding(true);
-      navigation.navigate('TapToPayEducation');
-    }
-  }, [shouldNavigateToEducation, navigation]);
+    if (!shouldNavigateToEducation) return;
+    if (tryNavigateToEducation()) return;
+    const unsubscribe = navigation.addListener('state', () => {
+      if (tryNavigateToEducation()) unsubscribe();
+    });
+    return unsubscribe;
+  }, [shouldNavigateToEducation, tryNavigateToEducation, navigation]);
 
   // Handle skip — dismiss modal and go straight to the app
   const handleSkipPayments = useCallback(() => {

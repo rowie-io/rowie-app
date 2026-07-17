@@ -15,22 +15,29 @@ export function DataPrefetcher() {
   const queryClient = useQueryClient();
   const { selectedCatalog } = useCatalog();
   const { deviceId } = useDevice();
-  const { subscription } = useAuth();
+  const { subscription, user } = useAuth();
   const hasPrefetched = useRef(false);
   const isPro = subscription?.tier === 'pro' || subscription?.tier === 'enterprise';
+  // /billing/subscription-info is owner/admin-only — prefetching it for staff
+  // just produces 403s.
+  const canViewBilling = user?.role === 'owner' || user?.role === 'admin';
 
   useEffect(() => {
     if (hasPrefetched.current) return;
-    if (!selectedCatalog?.id || !deviceId) return;
+    // Wait for the auth user too — firing before the cached user loads would
+    // permanently skip the owner-only billing prefetch (one-shot guard).
+    if (!selectedCatalog?.id || !deviceId || !user) return;
 
     hasPrefetched.current = true;
     logger.log('[DataPrefetcher] Prefetching data');
 
-    // Settings: subscription info
-    queryClient.prefetchQuery({
-      queryKey: ['subscription-info'],
-      queryFn: () => billingService.getSubscriptionInfo(),
-    });
+    // Settings: subscription info (owner/admin only — staff get 403)
+    if (canViewBilling) {
+      queryClient.prefetchQuery({
+        queryKey: ['subscription-info'],
+        queryFn: () => billingService.getSubscriptionInfo(),
+      });
+    }
 
     // Menu: products and categories
     queryClient.prefetchQuery({
@@ -43,17 +50,13 @@ export function DataPrefetcher() {
       queryFn: () => categoriesApi.list(selectedCatalog.id),
     });
 
-    // Transactions: first page (default 'all' filter)
+    // Transactions: first page (default 'all' filter) — key + offset scheme
+    // must mirror TransactionsScreen's useInfiniteQuery or the prefetch never
+    // matches the screen's cache entry.
     queryClient.prefetchInfiniteQuery({
-      queryKey: ['transactions', selectedCatalog.id, deviceId, 'all'],
-      queryFn: () =>
-        transactionsApi.list({
-          limit: 25,
-          catalog_id: selectedCatalog.id,
-          device_id: deviceId,
-          status: 'all',
-        }),
-      initialPageParam: undefined as string | undefined,
+      queryKey: ['transactions', 'all'],
+      queryFn: () => transactionsApi.list({ limit: 25, status: 'all', offset: 0 }),
+      initialPageParam: 0,
     });
 
     // Sessions: Pro/Enterprise only — prefetch open sessions + tabs.
@@ -77,7 +80,7 @@ export function DataPrefetcher() {
       queryKey: ['events'],
       queryFn: () => eventsApi.list(),
     });
-  }, [selectedCatalog?.id, deviceId, queryClient]);
+  }, [selectedCatalog?.id, deviceId, queryClient, user, canViewBilling]);
 
   return null;
 }

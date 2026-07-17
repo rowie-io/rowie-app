@@ -42,11 +42,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
-import { Gesture, GestureDetector, Directions } from 'react-native-gesture-handler';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useTheme } from '../context/ThemeContext';
 import { useCatalog } from '../context/CatalogContext';
-import { useCart } from '../context/CartContext';
+import { useCart, CartItem } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useSocketEvent, SocketEvents } from '../context/SocketContext';
 import {
@@ -71,13 +71,26 @@ import { CategoryManagerModal } from '../components/CategoryManagerModal';
 import { CatalogSettingsModal } from '../components/CatalogSettingsModal';
 import { ItemNotesModal } from '../components/ItemNotesModal';
 import { QuickChargeBottomSheet } from '../components/QuickChargeBottomSheet';
+import { UndoSnackbar } from '../components/UndoSnackbar';
 import { shadows } from '../lib/shadows';
 import { fonts } from '../lib/fonts';
 import { brandGradient, brandGradientLight } from '../lib/colors';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTapToPayGuard } from '../hooks';
+import { useTapToPayGuard, useNetworkStatus } from '../hooks';
 
 const isWeb = Platform.OS === 'web';
+
+// One-time hint that long-pressing a product opens the notes modal.
+const NOTES_HINT_SEEN_KEY = 'rowie_notes_hint_seen';
+
+// Stable no-op drag handler for non-draggable layouts (keeps ProductCard's
+// `drag` prop referentially stable so its memo isn't defeated).
+const NOOP_DRAG = () => {};
+
+// 32pt visual buttons + slop = ≥44pt effective touch target (Apple HIG).
+const QTY_HIT_SLOP = { top: 8, bottom: 8, left: 6, right: 6 };
+// Compact layout uses 30pt buttons.
+const QTY_HIT_SLOP_COMPACT = { top: 8, bottom: 8, left: 7, right: 7 };
 
 // Empty state for menu screen
 function EmptyMenuState({
@@ -150,7 +163,7 @@ function EmptyMenuState({
               accessibilityRole="button"
               accessibilityLabel={t('addProductAccessibilityLabel')}
             >
-              <Ionicons name="add" size={20} color="#fff" />
+              <Ionicons name="add" size={20} color="#1C1917" />
               <Text maxFontSizeMultiplier={1.3} style={[emptyMenuStyles.primaryButtonText, { fontFamily: fonts.semiBold }]}>{t('addProductButton')}</Text>
             </TouchableOpacity>
           </>
@@ -174,7 +187,7 @@ function EmptyMenuState({
                 accessibilityLabel={t('startEditingAccessibilityLabel')}
                 accessibilityHint={t('startEditingAccessibilityHint')}
               >
-                <Ionicons name="pencil" size={18} color="#fff" />
+                <Ionicons name="pencil" size={18} color="#1C1917" />
                 <Text maxFontSizeMultiplier={1.3} style={[emptyMenuStyles.primaryButtonText, { fontFamily: fonts.semiBold }]}>{t('startEditingButton')}</Text>
               </TouchableOpacity>
             )}
@@ -220,7 +233,8 @@ const emptyMenuStyles = StyleSheet.create({
   },
   primaryButtonText: {
     fontSize: 16,
-    color: '#fff',
+    // Dark stone on amber fill — white fails contrast (see colors.onPrimary)
+    color: '#1C1917',
   },
 });
 
@@ -322,6 +336,8 @@ const CategoryPill = memo(function CategoryPill({ label, count, isActive, onPres
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     gap: 8,
+    // 44pt minimum tap target per Apple HIG
+    minHeight: 44,
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 20,
@@ -411,6 +427,544 @@ const canManageCatalog = (role: string | undefined): boolean => {
   return role === 'owner' || role === 'admin';
 };
 
+interface ProductCardProps {
+  item: Product;
+  index: number;
+  layoutType: CatalogLayoutType;
+  quantity: number;
+  isSelected: boolean;
+  isSelectionMode: boolean;
+  isEditMode: boolean;
+  supportsDragAndDrop: boolean;
+  isDragging: boolean;
+  drag: () => void;
+  colors: any;
+  styles: any;
+  currency: string;
+  t: (key: string, params?: Record<string, string | number>) => string;
+  onAddToCart: (item: Product) => void;
+  onDecrement: (item: Product) => void;
+  onLongPress: (item: Product) => void;
+  onToggleSelection: (productId: string) => void;
+  onEdit: (item: Product) => void;
+  onDelete: (item: Product) => void;
+}
+
+/**
+ * Memoized product card. Extracted from MenuScreen so the product grid only
+ * re-renders the specific card whose quantity/selection changed on a cart or
+ * socket update, instead of re-rendering every card. All callbacks are passed
+ * as stable references (latest-ref wrappers in the parent) so shallow-prop
+ * comparison holds across parent re-renders.
+ */
+const ProductCard = memo(function ProductCard({
+  item,
+  index,
+  layoutType,
+  quantity,
+  isSelected,
+  isSelectionMode,
+  isEditMode,
+  supportsDragAndDrop,
+  isDragging,
+  drag,
+  colors,
+  styles,
+  currency,
+  t,
+  onAddToCart,
+  onDecrement,
+  onLongPress,
+  onToggleSelection,
+  onEdit,
+  onDelete,
+}: ProductCardProps) {
+  const isInactive = !item.isActive;
+
+  const handlePress = () => {
+    if (isSelectionMode) {
+      onToggleSelection(item.id);
+    } else {
+      onAddToCart(item);
+    }
+  };
+
+  // Helper: common accessibility label for a product
+  const getProductAccessibilityLabel = () => {
+    if (isInactive && isEditMode) return t('listAccessibilityLabelHidden', { name: item.name, price: formatCents(item.price, currency) });
+    if (quantity > 0) return t('listAccessibilityLabelWithQuantity', { name: item.name, price: formatCents(item.price, currency), quantity });
+    return t('listAccessibilityLabel', { name: item.name, price: formatCents(item.price, currency) });
+  };
+
+  // Helper: standard quantity controls (increment/decrement/badge)
+  const renderQuantityControls = (
+    decrementStyle: object,
+    incrementStyle: object,
+    badgeStyle: object,
+    textStyle: object,
+    decrementIconSize: number,
+    incrementIconSize: number,
+  ) => {
+    if (isEditMode || isSelectionMode) return null;
+    return (
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        {quantity > 0 ? (
+          <>
+            <TouchableOpacity
+              style={decrementStyle}
+              onPress={() => onDecrement(item)}
+              hitSlop={QTY_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('removeOneFromCart', { name: item.name })}
+            >
+              <Ionicons name="remove" size={decrementIconSize} color={colors.text} />
+            </TouchableOpacity>
+            <View style={badgeStyle} accessibilityLabel={t('inCartAccessibilityLabel', { quantity })}>
+              <Text maxFontSizeMultiplier={1.5} style={textStyle}>{quantity}</Text>
+            </View>
+            <TouchableOpacity
+              style={incrementStyle}
+              onPress={() => onAddToCart(item)}
+              hitSlop={QTY_HIT_SLOP}
+              accessibilityRole="button"
+              accessibilityLabel={t('addOneMoreToCart', { name: item.name })}
+            >
+              <Ionicons name="add" size={incrementIconSize} color={colors.onPrimary} />
+            </TouchableOpacity>
+          </>
+        ) : (
+          <TouchableOpacity
+            style={incrementStyle}
+            onPress={() => onAddToCart(item)}
+            hitSlop={QTY_HIT_SLOP}
+            accessibilityRole="button"
+            accessibilityLabel={t('addToCart', { name: item.name })}
+          >
+            <Ionicons name="add" size={incrementIconSize} color={colors.onPrimary} />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
+
+  // Helper: edit overlay (edit + delete buttons)
+  const renderEditOverlay = () => {
+    if (!isEditMode || isSelectionMode) return null;
+    return (
+      <View style={styles.editOverlay}>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => onEdit(item)}
+          accessibilityRole="button"
+          accessibilityLabel={t('editAccessibilityLabel', { name: item.name })}
+        >
+          <Ionicons name="pencil" size={18} color={colors.onPrimary} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => onDelete(item)}
+          accessibilityRole="button"
+          accessibilityLabel={t('deleteAccessibilityLabel', { name: item.name })}
+        >
+          <Ionicons name="trash-outline" size={18} color="#fff" />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  // Helper: inactive badge
+  const renderInactiveBadge = () => {
+    if (!(!item.isActive && isEditMode)) return null;
+    return (
+      <View style={styles.inactiveBadge}>
+        <Text maxFontSizeMultiplier={1.5} style={styles.inactiveBadgeText}>{t('hiddenBadge')}</Text>
+      </View>
+    );
+  };
+
+  // Helper: selection checkbox
+  const renderSelectionCheckbox = () => {
+    if (!isSelectionMode) return null;
+    return (
+      <TouchableOpacity
+        style={styles.selectionCheckbox}
+        onPress={() => onToggleSelection(item.id)}
+        accessibilityRole="checkbox"
+        accessibilityLabel={t('selectAccessibilityLabel', { name: item.name })}
+        accessibilityState={{ checked: isSelected }}
+      >
+        <View style={[styles.checkboxCircle, isSelected && styles.checkboxCircleSelected]}>
+          {isSelected && <Ionicons name="checkmark" size={16} color={colors.onPrimary} />}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  // Helper: drag handle
+  const renderDragHandle = () => {
+    if (!supportsDragAndDrop) return null;
+    return (
+      <Pressable
+        style={styles.dragHandle}
+        onLongPress={() => { drag(); }}
+        delayLongPress={150}
+        accessibilityRole="button"
+        accessibilityLabel={t('reorderAccessibilityLabel', { name: item.name })}
+        accessibilityHint={t('reorderAccessibilityHint')}
+      >
+        <Ionicons name="reorder-three" size={22} color={colors.textMuted} />
+      </Pressable>
+    );
+  };
+
+  // =========================================================================
+  // Classic Grid - square image, name, price, round add button
+  // =========================================================================
+  if (layoutType === 'classic-grid') {
+    return (
+      <AnimatedPressable
+        style={[
+          styles.productCard,
+          isInactive && isEditMode && styles.cardInactive,
+          isSelected && styles.cardSelected,
+        ]}
+        onPress={handlePress}
+        onLongPress={() => onLongPress(item)}
+        accessibilityLabel={getProductAccessibilityLabel()}
+        accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
+      >
+        {renderSelectionCheckbox()}
+        <View style={styles.productImageContainer}>
+          {item.imageUrl ? (
+            <Image source={{ uri: item.imageUrl }} style={styles.productImage} />
+          ) : (
+            <View style={styles.productImagePlaceholder}>
+              <Ionicons name="image-outline" size={32} color={colors.textMuted} />
+            </View>
+          )}
+          {renderInactiveBadge()}
+          {renderEditOverlay()}
+        </View>
+        <View style={styles.productInfo}>
+          <Text maxFontSizeMultiplier={1.5} style={styles.productName} numberOfLines={2}>
+            {item.name}
+          </Text>
+          <View style={styles.productPriceRow}>
+            <Text maxFontSizeMultiplier={1.3} style={styles.productPrice}>
+              {formatCents(item.price, currency)}
+            </Text>
+            {renderQuantityControls(
+              styles.quantityDecrementButton, styles.quantityIncrementButton,
+              styles.quantityBadge, styles.quantityText,
+              14, 14,
+            )}
+          </View>
+        </View>
+      </AnimatedPressable>
+    );
+  }
+
+  // =========================================================================
+  // List - horizontal card with image on left, name/desc/price on right
+  // =========================================================================
+  if (layoutType === 'list') {
+    const listContent = (
+      <AnimatedPressable
+        style={[
+          styles.listCard,
+          isInactive && isEditMode && styles.cardInactive,
+          isSelected && styles.cardSelected,
+          isDragging && styles.cardDragging,
+        ]}
+        onPress={handlePress}
+        onLongPress={supportsDragAndDrop ? undefined : () => onLongPress(item)}
+        accessibilityLabel={getProductAccessibilityLabel()}
+        accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
+      >
+        {renderDragHandle()}
+        {renderSelectionCheckbox()}
+        <View style={styles.listImageContainer}>
+          {item.imageUrl ? (
+            <Image source={{ uri: item.imageUrl }} style={styles.listImage} />
+          ) : (
+            <View style={styles.listImagePlaceholder}>
+              <Ionicons name="image-outline" size={24} color={colors.textMuted} />
+            </View>
+          )}
+          {renderInactiveBadge()}
+        </View>
+        <View style={styles.listInfo}>
+          <View style={styles.listTitleRow}>
+            <Text maxFontSizeMultiplier={1.5} style={styles.listName} numberOfLines={2}>
+              {item.name}
+            </Text>
+            {renderQuantityControls(
+              styles.listQuantityDecrementButton, styles.listQuantityIncrementButton,
+              styles.listQuantityBadge, styles.quantityText,
+              14, 14,
+            )}
+          </View>
+          {item.description ? (
+            <Text maxFontSizeMultiplier={1.5} style={styles.listDescription} numberOfLines={2}>
+              {item.description}
+            </Text>
+          ) : null}
+          <Text maxFontSizeMultiplier={1.3} style={styles.listPrice}>
+            {formatCents(item.price, currency)}
+          </Text>
+        </View>
+        {isSelectionMode ? null : isEditMode ? renderEditOverlay() : null}
+      </AnimatedPressable>
+    );
+    return supportsDragAndDrop ? (
+      <ScaleDecorator>{listContent}</ScaleDecorator>
+    ) : listContent;
+  }
+
+  // =========================================================================
+  // Cards - single column, large 3:2 image, generous info area
+  // =========================================================================
+  if (layoutType === 'cards') {
+    const cardsContent = (
+      <AnimatedPressable
+        style={[
+          styles.cardsCard,
+          isInactive && isEditMode && styles.cardInactive,
+          isSelected && styles.cardSelected,
+          isDragging && styles.cardDragging,
+        ]}
+        onPress={handlePress}
+        onLongPress={supportsDragAndDrop ? undefined : () => onLongPress(item)}
+        accessibilityLabel={getProductAccessibilityLabel()}
+        accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
+      >
+        {renderDragHandle()}
+        {renderSelectionCheckbox()}
+        <View style={styles.cardsImageContainer}>
+          {item.imageUrl ? (
+            <Image source={{ uri: item.imageUrl }} style={styles.cardsImage} />
+          ) : (
+            <View style={styles.cardsImagePlaceholder}>
+              <Ionicons name="image-outline" size={48} color={colors.textMuted} />
+            </View>
+          )}
+          {renderInactiveBadge()}
+          {renderEditOverlay()}
+        </View>
+        <View style={styles.cardsInfo}>
+          <Text maxFontSizeMultiplier={1.3} style={styles.cardsName} numberOfLines={2}>
+            {item.name}
+          </Text>
+          {item.description ? (
+            <Text maxFontSizeMultiplier={1.5} style={styles.cardsDescription} numberOfLines={2}>
+              {item.description}
+            </Text>
+          ) : null}
+          <Text maxFontSizeMultiplier={1.2} style={styles.cardsPrice}>
+            {formatCents(item.price, currency)}
+          </Text>
+          {!isEditMode && !isSelectionMode && (
+            <TouchableOpacity
+              style={styles.cardsAddButton}
+              onPress={() => onAddToCart(item)}
+              accessibilityRole="button"
+              accessibilityLabel={quantity > 0 ? t('addOneMoreToCart', { name: item.name }) : t('addToCart', { name: item.name })}
+            >
+              {quantity > 0 ? (
+                <View style={styles.cardsAddButtonInner}>
+                  <Ionicons name="add" size={18} color={colors.onPrimary} />
+                  <Text maxFontSizeMultiplier={1.3} style={styles.cardsAddButtonText}>
+                    {t('addOneMoreShort', { quantity })}
+                  </Text>
+                </View>
+              ) : (
+                <View style={styles.cardsAddButtonInner}>
+                  <Ionicons name="add" size={18} color={colors.onPrimary} />
+                  <Text maxFontSizeMultiplier={1.3} style={styles.cardsAddButtonText}>
+                    {t('addToCartShort')}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      </AnimatedPressable>
+    );
+    return supportsDragAndDrop ? (
+      <ScaleDecorator>{cardsContent}</ScaleDecorator>
+    ) : cardsContent;
+  }
+
+  // =========================================================================
+  // Mosaic - 2 columns, alternating heights for visual variety
+  // =========================================================================
+  if (layoutType === 'mosaic') {
+    const isOdd = index % 2 === 0; // First item taller (4:3), second wider (3:2)
+    const imageAspect = isOdd ? 4 / 3 : 3 / 2;
+
+    return (
+      <AnimatedPressable
+        style={[
+          styles.mosaicCard,
+          isInactive && isEditMode && styles.cardInactive,
+          isSelected && styles.cardSelected,
+        ]}
+        onPress={handlePress}
+        onLongPress={() => onLongPress(item)}
+        accessibilityLabel={getProductAccessibilityLabel()}
+        accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
+      >
+        {renderSelectionCheckbox()}
+        <View style={[styles.mosaicImageContainer, { aspectRatio: imageAspect }]}>
+          {item.imageUrl ? (
+            <Image source={{ uri: item.imageUrl }} style={styles.mosaicImage} />
+          ) : (
+            <View style={styles.mosaicImagePlaceholder}>
+              <Ionicons name="image-outline" size={32} color={colors.textMuted} />
+            </View>
+          )}
+          {/* Gradient overlay at bottom for name + price */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.7)']}
+            style={styles.mosaicGradient}
+          >
+            <Text maxFontSizeMultiplier={1.5} style={styles.mosaicName} numberOfLines={2}>
+              {item.name}
+            </Text>
+            <Text maxFontSizeMultiplier={1.3} style={styles.mosaicPrice}>
+              {formatCents(item.price, currency)}
+            </Text>
+          </LinearGradient>
+          {renderInactiveBadge()}
+          {renderEditOverlay()}
+          {/* Quantity badge overlay in bottom-right */}
+          {!isEditMode && !isSelectionMode && quantity > 0 && (
+            <View style={styles.mosaicQuantityBadge}>
+              <Text maxFontSizeMultiplier={1.3} style={styles.mosaicQuantityText}>{quantity}</Text>
+            </View>
+          )}
+        </View>
+      </AnimatedPressable>
+    );
+  }
+
+  // =========================================================================
+  // Compact - no images, name left, price right, controls far right
+  // =========================================================================
+  if (layoutType === 'compact') {
+    const compactContent = (
+      <AnimatedPressable
+        style={[
+          styles.compactCard,
+          isInactive && isEditMode && styles.cardInactive,
+          isSelected && styles.cardSelected,
+          isDragging && styles.cardDragging,
+        ]}
+        onPress={handlePress}
+        onLongPress={supportsDragAndDrop ? undefined : () => onLongPress(item)}
+        accessibilityLabel={getProductAccessibilityLabel()}
+        accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
+      >
+        {supportsDragAndDrop && (
+          <Pressable
+            style={styles.dragHandleCompact}
+            onLongPress={drag}
+            delayLongPress={150}
+            onPressIn={(e) => e.stopPropagation()}
+            accessibilityRole="button"
+            accessibilityLabel={t('reorderAccessibilityLabel', { name: item.name })}
+            accessibilityHint={t('reorderAccessibilityHint')}
+          >
+            <Ionicons name="reorder-three" size={20} color={colors.textMuted} />
+          </Pressable>
+        )}
+        {isSelectionMode && (
+          <View style={[styles.checkboxCircle, styles.checkboxCircleCompact, isSelected && styles.checkboxCircleSelected]}>
+            {isSelected && <Ionicons name="checkmark" size={14} color={colors.onPrimary} />}
+          </View>
+        )}
+        <View style={styles.compactInfo}>
+          <Text maxFontSizeMultiplier={1.5} style={styles.compactName} numberOfLines={1}>
+            {item.name}
+          </Text>
+          {isInactive && isEditMode && !isSelectionMode && (
+            <View style={styles.compactHiddenBadge}>
+              <Text maxFontSizeMultiplier={1.5} style={styles.compactHiddenText}>{t('hiddenBadge')}</Text>
+            </View>
+          )}
+        </View>
+        <Text maxFontSizeMultiplier={1.3} style={styles.compactPrice}>
+          {formatCents(item.price, currency)}
+        </Text>
+        {isSelectionMode ? null : isEditMode ? (
+          <View style={styles.compactEditActions}>
+            <TouchableOpacity
+              style={styles.compactEditButton}
+              onPress={() => onEdit(item)}
+              accessibilityRole="button"
+              accessibilityLabel={t('editAccessibilityLabel', { name: item.name })}
+            >
+              <Ionicons name="pencil" size={16} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.compactDeleteButton}
+              onPress={() => onDelete(item)}
+              accessibilityRole="button"
+              accessibilityLabel={t('deleteAccessibilityLabel', { name: item.name })}
+            >
+              <Ionicons name="trash-outline" size={16} color={colors.error} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.compactQuantityControls}>
+            {quantity > 0 ? (
+              <>
+                <TouchableOpacity
+                  style={styles.compactQuantityDecrementButton}
+                  onPress={() => onDecrement(item)}
+                  hitSlop={QTY_HIT_SLOP_COMPACT}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('removeOneFromCart', { name: item.name })}
+                >
+                  <Ionicons name="remove" size={14} color={colors.text} />
+                </TouchableOpacity>
+                <View style={styles.compactQuantityBadge} accessibilityLabel={t('inCartAccessibilityLabel', { quantity })}>
+                  <Text maxFontSizeMultiplier={1.5} style={styles.compactQuantityText}>{quantity}</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.compactQuantityIncrementButton}
+                  onPress={() => onAddToCart(item)}
+                  hitSlop={QTY_HIT_SLOP_COMPACT}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('addOneMoreToCart', { name: item.name })}
+                >
+                  <Ionicons name="add" size={14} color={colors.onPrimary} />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                style={styles.compactQuantityIncrementButton}
+                onPress={() => onAddToCart(item)}
+                hitSlop={QTY_HIT_SLOP_COMPACT}
+                accessibilityRole="button"
+                accessibilityLabel={t('addToCart', { name: item.name })}
+              >
+                <Ionicons name="add" size={14} color={colors.onPrimary} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      </AnimatedPressable>
+    );
+    return supportsDragAndDrop ? (
+      <ScaleDecorator>{compactContent}</ScaleDecorator>
+    ) : compactContent;
+  }
+
+  // Fallback: classic-grid (should not reach here due to explicit check above)
+  return null;
+});
+
 export function MenuScreen() {
   const { colors } = useTheme();
   const t = useTranslations('menu');
@@ -429,6 +983,7 @@ export function MenuScreen() {
   const {
     addItem,
     getItemQuantity,
+    getItemByCartKey,
     decrementItem,
     itemCount,
     subtotal,
@@ -440,6 +995,7 @@ export function MenuScreen() {
     setOrderNotes,
   } = useCart();
   const { guardCheckout } = useTapToPayGuard();
+  const { isOffline } = useNetworkStatus();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
@@ -489,39 +1045,9 @@ export function MenuScreen() {
     }
   }, [floorPlansData, serviceMode, setServiceMode]);
 
-  // Horizontal swipe-between-catalogs gesture. Fling (rather than Pan) keeps
-  // the trigger high-velocity so it doesn't fight the vertical product-list
-  // scroll or the horizontal category-pill ScrollView. Disabled in edit mode
-  // — accidentally swiping while reorganizing products would feel hostile.
-  const swipeToCatalog = useCallback(
-    (dir: 'left' | 'right') => {
-      if (catalogs.length < 2 || !selectedCatalog) return;
-      const idx = catalogs.findIndex((c) => c.id === selectedCatalog.id);
-      if (idx < 0) return;
-      const nextIdx = dir === 'left'
-        ? (idx + 1) % catalogs.length
-        : (idx - 1 + catalogs.length) % catalogs.length;
-      setSelectedCatalog(catalogs[nextIdx]);
-    },
-    [catalogs, selectedCatalog, setSelectedCatalog]
-  );
-  const catalogSwipeGesture = useMemo(() => {
-    // Disable per-direction (Race composition has no .enabled()). Edit mode
-    // suppresses swipes so accidental flings while reorganizing don't switch
-    // the active catalog.
-    const enabled = !isEditMode && catalogs.length > 1;
-    const swipeLeft = Gesture.Fling()
-      .direction(Directions.LEFT)
-      .enabled(enabled)
-      .runOnJS(true)
-      .onEnd(() => swipeToCatalog('left'));
-    const swipeRight = Gesture.Fling()
-      .direction(Directions.RIGHT)
-      .enabled(enabled)
-      .runOnJS(true)
-      .onEnd(() => swipeToCatalog('right'));
-    return Gesture.Race(swipeLeft, swipeRight);
-  }, [swipeToCatalog, isEditMode, catalogs.length]);
+  // NOTE: the full-screen horizontal catalog-swipe gesture was removed on
+  // purpose — it could silently switch catalogs mid-order. The visible
+  // catalog pill strip below the header is the way to switch.
 
   // Exit edit mode and selection mode when navigating away from this screen
   useEffect(() => {
@@ -550,6 +1076,22 @@ export function MenuScreen() {
   const [notesProduct, setNotesProduct] = useState<Product | null>(null);
   const [quickChargeVisible, setQuickChargeVisible] = useState(false);
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+
+  // Last removed cart line (decrement at qty 1) — feeds the "Removed X ·
+  // Undo" snackbar so an accidental tap is recoverable.
+  const [removedItem, setRemovedItem] = useState<CartItem | null>(null);
+
+  // First-use affordance for the hidden long-press-for-notes gesture.
+  const [showNotesHint, setShowNotesHint] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(NOTES_HINT_SEEN_KEY).then((seen) => {
+      if (!seen) setShowNotesHint(true);
+    });
+  }, []);
+  const dismissNotesHint = useCallback(() => {
+    setShowNotesHint(false);
+    AsyncStorage.setItem(NOTES_HINT_SEEN_KEY, '1');
+  }, []);
 
   // Bulk selection state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -1182,9 +1724,29 @@ export function MenuScreen() {
     }
   };
 
+  // Decrement from a product tile. At qty 1 the line is removed — capture it
+  // first so the undo snackbar can restore it (with its notes).
+  // Note: tile controls target the no-notes line (cartKey === productId).
+  const handleDecrementFromTile = (product: Product) => {
+    const line = getItemByCartKey(product.id);
+    if (line && line.quantity === 1) {
+      setRemovedItem(line);
+    }
+    decrementItem(product.id);
+  };
+
+  const handleUndoRemove = () => {
+    if (removedItem) {
+      addItem(removedItem.product, removedItem.quantity, removedItem.notes);
+    }
+    setRemovedItem(null);
+  };
+
   // Long-press opens notes modal
   const handleProductLongPress = (product: Product) => {
     if (!isEditMode) {
+      // The gesture has been discovered — retire the first-use hint.
+      if (showNotesHint) dismissNotesHint();
       setNotesProduct(product);
       setNotesModalVisible(true);
     }
@@ -1203,138 +1765,40 @@ export function MenuScreen() {
     setNotesProduct(null);
   };
 
-  const styles = createStyles(colors, cardWidth, currentLayoutType, isEditMode, screenWidth);
+  const styles = useMemo(
+    () => createStyles(colors, cardWidth, currentLayoutType, isEditMode, screenWidth),
+    [colors, cardWidth, currentLayoutType, isEditMode, screenWidth],
+  );
 
   // Check if current layout supports drag-and-drop (single column layouts, not magazine which uses ScrollView)
   const supportsDragAndDrop = numColumns === 1 && currentLayoutType !== 'split-view' && isEditMode && !isSelectionMode;
 
-  // Helper: build common accessibility label for a product
-  const getProductAccessibilityLabel = (item: Product, quantity: number, isInactive: boolean) => {
-    if (isInactive && isEditMode) return t('listAccessibilityLabelHidden', { name: item.name, price: formatCents(item.price, currency) });
-    if (quantity > 0) return t('listAccessibilityLabelWithQuantity', { name: item.name, price: formatCents(item.price, currency), quantity });
-    return t('listAccessibilityLabel', { name: item.name, price: formatCents(item.price, currency) });
-  };
+  // Stable callback wrappers for the memoized ProductCard. The underlying
+  // handlers close over changing state (isEditMode, cart items, mutations), so
+  // we route through a latest-ref to keep these identities constant across
+  // re-renders — otherwise ProductCard's memo would break on every cart/socket
+  // update and the whole grid would re-render.
+  const cardHandlersRef = useRef({
+    addToCart: handleAddToCart,
+    decrement: handleDecrementFromTile,
+    longPress: handleProductLongPress,
+    toggleSelection: toggleProductSelection,
+    edit: handleOpenProductModal,
+    remove: handleDeleteProduct,
+  });
+  cardHandlersRef.current.addToCart = handleAddToCart;
+  cardHandlersRef.current.decrement = handleDecrementFromTile;
+  cardHandlersRef.current.longPress = handleProductLongPress;
+  cardHandlersRef.current.toggleSelection = toggleProductSelection;
+  cardHandlersRef.current.edit = handleOpenProductModal;
+  cardHandlersRef.current.remove = handleDeleteProduct;
 
-  // Helper: render standard quantity controls (increment/decrement/badge)
-  const renderQuantityControls = (
-    item: Product,
-    quantity: number,
-    decrementStyle: object,
-    incrementStyle: object,
-    badgeStyle: object,
-    textStyle: object,
-    decrementIconSize: number,
-    incrementIconSize: number,
-  ) => {
-    if (isEditMode || isSelectionMode) return null;
-    return (
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        {quantity > 0 ? (
-          <>
-            <TouchableOpacity
-              style={decrementStyle}
-              onPress={() => decrementItem(item.id)}
-              accessibilityRole="button"
-              accessibilityLabel={t('removeOneFromCart', { name: item.name })}
-            >
-              <Ionicons name="remove" size={decrementIconSize} color="#fff" />
-            </TouchableOpacity>
-            <View style={badgeStyle} accessibilityLabel={t('inCartAccessibilityLabel', { quantity })}>
-              <Text maxFontSizeMultiplier={1.5} style={textStyle}>{quantity}</Text>
-            </View>
-            <TouchableOpacity
-              style={incrementStyle}
-              onPress={() => handleAddToCart(item)}
-              accessibilityRole="button"
-              accessibilityLabel={t('addOneMoreToCart', { name: item.name })}
-            >
-              <Ionicons name="add" size={incrementIconSize} color="#fff" />
-            </TouchableOpacity>
-          </>
-        ) : (
-          <TouchableOpacity
-            style={incrementStyle}
-            onPress={() => handleAddToCart(item)}
-            accessibilityRole="button"
-            accessibilityLabel={t('addToCart', { name: item.name })}
-          >
-            <Ionicons name="add" size={incrementIconSize} color="#fff" />
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-  };
-
-  // Helper: render edit overlay (edit + delete buttons)
-  const renderEditOverlay = (item: Product) => {
-    if (!isEditMode || isSelectionMode) return null;
-    return (
-      <View style={styles.editOverlay}>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={() => handleOpenProductModal(item)}
-          accessibilityRole="button"
-          accessibilityLabel={t('editAccessibilityLabel', { name: item.name })}
-        >
-          <Ionicons name="pencil" size={18} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => handleDeleteProduct(item)}
-          accessibilityRole="button"
-          accessibilityLabel={t('deleteAccessibilityLabel', { name: item.name })}
-        >
-          <Ionicons name="trash-outline" size={18} color="#fff" />
-        </TouchableOpacity>
-      </View>
-    );
-  };
-
-  // Helper: render inactive badge
-  const renderInactiveBadge = (item: Product) => {
-    if (!(!item.isActive && isEditMode)) return null;
-    return (
-      <View style={styles.inactiveBadge}>
-        <Text maxFontSizeMultiplier={1.5} style={styles.inactiveBadgeText}>{t('hiddenBadge')}</Text>
-      </View>
-    );
-  };
-
-  // Helper: render selection checkbox
-  const renderSelectionCheckbox = (item: Product) => {
-    if (!isSelectionMode) return null;
-    const isSelected = selectedProducts.has(item.id);
-    return (
-      <TouchableOpacity
-        style={styles.selectionCheckbox}
-        onPress={() => toggleProductSelection(item.id)}
-        accessibilityRole="checkbox"
-        accessibilityLabel={t('selectAccessibilityLabel', { name: item.name })}
-        accessibilityState={{ checked: isSelected }}
-      >
-        <View style={[styles.checkboxCircle, isSelected && styles.checkboxCircleSelected]}>
-          {isSelected && <Ionicons name="checkmark" size={16} color="#fff" />}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  // Helper: render drag handle
-  const renderDragHandle = (item: Product, drag: () => void) => {
-    if (!supportsDragAndDrop) return null;
-    return (
-      <Pressable
-        style={styles.dragHandle}
-        onLongPress={() => { drag(); }}
-        delayLongPress={150}
-        accessibilityRole="button"
-        accessibilityLabel={t('reorderAccessibilityLabel', { name: item.name })}
-        accessibilityHint={t('reorderAccessibilityHint')}
-      >
-        <Ionicons name="reorder-three" size={22} color={colors.textMuted} />
-      </Pressable>
-    );
-  };
+  const handleCardAddToCart = useCallback((p: Product) => cardHandlersRef.current.addToCart(p), []);
+  const handleCardDecrement = useCallback((p: Product) => cardHandlersRef.current.decrement(p), []);
+  const handleCardLongPress = useCallback((p: Product) => cardHandlersRef.current.longPress(p), []);
+  const handleCardToggleSelection = useCallback((id: string) => cardHandlersRef.current.toggleSelection(id), []);
+  const handleCardEdit = useCallback((p: Product) => cardHandlersRef.current.edit(p), []);
+  const handleCardDelete = useCallback((p: Product) => cardHandlersRef.current.remove(p), []);
 
   // Split View layout: group products by category for sidebar display
   // On phones (<768px), this renders as classic-grid with always-visible category pills
@@ -1349,371 +1813,41 @@ export function MenuScreen() {
   // Split View: selected category in sidebar (null = all)
   const [splitViewSelectedCat, setSplitViewSelectedCat] = useState<string | null>(null);
 
-  // Render product card based on layout type
-  const renderProduct = ({ item, drag, isActive: isDragging }: RenderItemParams<Product>) => {
-    const quantity = getItemQuantity(item.id);
-    const isInactive = !item.isActive;
-    const isSelected = selectedProducts.has(item.id);
-
-    // Handle press based on mode
-    const handlePress = () => {
-      if (isSelectionMode) {
-        toggleProductSelection(item.id);
-      } else {
-        handleAddToCart(item);
-      }
-    };
-
-    // =========================================================================
-    // Classic Grid (was "grid") - square image, name, price, round add button
-    // =========================================================================
-    if (currentLayoutType === 'classic-grid') {
-      return (
-        <AnimatedPressable
-          style={[
-            styles.productCard,
-            isInactive && isEditMode && styles.cardInactive,
-            isSelected && styles.cardSelected,
-          ]}
-          onPress={handlePress}
-          onLongPress={() => undefined}
-          accessibilityLabel={getProductAccessibilityLabel(item, quantity, isInactive)}
-          accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
-        >
-          {renderSelectionCheckbox(item)}
-          <View style={styles.productImageContainer}>
-            {item.imageUrl ? (
-              <Image source={{ uri: item.imageUrl }} style={styles.productImage} />
-            ) : (
-              <View style={styles.productImagePlaceholder}>
-                <Ionicons name="image-outline" size={32} color={colors.textMuted} />
-              </View>
-            )}
-            {renderInactiveBadge(item)}
-            {renderEditOverlay(item)}
-          </View>
-          <View style={styles.productInfo}>
-            <Text maxFontSizeMultiplier={1.5} style={styles.productName} numberOfLines={2}>
-              {item.name}
-            </Text>
-            <View style={styles.productPriceRow}>
-              <Text maxFontSizeMultiplier={1.3} style={styles.productPrice}>
-                {formatCents(item.price, currency)}
-              </Text>
-              {renderQuantityControls(
-                item, quantity,
-                styles.quantityDecrementButton, styles.quantityIncrementButton,
-                styles.quantityBadge, styles.quantityText,
-                14, 14,
-              )}
-            </View>
-          </View>
-        </AnimatedPressable>
-      );
-    }
-
-    // Split View uses the classic-grid card rendering via the FlatList above.
-    // No special branch needed — it falls through to the default grid card below.
-
-    // =========================================================================
-    // List - horizontal card with image on left, name/desc/price on right
-    // =========================================================================
-    if (currentLayoutType === 'list') {
-      const listContent = (
-        <AnimatedPressable
-          style={[
-            styles.listCard,
-            isInactive && isEditMode && styles.cardInactive,
-            isSelected && styles.cardSelected,
-            isDragging && styles.cardDragging,
-          ]}
-          onPress={handlePress}
-          onLongPress={supportsDragAndDrop ? undefined : () => undefined}
-          accessibilityLabel={getProductAccessibilityLabel(item, quantity, isInactive)}
-          accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
-        >
-          {renderDragHandle(item, drag)}
-          {renderSelectionCheckbox(item)}
-          <View style={styles.listImageContainer}>
-            {item.imageUrl ? (
-              <Image source={{ uri: item.imageUrl }} style={styles.listImage} />
-            ) : (
-              <View style={styles.listImagePlaceholder}>
-                <Ionicons name="image-outline" size={24} color={colors.textMuted} />
-              </View>
-            )}
-            {renderInactiveBadge(item)}
-          </View>
-          <View style={styles.listInfo}>
-            <View style={styles.listTitleRow}>
-              <Text maxFontSizeMultiplier={1.5} style={styles.listName} numberOfLines={2}>
-                {item.name}
-              </Text>
-              {renderQuantityControls(
-                item, quantity,
-                styles.listQuantityDecrementButton, styles.listQuantityIncrementButton,
-                styles.listQuantityBadge, styles.quantityText,
-                14, 14,
-              )}
-            </View>
-            {item.description ? (
-              <Text maxFontSizeMultiplier={1.5} style={styles.listDescription} numberOfLines={2}>
-                {item.description}
-              </Text>
-            ) : null}
-            <Text maxFontSizeMultiplier={1.3} style={styles.listPrice}>
-              {formatCents(item.price, currency)}
-            </Text>
-          </View>
-          {isSelectionMode ? null : isEditMode ? renderEditOverlay(item) : null}
-        </AnimatedPressable>
-      );
-      return supportsDragAndDrop ? (
-        <ScaleDecorator>{listContent}</ScaleDecorator>
-      ) : listContent;
-    }
-
-    // =========================================================================
-    // Cards (was "large-grid") - single column, large 3:2 image, generous info area
-    // =========================================================================
-    if (currentLayoutType === 'cards') {
-      const cardsContent = (
-        <AnimatedPressable
-          style={[
-            styles.cardsCard,
-            isInactive && isEditMode && styles.cardInactive,
-            isSelected && styles.cardSelected,
-            isDragging && styles.cardDragging,
-          ]}
-          onPress={handlePress}
-          onLongPress={supportsDragAndDrop ? undefined : () => undefined}
-          accessibilityLabel={getProductAccessibilityLabel(item, quantity, isInactive)}
-          accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
-        >
-          {renderDragHandle(item, drag)}
-          {renderSelectionCheckbox(item)}
-          <View style={styles.cardsImageContainer}>
-            {item.imageUrl ? (
-              <Image source={{ uri: item.imageUrl }} style={styles.cardsImage} />
-            ) : (
-              <View style={styles.cardsImagePlaceholder}>
-                <Ionicons name="image-outline" size={48} color={colors.textMuted} />
-              </View>
-            )}
-            {renderInactiveBadge(item)}
-            {renderEditOverlay(item)}
-          </View>
-          <View style={styles.cardsInfo}>
-            <Text maxFontSizeMultiplier={1.3} style={styles.cardsName} numberOfLines={2}>
-              {item.name}
-            </Text>
-            {item.description ? (
-              <Text maxFontSizeMultiplier={1.5} style={styles.cardsDescription} numberOfLines={2}>
-                {item.description}
-              </Text>
-            ) : null}
-            <Text maxFontSizeMultiplier={1.2} style={styles.cardsPrice}>
-              {formatCents(item.price, currency)}
-            </Text>
-            {!isEditMode && !isSelectionMode && (
-              <TouchableOpacity
-                style={styles.cardsAddButton}
-                onPress={() => handleAddToCart(item)}
-                accessibilityRole="button"
-                accessibilityLabel={quantity > 0 ? t('addOneMoreToCart', { name: item.name }) : t('addToCart', { name: item.name })}
-              >
-                {quantity > 0 ? (
-                  <View style={styles.cardsAddButtonInner}>
-                    <Ionicons name="add" size={18} color="#fff" />
-                    <Text maxFontSizeMultiplier={1.3} style={styles.cardsAddButtonText}>
-                      {t('addOneMoreShort', { quantity })}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.cardsAddButtonInner}>
-                    <Ionicons name="add" size={18} color="#fff" />
-                    <Text maxFontSizeMultiplier={1.3} style={styles.cardsAddButtonText}>
-                      {t('addToCartShort')}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
-        </AnimatedPressable>
-      );
-      return supportsDragAndDrop ? (
-        <ScaleDecorator>{cardsContent}</ScaleDecorator>
-      ) : cardsContent;
-    }
-
-    // =========================================================================
-    // Mosaic - 2 columns, alternating heights for visual variety
-    // =========================================================================
-    if (currentLayoutType === 'mosaic') {
-      const itemIndex = filteredProducts.indexOf(item);
-      const isOdd = itemIndex % 2 === 0; // First item taller (4:3), second wider (3:2)
-      const imageAspect = isOdd ? 4 / 3 : 3 / 2;
-
-      return (
-        <AnimatedPressable
-          style={[
-            styles.mosaicCard,
-            isInactive && isEditMode && styles.cardInactive,
-            isSelected && styles.cardSelected,
-          ]}
-          onPress={handlePress}
-          onLongPress={() => undefined}
-          accessibilityLabel={getProductAccessibilityLabel(item, quantity, isInactive)}
-          accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
-        >
-          {renderSelectionCheckbox(item)}
-          <View style={[styles.mosaicImageContainer, { aspectRatio: imageAspect }]}>
-            {item.imageUrl ? (
-              <Image source={{ uri: item.imageUrl }} style={styles.mosaicImage} />
-            ) : (
-              <View style={styles.mosaicImagePlaceholder}>
-                <Ionicons name="image-outline" size={32} color={colors.textMuted} />
-              </View>
-            )}
-            {/* Gradient overlay at bottom for name + price */}
-            <LinearGradient
-              colors={['transparent', 'rgba(0,0,0,0.7)']}
-              style={styles.mosaicGradient}
-            >
-              <Text maxFontSizeMultiplier={1.5} style={styles.mosaicName} numberOfLines={2}>
-                {item.name}
-              </Text>
-              <Text maxFontSizeMultiplier={1.3} style={styles.mosaicPrice}>
-                {formatCents(item.price, currency)}
-              </Text>
-            </LinearGradient>
-            {renderInactiveBadge(item)}
-            {renderEditOverlay(item)}
-            {/* Quantity badge overlay in bottom-right */}
-            {!isEditMode && !isSelectionMode && quantity > 0 && (
-              <View style={styles.mosaicQuantityBadge}>
-                <Text maxFontSizeMultiplier={1.3} style={styles.mosaicQuantityText}>{quantity}</Text>
-              </View>
-            )}
-          </View>
-        </AnimatedPressable>
-      );
-    }
-
-    // =========================================================================
-    // Compact - no images, name left, price right, controls far right
-    // =========================================================================
-    if (currentLayoutType === 'compact') {
-      const compactContent = (
-        <AnimatedPressable
-          style={[
-            styles.compactCard,
-            isInactive && isEditMode && styles.cardInactive,
-            isSelected && styles.cardSelected,
-            isDragging && styles.cardDragging,
-          ]}
-          onPress={handlePress}
-          onLongPress={supportsDragAndDrop ? undefined : () => undefined}
-          accessibilityLabel={getProductAccessibilityLabel(item, quantity, isInactive)}
-          accessibilityHint={isEditMode ? t('editModeAccessibilityHint') : t('cartModeAccessibilityHint')}
-        >
-          {supportsDragAndDrop && (
-            <Pressable
-              style={styles.dragHandleCompact}
-              onLongPress={drag}
-              delayLongPress={150}
-              onPressIn={(e) => e.stopPropagation()}
-              accessibilityRole="button"
-              accessibilityLabel={t('reorderAccessibilityLabel', { name: item.name })}
-              accessibilityHint={t('reorderAccessibilityHint')}
-            >
-              <Ionicons name="reorder-three" size={20} color={colors.textMuted} />
-            </Pressable>
-          )}
-          {isSelectionMode && (
-            <View style={[styles.checkboxCircle, styles.checkboxCircleCompact, isSelected && styles.checkboxCircleSelected]}>
-              {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
-            </View>
-          )}
-          <View style={styles.compactInfo}>
-            <Text maxFontSizeMultiplier={1.5} style={styles.compactName} numberOfLines={1}>
-              {item.name}
-            </Text>
-            {isInactive && isEditMode && !isSelectionMode && (
-              <View style={styles.compactHiddenBadge}>
-                <Text maxFontSizeMultiplier={1.5} style={styles.compactHiddenText}>{t('hiddenBadge')}</Text>
-              </View>
-            )}
-          </View>
-          <Text maxFontSizeMultiplier={1.3} style={styles.compactPrice}>
-            {formatCents(item.price, currency)}
-          </Text>
-          {isSelectionMode ? null : isEditMode ? (
-            <View style={styles.compactEditActions}>
-              <TouchableOpacity
-                style={styles.compactEditButton}
-                onPress={() => handleOpenProductModal(item)}
-                accessibilityRole="button"
-                accessibilityLabel={t('editAccessibilityLabel', { name: item.name })}
-              >
-                <Ionicons name="pencil" size={16} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.compactDeleteButton}
-                onPress={() => handleDeleteProduct(item)}
-                accessibilityRole="button"
-                accessibilityLabel={t('deleteAccessibilityLabel', { name: item.name })}
-              >
-                <Ionicons name="trash-outline" size={16} color={colors.error} />
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.compactQuantityControls}>
-              {quantity > 0 ? (
-                <>
-                  <TouchableOpacity
-                    style={styles.compactQuantityDecrementButton}
-                    onPress={() => decrementItem(item.id)}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('removeOneFromCart', { name: item.name })}
-                  >
-                    <Ionicons name="remove" size={12} color="#fff" />
-                  </TouchableOpacity>
-                  <View style={styles.compactQuantityBadge} accessibilityLabel={t('inCartAccessibilityLabel', { quantity })}>
-                    <Text maxFontSizeMultiplier={1.5} style={styles.compactQuantityText}>{quantity}</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.compactQuantityIncrementButton}
-                    onPress={() => handleAddToCart(item)}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('addOneMoreToCart', { name: item.name })}
-                  >
-                    <Ionicons name="add" size={12} color="#fff" />
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <TouchableOpacity
-                  style={styles.compactQuantityIncrementButton}
-                  onPress={() => handleAddToCart(item)}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('addToCart', { name: item.name })}
-                >
-                  <Ionicons name="add" size={14} color="#fff" />
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-        </AnimatedPressable>
-      );
-      return supportsDragAndDrop ? (
-        <ScaleDecorator>{compactContent}</ScaleDecorator>
-      ) : compactContent;
-    }
-
-    // Fallback: classic-grid (should not reach here due to explicit check above)
-    return null;
-  };
+  // Render product card based on layout type. Delegates to the memoized
+  // ProductCard so only the card whose quantity/selection changed re-renders
+  // on a cart or socket update, instead of the whole grid.
+  const renderProduct = useCallback(
+    ({ item, index, drag, isActive: isDragging }: { item: Product; index?: number; drag?: () => void; isActive?: boolean }) => (
+      <ProductCard
+        item={item}
+        index={index ?? 0}
+        layoutType={currentLayoutType}
+        quantity={getItemQuantity(item.id)}
+        isSelected={selectedProducts.has(item.id)}
+        isSelectionMode={isSelectionMode}
+        isEditMode={isEditMode}
+        supportsDragAndDrop={supportsDragAndDrop}
+        isDragging={!!isDragging}
+        drag={drag ?? NOOP_DRAG}
+        colors={colors}
+        styles={styles}
+        currency={currency}
+        t={t}
+        onAddToCart={handleCardAddToCart}
+        onDecrement={handleCardDecrement}
+        onLongPress={handleCardLongPress}
+        onToggleSelection={handleCardToggleSelection}
+        onEdit={handleCardEdit}
+        onDelete={handleCardDelete}
+      />
+    ),
+    [
+      currentLayoutType, getItemQuantity, selectedProducts, isSelectionMode,
+      isEditMode, supportsDragAndDrop, colors, styles, currency, t,
+      handleCardAddToCart, handleCardDecrement, handleCardLongPress,
+      handleCardToggleSelection, handleCardEdit, handleCardDelete,
+    ],
+  );
 
   // Show skeleton loading while auth or catalogs are being fetched
   if (authLoading || catalogsLoading) {
@@ -1756,16 +1890,19 @@ export function MenuScreen() {
         {/* Quick Charge FAB - disabled without connected account */}
         <View style={[styles.bottomActions, styles.bottomActionsEmpty, { bottom: 8 }]}>
           <TouchableOpacity
-            style={[styles.quickChargeFab, { backgroundColor: colors.text, opacity: isPaymentReady ? 1 : 0.35 }]}
-            onPress={() => { if (isPaymentReady) setQuickChargeVisible(true); }}
-            disabled={!isPaymentReady}
+            style={[styles.quickChargeFab, { backgroundColor: colors.text, opacity: isPaymentReady && !isOffline ? 1 : 0.35 }]}
+            onPress={() => { if (isPaymentReady && !isOffline) setQuickChargeVisible(true); }}
+            disabled={!isPaymentReady || isOffline}
             activeOpacity={0.9}
             accessibilityRole="button"
-            accessibilityLabel={t('quickChargeAccessibilityLabel')}
+            accessibilityLabel={isOffline ? `${t('quickChargeAccessibilityLabel')}, ${t('quickChargeOfflineNotice')}` : t('quickChargeAccessibilityLabel')}
             accessibilityHint={t('quickChargeAccessibilityHint')}
-            accessibilityState={{ disabled: !isPaymentReady }}
+            accessibilityState={{ disabled: !isPaymentReady || isOffline }}
           >
-            <Ionicons name="flash" size={22} color={colors.background} />
+            <Ionicons name={isOffline ? 'cloud-offline' : 'flash'} size={22} color={colors.background} />
+            <Text maxFontSizeMultiplier={1.2} style={[styles.quickChargeFabLabel, { color: colors.background }]} numberOfLines={1}>
+              {isOffline ? t('quickChargeOfflineLabel') : t('quickChargeLabel')}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -1845,7 +1982,7 @@ export function MenuScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('retryAccessibilityLabel')}
           >
-            <Text maxFontSizeMultiplier={1.3} style={{ color: '#fff', fontFamily: fonts.semiBold, fontSize: 15 }}>{t('retryButton')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={{ color: colors.onPrimary, fontFamily: fonts.semiBold, fontSize: 15 }}>{t('retryButton')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1853,7 +1990,6 @@ export function MenuScreen() {
   }
 
   return (
-    <GestureDetector gesture={catalogSwipeGesture}>
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={[styles.container, { paddingTop: insets.top }]}>
         {/* Header */}
@@ -1915,7 +2051,7 @@ export function MenuScreen() {
                     <Ionicons
                       name={isEditMode ? 'checkmark' : 'pencil'}
                       size={16}
-                      color={isEditMode ? '#fff' : colors.textSecondary}
+                      color={isEditMode ? colors.onPrimary : colors.textSecondary}
                     />
                   </TouchableOpacity>
                 )}
@@ -2097,6 +2233,25 @@ export function MenuScreen() {
         </View>
       )}
 
+      {/* First-use hint for the long-press-for-notes gesture — shows once the
+          cart has items, dismisses permanently (or on first long-press). */}
+      {!isEditMode && !isSelectionMode && itemCount > 0 && showNotesHint && (
+        <View style={styles.notesHintBar}>
+          <Ionicons name="create-outline" size={16} color={colors.primary} />
+          <Text style={styles.notesHintText} maxFontSizeMultiplier={1.5}>
+            {t('longPressNotesHint')}
+          </Text>
+          <TouchableOpacity
+            onPress={dismissNotesHint}
+            hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
+            accessibilityRole="button"
+            accessibilityLabel={t('dismissHintAccessibilityLabel')}
+          >
+            <Ionicons name="close" size={16} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Search Results Count */}
       {searchQuery.trim() ? (
         <View style={styles.searchResultsBar}>
@@ -2212,9 +2367,10 @@ export function MenuScreen() {
               ? filteredProducts.filter(p => p.categoryId === splitViewSelectedCat)
               : filteredProducts
             }
-            renderItem={({ item }) => renderProduct({ item, drag: () => {}, isActive: false, getIndex: () => undefined })}
+            renderItem={({ item, index }) => renderProduct({ item, index })}
             keyExtractor={(item: Product) => item.id}
             numColumns={2}
+            removeClippedSubviews
             columnWrapperStyle={{ gap: GRID_GAP }}
             contentContainerStyle={[styles.productList, screenWidth >= 768 && { flex: 1 }]}
             refreshControl={
@@ -2250,6 +2406,7 @@ export function MenuScreen() {
           keyExtractor={(item) => item.id}
           numColumns={numColumns}
           key={`${currentLayoutType}-${numColumns}`} // Force re-render when layout changes
+          removeClippedSubviews
           contentContainerStyle={styles.productList}
           columnWrapperStyle={numColumns > 1 ? styles.productRow : undefined}
           refreshControl={
@@ -2271,7 +2428,7 @@ export function MenuScreen() {
           accessibilityRole="button"
           accessibilityLabel={t('addNewProductAccessibilityLabel')}
         >
-          <Ionicons name="add" size={28} color="#fff" />
+          <Ionicons name="add" size={28} color={colors.onPrimary} />
         </TouchableOpacity>
       )}
 
@@ -2302,14 +2459,19 @@ export function MenuScreen() {
         <View style={[styles.bottomActions, { bottom: 8 }, itemCount === 0 && styles.bottomActionsEmpty]}>
           {/* Quick Charge FAB */}
           <TouchableOpacity
-            style={[styles.quickChargeFab, { backgroundColor: colors.text }]}
-            onPress={() => setQuickChargeVisible(true)}
+            style={[styles.quickChargeFab, { backgroundColor: colors.text, opacity: isOffline ? 0.35 : 1 }]}
+            onPress={() => { if (!isOffline) setQuickChargeVisible(true); }}
+            disabled={isOffline}
             activeOpacity={0.9}
             accessibilityRole="button"
-            accessibilityLabel={t('quickChargeAccessibilityLabel')}
+            accessibilityLabel={isOffline ? `${t('quickChargeAccessibilityLabel')}, ${t('quickChargeOfflineNotice')}` : t('quickChargeAccessibilityLabel')}
             accessibilityHint={t('quickChargeAccessibilityHint')}
+            accessibilityState={{ disabled: isOffline }}
           >
-            <Ionicons name="flash" size={22} color={colors.background} />
+            <Ionicons name={isOffline ? 'cloud-offline' : 'flash'} size={22} color={colors.background} />
+            <Text maxFontSizeMultiplier={1.2} style={[styles.quickChargeFabLabel, { color: colors.background }]} numberOfLines={1}>
+              {isOffline ? t('quickChargeOfflineLabel') : t('quickChargeLabel')}
+            </Text>
           </TouchableOpacity>
 
           {/* Cart action — three paths:
@@ -2333,7 +2495,7 @@ export function MenuScreen() {
               }}
               activeOpacity={0.9}
               accessibilityRole="button"
-              accessibilityLabel={
+              accessibilityLabel={`${
                 targetSessionId
                   ? `Send ${itemCount} item${itemCount === 1 ? '' : 's'} to this session`
                   : serviceMode === 'table_service'
@@ -2341,17 +2503,20 @@ export function MenuScreen() {
                   : itemCount === 1
                   ? t('goToCartAccessibilityLabelSingular', { count: itemCount })
                   : t('goToCartAccessibilityLabelPlural', { count: itemCount })
-              }
+              }, ${formatCents(subtotal, currency)}`}
             >
               <View style={styles.goToCartBadge}>
                 <Text maxFontSizeMultiplier={1.3} style={styles.goToCartBadgeText}>{itemCount}</Text>
               </View>
-              <Text maxFontSizeMultiplier={1.3} style={styles.goToCartText}>
+              <Text maxFontSizeMultiplier={1.3} style={styles.goToCartText} numberOfLines={1}>
                 {targetSessionId
                   ? sendToSessionMutation.isPending ? 'Sending…' : 'Send to session'
                   : serviceMode === 'table_service' ? 'Send to table' : t('goToCartButton')}
               </Text>
-              <Ionicons name="chevron-forward" size={18} color="#fff" />
+              <Text maxFontSizeMultiplier={1.3} style={styles.goToCartAmount} numberOfLines={1}>
+                {formatCents(subtotal, currency)}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={colors.onPrimary} />
             </TouchableOpacity>
           )}
         </View>
@@ -2405,9 +2570,19 @@ export function MenuScreen() {
           visible={quickChargeVisible}
           onClose={() => setQuickChargeVisible(false)}
         />
+
+        {/* Removed-item undo snackbar (decrement at qty 1) */}
+        <UndoSnackbar
+          visible={!!removedItem}
+          message={removedItem ? tc('removedFromCart', { name: removedItem.product.name }) : ''}
+          onUndo={handleUndoRemove}
+          onDismiss={() => setRemovedItem(null)}
+          bottomOffset={
+            itemCount > 0 && (targetSessionId || serviceMode === 'table_service') ? 124 : 76
+          }
+        />
       </View>
     </View>
-    </GestureDetector>
   );
 }
 
@@ -2576,7 +2751,7 @@ const createStyles = (colors: any, cardWidth: number, layoutType: CatalogLayoutT
       borderRadius: 999,
       borderWidth: 1,
       // 44pt minimum tap target per Apple HIG
-      minHeight: 36,
+      minHeight: 44,
     },
     catalogStripPillText: {
       fontSize: 13,
@@ -2638,20 +2813,20 @@ const createStyles = (colors: any, cardWidth: number, layoutType: CatalogLayoutT
     quantityControls: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: 8,
     },
     quantityDecrementButton: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       backgroundColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
     quantityIncrementButton: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
@@ -2756,20 +2931,20 @@ const createStyles = (colors: any, cardWidth: number, layoutType: CatalogLayoutT
     listQuantityControls: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
+      gap: 8,
     },
     listQuantityDecrementButton: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       backgroundColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
     listQuantityIncrementButton: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
@@ -2969,7 +3144,7 @@ const createStyles = (colors: any, cardWidth: number, layoutType: CatalogLayoutT
     cardsAddButtonText: {
       fontSize: 15,
       fontWeight: '600',
-      color: '#fff',
+      color: colors.onPrimary,
     },
     // Magazine layout styles - hero/pair pattern
     // Split View layout styles
@@ -3084,7 +3259,7 @@ const createStyles = (colors: any, cardWidth: number, layoutType: CatalogLayoutT
       bottom: 8,
       right: 8,
       minWidth: 24,
-      height: 24,
+      minHeight: 24,
       borderRadius: 12,
       backgroundColor: colors.primary,
       alignItems: 'center',
@@ -3094,7 +3269,7 @@ const createStyles = (colors: any, cardWidth: number, layoutType: CatalogLayoutT
     mosaicQuantityText: {
       fontSize: 13,
       fontWeight: '700',
-      color: '#fff',
+      color: colors.onPrimary,
     },
     // Compact layout styles with card styling
     compactCard: {
@@ -3123,22 +3298,22 @@ const createStyles = (colors: any, cardWidth: number, layoutType: CatalogLayoutT
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'flex-end',
-      gap: 4,
+      gap: 8,
       marginLeft: 10,
-      width: 86,
+      width: 100,
     },
     compactQuantityDecrementButton: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
+      width: 30,
+      height: 30,
+      borderRadius: 15,
       backgroundColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
     compactQuantityIncrementButton: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
+      width: 30,
+      height: 30,
+      borderRadius: 15,
       backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
@@ -3342,22 +3517,55 @@ const createStyles = (colors: any, cardWidth: number, layoutType: CatalogLayoutT
       justifyContent: 'center',
     },
     goToCartBadgeText: {
-      color: '#fff',
+      color: colors.onPrimary,
       fontSize: 12,
       fontWeight: '700',
     },
     goToCartText: {
-      color: '#fff',
+      flexShrink: 1,
+      color: colors.onPrimary,
       fontSize: 14,
       fontWeight: '600',
     },
+    goToCartAmount: {
+      color: colors.onPrimary,
+      fontSize: 14,
+      fontWeight: '700',
+      fontVariant: ['tabular-nums'],
+    },
+    notesHintBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginHorizontal: 16,
+      marginBottom: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+      backgroundColor: colors.primary + '12',
+      borderWidth: 1,
+      borderColor: colors.primary + '25',
+    },
+    notesHintText: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '500',
+      color: colors.textSecondary,
+    },
     quickChargeFab: {
-      width: 52,
+      flexDirection: 'row',
       height: 52,
+      minWidth: 52,
+      paddingHorizontal: 16,
       borderRadius: 26,
       alignItems: 'center',
       justifyContent: 'center',
+      gap: 6,
       ...shadows.lg,
+    },
+    quickChargeFabLabel: {
+      fontSize: 14,
+      fontWeight: '600',
     },
     // Skeleton loading styles
     skeletonBox: {

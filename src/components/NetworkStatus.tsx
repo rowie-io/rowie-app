@@ -1,57 +1,46 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Text, StyleSheet, Animated } from 'react-native';
-import NetInfo, { NetInfoState } from '@react-native-community/netinfo';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../context/ThemeContext';
 import { fonts } from '../lib/fonts';
 import { useTranslations } from '../lib/i18n';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 
+/**
+ * Connectivity banner. Rendered as a normal layout row at the top of the app
+ * (NOT an absolute overlay) so it pushes content down instead of covering
+ * screen headers. Auto-hides shortly after connectivity is restored.
+ */
 export function NetworkStatus() {
   const { colors } = useTheme();
   const t = useTranslations('components.networkStatus');
   const insets = useSafeAreaInsets();
-  const [isConnected, setIsConnected] = useState<boolean | null>(true);
+  const { isConnected } = useNetworkStatus();
   const [showBanner, setShowBanner] = useState(false);
-  const slideAnim = useRef(new Animated.Value(-100)).current;
-
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener((state: NetInfoState) => {
-      const connected = state.isConnected && state.isInternetReachable !== false;
-      setIsConnected(connected);
-    });
-
-    // Check initial state
-    NetInfo.fetch().then((state) => {
-      const connected = state.isConnected && state.isInternetReachable !== false;
-      setIsConnected(connected);
-    });
-
-    return () => unsubscribe();
-  }, []);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (isConnected === false) {
       setShowBanner(true);
-      Animated.spring(slideAnim, {
-        toValue: 0,
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
         useNativeDriver: true,
-        tension: 80,
-        friction: 10,
       }).start();
     } else if (isConnected === true && showBanner) {
       // Show "Back Online" briefly then hide
       Animated.sequence([
         Animated.delay(1500),
-        Animated.timing(slideAnim, {
-          toValue: -100,
+        Animated.timing(fadeAnim, {
+          toValue: 0,
           duration: 300,
           useNativeDriver: true,
         }),
       ]).start(() => setShowBanner(false));
     }
-  }, [isConnected, showBanner, slideAnim]);
+  }, [isConnected, showBanner, fadeAnim]);
 
   if (!showBanner) return null;
 
@@ -64,7 +53,7 @@ export function NetworkStatus() {
         {
           backgroundColor: isOffline ? colors.error : colors.success,
           paddingTop: insets.top + 8,
-          transform: [{ translateY: slideAnim }],
+          opacity: fadeAnim,
         },
       ]}
       accessibilityRole="alert"
@@ -85,16 +74,13 @@ export function NetworkStatus() {
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    // Layout row (not position:absolute) — pushes the app content down while
+    // visible so it never covers screen headers.
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingBottom: 12,
-    zIndex: 9999,
   },
   text: {
     color: '#fff',

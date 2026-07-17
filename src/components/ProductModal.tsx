@@ -82,7 +82,7 @@ export function ProductModal({
       if (product) {
         setName(product.name);
         setDescription(product.description || '');
-        setPriceString(isZeroDecimal(currency) ? String(product.price) : (product.price / 100).toFixed(2));
+        setPriceString(isZeroDecimal(currency) ? String(product.price) : fromSmallestUnit(product.price, currency).toFixed(2));
         setCategoryId(product.categoryId);
         setIsActive(product.isActive);
         setExistingImageUrl(product.imageUrl);
@@ -225,7 +225,7 @@ export function ProductModal({
               accessibilityLabel={isSaving ? tc('saving') : tc('save')}
             >
               {isSaving ? (
-                <ActivityIndicator size="small" color="#fff" accessibilityLabel={tc('saving')} />
+                <ActivityIndicator size="small" color={colors.onPrimary} accessibilityLabel={tc('saving')} />
               ) : (
                 <Text style={styles.saveButtonText} maxFontSizeMultiplier={1.3}>{tc('save')}</Text>
               )}
@@ -489,7 +489,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       opacity: 0.6,
     },
     saveButtonText: {
-      color: '#fff',
+      color: colors.onPrimary,
       fontSize: 16,
       fontWeight: '600',
     },

@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import PhoneInput, { ICountry, isValidPhoneNumber } from 'react-native-international-phone-number';
+import PhoneInput, { ICountry, isValidPhoneNumber } from '../vendor/phone-input';
 
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -277,7 +277,7 @@ export function ProfileEditModal({ visible, onClose }: ProfileEditModalProps) {
                 </View>
               ) : (
                 <View style={styles.cameraButton}>
-                  <Ionicons name="camera" size={16} color="#fff" />
+                  <Ionicons name="camera" size={16} color={colors.onPrimary} />
                 </View>
               )}
             </TouchableOpacity>

@@ -13,6 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { SUPPORTED_LANGUAGES, LANGUAGE_NAMES, type SupportedLanguage } from '../lib/languages';
 import { useTranslations } from '../lib/i18n';
+import { fonts } from '../lib/fonts';
 
 interface LanguagePickerModalProps {
   visible: boolean;
@@ -65,7 +66,11 @@ export function LanguagePickerModal({ visible, onClose }: LanguagePickerModalPro
           </View>
         )}
 
-        <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          accessibilityRole="radiogroup"
+        >
           {SUPPORTED_LANGUAGES.map((lang) => {
             const isSelected = lang === language;
             const isOrgDefault = lang === orgLanguage;
@@ -120,13 +125,13 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 17,
-    fontFamily: 'PlusJakartaSans_600SemiBold',
+    fontFamily: fonts.semiBold,
     textAlign: 'center',
   },
   closeButton: {
     position: 'absolute',
     right: 16,
-    padding: 4,
+    padding: 10,
   },
   loadingOverlay: {
     paddingVertical: 8,
@@ -153,10 +158,10 @@ const styles = StyleSheet.create({
   },
   languageName: {
     fontSize: 16,
-    fontFamily: 'PlusJakartaSans_500Medium',
+    fontFamily: fonts.medium,
   },
   defaultBadge: {
     fontSize: 12,
-    fontFamily: 'PlusJakartaSans_400Regular',
+    fontFamily: fonts.regular,
   },
 });

@@ -1,3 +1,5 @@
+// TODO(security): install expo-screen-capture and guard this screen with
+// usePreventScreenCapture() — it displays transaction amounts / card details.
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   View,
@@ -32,8 +34,10 @@ import { shadows } from '../lib/shadows';
 import { fonts } from '../lib/fonts';
 import { PayoutsSetupBanner } from '../components/PayoutsSetupBanner';
 import { SetupRequiredBanner } from '../components/SetupRequiredBanner';
+import { UndoSnackbar } from '../components/UndoSnackbar';
 import logger from '../lib/logger';
 import { isValidEmailOrEmpty } from '../lib/validation';
+import { useNetworkStatus } from '../hooks/useNetworkStatus';
 import { formatCents, getCurrencySymbol, toSmallestUnit, fromSmallestUnit, isZeroDecimal } from '../utils/currency';
 import { useTranslations } from '../lib/i18n';
 
@@ -43,6 +47,9 @@ interface TipOption {
   value: number;
   isCustom?: boolean;
 }
+
+// 36pt visual buttons + slop = ≥44pt effective touch target (Apple HIG).
+const QTY_HIT_SLOP = { top: 8, bottom: 8, left: 4, right: 4 };
 
 type RouteParams = {
   Checkout: {
@@ -57,7 +64,7 @@ export function CheckoutScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'Checkout'>>();
-  const { items, itemCount, clearCart, incrementItem, decrementItem, removeItem, subtotal: cartSubtotal, orderNotes, setOrderNotes, customerEmail, setCustomerEmail, paymentMethod, setPaymentMethod, selectedTipIndex, setSelectedTipIndex, customTipAmount, setCustomTipAmount, showCustomTipInput, setShowCustomTipInput } = useCart();
+  const { items, itemCount, clearCart, addItem, incrementItem, decrementItem, removeItem, subtotal: cartSubtotal, orderNotes, setOrderNotes, customerEmail, setCustomerEmail, paymentMethod, setPaymentMethod, selectedTipIndex, setSelectedTipIndex, customTipAmount, setCustomTipAmount, showCustomTipInput, setShowCustomTipInput } = useCart();
   // CheckoutScreen is only reachable in quick_service mode now — table_service
   // sends carts straight to a table session via FloorPlan, so orders created
   // here never carry a tableId.
@@ -74,6 +81,10 @@ export function CheckoutScreen() {
 
   const [emailError, setEmailError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Last removed cart line (decrement at qty 1 or swipe-delete) — feeds the
+  // "Removed X · Undo" snackbar so an accidental tap is recoverable.
+  const [removedItem, setRemovedItem] = useState<CartItem | null>(null);
 
   // Hold order modal
   const [showHoldModal, setShowHoldModal] = useState(false);
@@ -104,12 +115,14 @@ export function CheckoutScreen() {
   // Use cart subtotal for regular checkout, route total for quick charge.
   const subtotal = isQuickCharge ? routeTotal : cartSubtotal;
 
-  // Navigate back if cart becomes empty (quick charge is exempt — it has no cart).
+  // Navigate back if cart becomes empty (quick charge is exempt — it has no
+  // cart). While the undo snackbar is up we stay put so the last removal can
+  // be undone; dismissing it (or letting it time out) then pops the screen.
   useEffect(() => {
-    if (!isQuickCharge && items.length === 0) {
+    if (!isQuickCharge && items.length === 0 && !removedItem) {
       navigation.goBack();
     }
-  }, [items.length, isQuickCharge, navigation]);
+  }, [items.length, isQuickCharge, removedItem, navigation]);
 
   // Set to true before any programmatic goBack() so the hold flow doesn't
   // accidentally hit a beforeRemove guard later. Kept as a no-op ref for now;
@@ -118,6 +131,14 @@ export function CheckoutScreen() {
 
   // Show setup required banner when charges aren't enabled
   const showSetupBanner = !connectLoading && connectStatus && !connectStatus.chargesEnabled;
+
+  // Charges disabled → the Pay button is disabled with an inline explanation
+  // instead of relying on a post-tap alert.
+  const chargesDisabled = !!showSetupBanner;
+
+  // Offline → payments can't be processed; disable the Pay button with an
+  // inline explanation (same pattern as chargesDisabled).
+  const { isOffline } = useNetworkStatus();
 
   // Show payouts banner when charges are enabled but payouts aren't (user can still accept payments)
   const showPayoutsBanner = !connectLoading && isPaymentReady && connectStatus && !connectStatus.payoutsEnabled;
@@ -187,6 +208,36 @@ export function CheckoutScreen() {
       holdName,
     };
   }, [tipAmount, taxAmount, subtotal, grandTotal, paymentMethod, customerEmail, orderNotes, holdName]);
+
+  // Pre-select "No tip" (always the last option) so the default Pay path
+  // needs zero tip taps — percentages stay one tap away. Never auto-select a
+  // nonzero tip. clearCart() resets selectedTipIndex to null, so each new
+  // checkout re-defaults here.
+  useEffect(() => {
+    if (showTipScreen && selectedTipIndex === null && tipOptions.length > 0) {
+      setSelectedTipIndex(tipOptions.length - 1);
+    }
+  }, [showTipScreen, selectedTipIndex, tipOptions.length, setSelectedTipIndex]);
+
+  // Cart line removal with undo (decrement at qty 1 deletes the line)
+  const handleDecrementItem = (item: CartItem) => {
+    if (item.quantity === 1) {
+      setRemovedItem(item);
+    }
+    decrementItem(item.cartKey);
+  };
+
+  const handleRemoveItem = (item: CartItem) => {
+    setRemovedItem(item);
+    removeItem(item.cartKey);
+  };
+
+  const handleUndoRemove = () => {
+    if (removedItem) {
+      addItem(removedItem.product, removedItem.quantity, removedItem.notes);
+    }
+    setRemovedItem(null);
+  };
 
   const handleTipSelect = (index: number) => {
     setSelectedTipIndex(index);
@@ -400,6 +451,10 @@ export function CheckoutScreen() {
       const idempotencyKey = `pi-${order.id}-${grandTotal}`;
       const paymentIntent = await stripeTerminalApi.createPaymentIntent({
         amount: fromSmallestUnit(grandTotal, currency), // Convert smallest unit to base unit for API
+        // Top-level tipAmount (base units, same conversion as `amount`) so the
+        // API excludes the tip from the platform-fee base — tips go 100% to
+        // the merchant. metadata.tipAmount below is display-only.
+        tipAmount: fromSmallestUnit(tipAmount, currency),
         currency, // Multi-currency support — never assume USD
         description,
         metadata: {
@@ -708,7 +763,7 @@ export function CheckoutScreen() {
                   <Ionicons
                     name="phone-portrait-outline"
                     size={20}
-                    color={paymentMethod === 'tap_to_pay' ? '#fff' : colors.text}
+                    color={paymentMethod === 'tap_to_pay' ? colors.onPrimary : colors.text}
                   />
                 )}
                 <Text
@@ -734,7 +789,7 @@ export function CheckoutScreen() {
                 <Ionicons
                   name="cash-outline"
                   size={20}
-                  color={paymentMethod === 'cash' ? '#fff' : colors.text}
+                  color={paymentMethod === 'cash' ? colors.onPrimary : colors.text}
                 />
                 <Text
                   style={[
@@ -759,7 +814,7 @@ export function CheckoutScreen() {
                 <Ionicons
                   name="git-branch-outline"
                   size={20}
-                  color={paymentMethod === 'split' ? '#fff' : colors.text}
+                  color={paymentMethod === 'split' ? colors.onPrimary : colors.text}
                 />
                 <Text
                   style={[
@@ -822,7 +877,7 @@ export function CheckoutScreen() {
                   return (
                     <TouchableOpacity
                       style={styles.deleteAction}
-                      onPress={() => removeItem(item.cartKey)}
+                      onPress={() => handleRemoveItem(item)}
                       activeOpacity={0.8}
                       accessibilityRole="button"
                       accessibilityLabel={t('removeFromCartAccessibilityLabel', { name: item.product.name })}
@@ -854,7 +909,7 @@ export function CheckoutScreen() {
                         )}
                       </View>
                       <View style={styles.itemInfo}>
-                        <Text style={styles.itemName} maxFontSizeMultiplier={1.5} numberOfLines={1}>{item.product.name}</Text>
+                        <Text style={styles.itemName} maxFontSizeMultiplier={1.5} numberOfLines={2}>{item.product.name}</Text>
                         {item.notes ? (
                           <Text style={styles.itemNotes} maxFontSizeMultiplier={1.5} numberOfLines={1}>{item.notes}</Text>
                         ) : (
@@ -864,13 +919,14 @@ export function CheckoutScreen() {
                       <View style={styles.quantityControls}>
                         <TouchableOpacity
                           style={styles.quantityButton}
-                          onPress={() => decrementItem(item.cartKey)}
+                          onPress={() => handleDecrementItem(item)}
+                          hitSlop={QTY_HIT_SLOP}
                           accessibilityRole="button"
                           accessibilityLabel={item.quantity === 1 ? t('removeFromCartAccessibilityLabel', { name: item.product.name }) : t('decreaseQuantityAccessibilityLabel', { name: item.product.name })}
                         >
                           <Ionicons
                             name={item.quantity === 1 ? 'trash-outline' : 'remove'}
-                            size={16}
+                            size={18}
                             color={item.quantity === 1 ? colors.error : colors.text}
                           />
                         </TouchableOpacity>
@@ -878,10 +934,11 @@ export function CheckoutScreen() {
                         <TouchableOpacity
                           style={styles.quantityButton}
                           onPress={() => incrementItem(item.cartKey)}
+                          hitSlop={QTY_HIT_SLOP}
                           accessibilityRole="button"
                           accessibilityLabel={t('increaseQuantityAccessibilityLabel', { name: item.product.name })}
                         >
-                          <Ionicons name="add" size={16} color={colors.text} />
+                          <Ionicons name="add" size={18} color={colors.text} />
                         </TouchableOpacity>
                       </View>
                       <Text style={styles.itemPrice} maxFontSizeMultiplier={1.5} numberOfLines={1} adjustsFontSizeToFit>
@@ -919,6 +976,27 @@ export function CheckoutScreen() {
         </View>
       </ScrollView>
 
+      {/* Inline explanation when charges aren't enabled — the Pay button
+          below is disabled instead of relying on a post-tap alert. */}
+      {chargesDisabled && (
+        <View style={styles.chargesDisabledHintRow} accessibilityRole="alert">
+          <Ionicons name="alert-circle-outline" size={14} color={colors.warning} />
+          <Text style={styles.chargesDisabledHintText} maxFontSizeMultiplier={1.5}>
+            {t('chargesDisabledPayHint')}
+          </Text>
+        </View>
+      )}
+
+      {/* Inline explanation when the device is offline — Pay is disabled */}
+      {isOffline && !chargesDisabled && (
+        <View style={styles.chargesDisabledHintRow} accessibilityRole="alert">
+          <Ionicons name="cloud-offline-outline" size={14} color={colors.warning} />
+          <Text style={styles.chargesDisabledHintText} maxFontSizeMultiplier={1.5}>
+            {t('offlinePayHint')}
+          </Text>
+        </View>
+      )}
+
       {/* Footer with Add to Table + Pay Button */}
       <View style={styles.footer}>
         {/* Add to Table button — shown when org has floor plans (future: check floorPlans.length > 0) */}
@@ -935,18 +1013,18 @@ export function CheckoutScreen() {
         */}
         <TouchableOpacity
           onPress={handlePayment}
-          disabled={isProcessing}
+          disabled={isProcessing || chargesDisabled || isOffline}
           activeOpacity={0.9}
           style={[
             styles.payButton,
             paymentMethod === 'cash' && styles.payButtonCash,
             paymentMethod === 'split' && styles.payButtonSplit,
             paymentMethod === 'tap_to_pay' && { backgroundColor: isDark ? '#fff' : '#1C1917' },
-            isProcessing && styles.payButtonDisabled,
+            (isProcessing || chargesDisabled || isOffline) && styles.payButtonDisabled,
           ]}
           accessibilityRole="button"
           accessibilityLabel={isProcessing ? t('processingPaymentAccessibilityLabel') : paymentMethod === 'tap_to_pay' ? t('payButtonTapToPayAccessibilityLabel', { tapToPayLabel, amount: formatCents(grandTotal, currency) }) : paymentMethod === 'cash' ? t('payButtonCashAccessibilityLabel', { amount: formatCents(grandTotal, currency) }) : t('payButtonSplitAccessibilityLabel', { amount: formatCents(grandTotal, currency) })}
-          accessibilityState={{ disabled: isProcessing }}
+          accessibilityState={{ disabled: isProcessing || chargesDisabled || isOffline }}
         >
           {isProcessing ? (
             <ActivityIndicator color={paymentMethod === 'tap_to_pay' ? (isDark ? '#1C1917' : '#fff') : '#fff'} accessibilityLabel={t('processingPaymentAccessibilityLabel')} />
@@ -968,18 +1046,25 @@ export function CheckoutScreen() {
                       <Ionicons name="wifi" size={22} color={isDark ? '#1C1917' : '#fff'} style={styles.tapToPayIconRotated} />
                     </View>
                   )}
-                  {/* Apple HIG: "Tap to Pay on iPhone" copy on final checkout button */}
-                  <Text style={[styles.payButtonText, { color: isDark ? '#1C1917' : '#fff' }]} maxFontSizeMultiplier={1.3}>{tapToPayLabel}</Text>
+                  {/* Apple HIG: "Tap to Pay on iPhone" copy + unambiguous amount
+                      at the moment of payment (Apple TTPOi 3.1) */}
+                  <Text style={[styles.payButtonText, { color: isDark ? '#1C1917' : '#fff' }]} maxFontSizeMultiplier={1.3} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                    {`${tapToPayLabel} · ${formatCents(grandTotal, currency)}`}
+                  </Text>
                 </>
               ) : paymentMethod === 'cash' ? (
                 <>
                   <Ionicons name="cash-outline" size={22} color="#fff" />
-                  <Text style={styles.payButtonText} maxFontSizeMultiplier={1.3}>{t('payWithCashButton')}</Text>
+                  <Text style={styles.payButtonText} maxFontSizeMultiplier={1.3} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                    {`${t('payWithCashButton')} · ${formatCents(grandTotal, currency)}`}
+                  </Text>
                 </>
               ) : (
                 <>
-                  <Ionicons name="git-branch-outline" size={22} color="#fff" />
-                  <Text style={styles.payButtonText} maxFontSizeMultiplier={1.3}>{t('splitPaymentButton')}</Text>
+                  <Ionicons name="git-branch-outline" size={22} color={colors.onPrimary} />
+                  <Text style={[styles.payButtonText, { color: colors.onPrimary }]} maxFontSizeMultiplier={1.3} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>
+                    {`${t('splitPaymentButton')} · ${formatCents(grandTotal, currency)}`}
+                  </Text>
                 </>
               )}
             </>
@@ -1058,6 +1143,15 @@ export function CheckoutScreen() {
         </Pressable>
       </Modal>
       </KeyboardAvoidingView>
+
+      {/* Removed-item undo snackbar (decrement at qty 1 / swipe-delete) */}
+      <UndoSnackbar
+        visible={!!removedItem}
+        message={removedItem ? tc('removedFromCart', { name: removedItem.product.name }) : ''}
+        onUndo={handleUndoRemove}
+        onDismiss={() => setRemovedItem(null)}
+        bottomOffset={insets.bottom + 88}
+      />
       </View>
     </View>
   );
@@ -1190,7 +1284,7 @@ const createStyles = (colors: any, isDark: boolean) => {
     },
     itemUnitPrice: {
       fontSize: 12,
-      color: colors.textMuted,
+      color: colors.textSecondary,
     },
     quantityControls: {
       flexDirection: 'row',
@@ -1202,8 +1296,8 @@ const createStyles = (colors: any, isDark: boolean) => {
       marginRight: 10,
     },
     quantityButton: {
-      width: 28,
-      height: 28,
+      width: 36,
+      height: 36,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1211,7 +1305,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       fontSize: 14,
       fontWeight: '600',
       color: colors.text,
-      minWidth: 20,
+      minWidth: 22,
       textAlign: 'center',
     },
     itemPrice: {
@@ -1278,6 +1372,20 @@ const createStyles = (colors: any, isDark: boolean) => {
       padding: 16,
       paddingBottom: 12,
       gap: 10,
+    },
+    chargesDisabledHintRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingHorizontal: 20,
+      paddingTop: 10,
+    },
+    chargesDisabledHintText: {
+      flexShrink: 1,
+      fontSize: 13,
+      fontWeight: '500',
+      color: colors.warning,
     },
     payButton: {
       flex: 1,
@@ -1350,7 +1458,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       color: colors.text,
     },
     tipButtonLabelSelected: {
-      color: '#fff',
+      color: colors.onPrimary,
     },
     tipButtonAmount: {
       fontSize: 13,
@@ -1358,7 +1466,8 @@ const createStyles = (colors: any, isDark: boolean) => {
       marginTop: 4,
     },
     tipButtonAmountSelected: {
-      color: 'rgba(255, 255, 255, 0.8)',
+      color: colors.onPrimary,
+      opacity: 0.8,
     },
     // Custom tip styles
     customTipContainer: {
@@ -1478,6 +1587,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
+      minHeight: 44,
       paddingVertical: 12,
       borderRadius: 12,
       backgroundColor: colors.surface,
@@ -1495,7 +1605,7 @@ const createStyles = (colors: any, isDark: boolean) => {
       height: 22,
     },
     paymentMethodButtonTextSelected: {
-      color: '#fff',
+      color: colors.onPrimary,
     },
     // Pay button variants
     payButtonCash: {

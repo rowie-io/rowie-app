@@ -284,7 +284,7 @@ function createStyles(colors: any, isDark: boolean) {
     defaultBadgeText: {
       fontFamily: fonts.semiBold,
       fontSize: 10,
-      color: '#fff',
+      color: colors.onPrimary,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },

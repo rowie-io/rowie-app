@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,11 +6,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Vibration,
+  ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { ordersApi } from '../lib/api';
@@ -18,6 +20,7 @@ import { formatCents, getCurrencySymbol, isZeroDecimal, fromSmallestUnit, toSmal
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { useTranslations } from '../lib/i18n';
+import { KeypadButton } from '../components/Keypad';
 
 type RouteParams = {
   CashPayment: {
@@ -27,6 +30,18 @@ type RouteParams = {
     customerEmail?: string;
   };
 };
+
+const KEYPAD_ROWS = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['.', '0', 'backspace'],
+];
+
+// Quick-tender denominations, in base currency units. Zero-decimal currencies
+// (JPY, KRW, …) use note-sized values since their base unit is tiny.
+const QUICK_TENDER_BASE = [5, 10, 20, 50, 100];
+const QUICK_TENDER_ZERO_DECIMAL = [500, 1000, 2000, 5000, 10000];
 
 export function CashPaymentScreen() {
   const { colors } = useTheme();
@@ -40,6 +55,7 @@ export function CashPaymentScreen() {
 
   const [cashTendered, setCashTendered] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const { width: screenWidth } = useWindowDimensions();
 
   const cashTenderedCents = toSmallestUnit(parseFloat(cashTendered || '0'), currency);
   const changeAmount = Math.max(0, cashTenderedCents - totalAmount);
@@ -47,9 +63,19 @@ export function CashPaymentScreen() {
 
   const styles = createStyles(colors);
 
-  // Handle keypad input
+  // Keypad key sizing: 3 columns filling the width, kept short so the whole
+  // screen (totals + tendered + quick amounts + keypad + footer) fits.
+  const keypadButtonWidth = Math.min(118, Math.max(72, Math.floor((screenWidth - 40 - 24) / 3)));
+  const keypadButtonHeight = 60;
+
+  // Quick-tender denominations that can actually cover the total (fill, not add).
+  const quickTenderOptions = useMemo(() => {
+    const base = isZeroDecimal(currency) ? QUICK_TENDER_ZERO_DECIMAL : QUICK_TENDER_BASE;
+    return base.filter((denom) => toSmallestUnit(denom, currency) >= totalAmount);
+  }, [currency, totalAmount]);
+
+  // Handle keypad input (haptics handled inside KeypadButton)
   const handleKeyPress = (key: string) => {
-    Vibration.vibrate(10);
     if (key === 'backspace') {
       setCashTendered(prev => prev.slice(0, -1));
     } else if (key === '.') {
@@ -69,9 +95,15 @@ export function CashPaymentScreen() {
 
   // Handle exact amount
   const handleExactAmount = () => {
-    Vibration.vibrate(10);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     const base = fromSmallestUnit(totalAmount, currency);
     setCashTendered(isZeroDecimal(currency) ? String(base) : base.toFixed(2));
+  };
+
+  // Quick-tender: set (not add) the tendered amount to a denomination
+  const handleQuickTender = (denomBase: number) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    setCashTendered(isZeroDecimal(currency) ? String(denomBase) : denomBase.toFixed(2));
   };
 
   // Complete cash payment
@@ -169,29 +201,51 @@ export function CashPaymentScreen() {
         </View>
       )}
 
-      {/* Exact Amount Button */}
-      <View style={styles.exactRow}>
-        <TouchableOpacity style={styles.exactButton} onPress={handleExactAmount} accessibilityRole="button" accessibilityLabel={t('exactAmountAccessibility', { amount: formatCents(totalAmount, currency) })}>
-          <Text style={styles.exactButtonText} maxFontSizeMultiplier={1.3}>{t('exactAmount')}</Text>
-        </TouchableOpacity>
+      {/* Quick Tender Row: Exact + denominations that cover the total */}
+      <View style={styles.quickTenderSection}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.quickTenderContainer}
+        >
+          <TouchableOpacity style={styles.exactButton} onPress={handleExactAmount} accessibilityRole="button" accessibilityLabel={t('exactAmountAccessibility', { amount: formatCents(totalAmount, currency) })}>
+            <Text style={styles.exactButtonText} maxFontSizeMultiplier={1.3}>{t('exactAmount')}</Text>
+          </TouchableOpacity>
+          {quickTenderOptions.map((denom) => (
+            <TouchableOpacity
+              key={denom}
+              style={styles.quickTenderButton}
+              onPress={() => handleQuickTender(denom)}
+              accessibilityRole="button"
+              accessibilityLabel={t('tenderQuickAmountAccessibility', { amount: formatCents(toSmallestUnit(denom, currency), currency) })}
+            >
+              <Text style={styles.quickTenderButtonText} maxFontSizeMultiplier={1.3}>
+                {`${getCurrencySymbol(currency)}${denom}`}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
       {/* Number Keypad */}
       <View style={styles.keypad}>
-        {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'backspace'].map((key) => (
-          <TouchableOpacity
-            key={key}
-            style={styles.keypadButton}
-            onPress={() => handleKeyPress(key)}
-            accessibilityRole="button"
-            accessibilityLabel={key === 'backspace' ? t('deleteKey') : key === '.' ? t('decimalPoint') : key}
-          >
-            {key === 'backspace' ? (
-              <Ionicons name="backspace-outline" size={28} color={colors.text} />
-            ) : (
-              <Text style={styles.keypadButtonText} maxFontSizeMultiplier={1.2}>{key}</Text>
-            )}
-          </TouchableOpacity>
+        {KEYPAD_ROWS.map((row, rowIndex) => (
+          <View key={rowIndex} style={styles.keypadRow}>
+            {row.map((key) => (
+              <KeypadButton
+                key={key}
+                keyValue={key}
+                onPress={handleKeyPress}
+                colors={colors}
+                buttonSize={keypadButtonWidth}
+                buttonHeight={keypadButtonHeight}
+                backgroundColor={colors.card}
+                pressedBackgroundColor={colors.surface}
+                disabled={key === '.' && isZeroDecimal(currency)}
+                accessibilityLabel={key === 'backspace' ? t('deleteKey') : key === '.' ? t('decimalPoint') : key}
+              />
+            ))}
+          </View>
         ))}
       </View>
 
@@ -338,13 +392,19 @@ const createStyles = (colors: any) =>
       fontFamily: fonts.semiBold,
       color: colors.error,
     },
-    exactRow: {
-      alignItems: 'center',
+    quickTenderSection: {
       paddingVertical: 12,
     },
+    quickTenderContainer: {
+      paddingHorizontal: 20,
+      gap: 8,
+      alignItems: 'center',
+    },
     exactButton: {
-      paddingHorizontal: 24,
-      paddingVertical: 12,
+      minHeight: 44,
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 10,
       backgroundColor: colors.primary + '20',
       borderRadius: 12,
       borderWidth: 1,
@@ -355,29 +415,32 @@ const createStyles = (colors: any) =>
       fontFamily: fonts.semiBold,
       color: colors.primary,
     },
-    keypad: {
-      flex: 1,
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      paddingHorizontal: 20,
-      paddingVertical: 8,
+    quickTenderButton: {
+      minHeight: 44,
       justifyContent: 'center',
-    },
-    keypadButton: {
-      width: '30%',
-      aspectRatio: 2,
-      alignItems: 'center',
-      justifyContent: 'center',
-      margin: '1.5%',
+      paddingHorizontal: 18,
+      paddingVertical: 10,
       backgroundColor: colors.card,
-      borderRadius: 16,
+      borderRadius: 12,
       borderWidth: 1,
       borderColor: colors.border,
     },
-    keypadButtonText: {
-      fontSize: 28,
+    quickTenderButtonText: {
+      fontSize: 16,
       fontFamily: fonts.semiBold,
       color: colors.text,
+    },
+    keypad: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 8,
+    },
+    keypadRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 12,
+      marginBottom: 12,
     },
     footer: {
       padding: 20,

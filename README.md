@@ -111,7 +111,7 @@ The `eas.json` file controls build profiles:
 Create a `.env` file:
 
 ```bash
-EXPO_PUBLIC_API_URL=https://api.rowie.io
+EXPO_PUBLIC_API_URL=https://api.rowie.eu
 ```
 
 ## Project Structure

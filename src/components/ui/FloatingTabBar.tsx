@@ -10,17 +10,26 @@ import {
   Text,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import { shadows } from '../../lib/shadows';
 import { fonts } from '../../lib/fonts';
+import { brandGradient, brandGradientLight } from '../../lib/colors';
 import { useTranslations } from '../../lib/i18n';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
+import { QuickChargeBottomSheet } from '../QuickChargeBottomSheet';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 const TAB_BAR_HEIGHT = 60;
 const ICON_SIZE = 22;
 const TAB_MARGIN_HORIZONTAL = 16;
 const TAB_MARGIN_BOTTOM = 4;
+// Persistent center "Charge" action
+const CENTER_SLOT_WIDTH = 76;
+const CHARGE_BUTTON_SIZE = 52;
+const CHARGE_BUTTON_RAISE = 16; // how far the circle floats above the bar
 
 const ROUTE_ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap; labelKey: string }> = {
   Menu: { active: 'storefront', inactive: 'storefront-outline', labelKey: 'menuLabel' },
@@ -37,13 +46,20 @@ export const FloatingTabBar = memo(function FloatingTabBar({
   navigation,
 }: BottomTabBarProps) {
   const { colors, isDark } = useTheme();
+  const { isPaymentReady } = useAuth();
+  const { isOffline } = useNetworkStatus();
   const t = useTranslations('components.floatingTabBar');
   const insets = useSafeAreaInsets();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
+  const [quickChargeVisible, setQuickChargeVisible] = useState(false);
 
   // Animated values
   const indicatorX = useRef(new Animated.Value(0)).current;
+
+  // Tabs split around the raised center Charge action
+  const routeCount = state.routes.length;
+  const centerInsertIndex = Math.ceil(routeCount / 2);
 
   // Hide tab bar when keyboard is visible
   useEffect(() => {
@@ -60,8 +76,9 @@ export const FloatingTabBar = memo(function FloatingTabBar({
   // Animate indicator when tab changes
   useEffect(() => {
     if (containerWidth === 0) return;
-    const tabWidth = containerWidth / state.routes.length;
-    const targetX = state.index * tabWidth;
+    const tabWidth = (containerWidth - CENTER_SLOT_WIDTH) / routeCount;
+    const targetX =
+      state.index * tabWidth + (state.index >= centerInsertIndex ? CENTER_SLOT_WIDTH : 0);
 
     Animated.spring(indicatorX, {
       toValue: targetX,
@@ -69,7 +86,7 @@ export const FloatingTabBar = memo(function FloatingTabBar({
       friction: 25,
       useNativeDriver: true,
     }).start();
-  }, [state.index, containerWidth, state.routes.length, indicatorX]);
+  }, [state.index, containerWidth, routeCount, centerInsertIndex, indicatorX]);
 
   const handleLayout = (e: LayoutChangeEvent) => {
     setContainerWidth(e.nativeEvent.layout.width);
@@ -77,13 +94,67 @@ export const FloatingTabBar = memo(function FloatingTabBar({
 
   if (keyboardVisible) return null;
 
-  const tabWidth = containerWidth > 0 ? containerWidth / state.routes.length : 0;
+  const tabWidth = containerWidth > 0 ? (containerWidth - CENTER_SLOT_WIDTH) / routeCount : 0;
 
   // Sit closer to the home indicator than `insets.bottom` would suggest —
   // full safe-area padding pushes the floating bar too high on notched
   // iPhones compared to what most iOS apps do. Keeps a minimum 8pt gap on
   // devices without a home indicator (insets.bottom === 0).
   const bottomOffset = Math.max(insets.bottom - 18, 8);
+
+  const chargeDisabled = isOffline || !isPaymentReady;
+  const chargeLabel = isOffline ? t('chargeOfflineLabel') : t('chargeLabel');
+  const chargeAccessibilityLabel = isOffline
+    ? `${t('chargeAccessibilityLabel')}, ${t('chargeOfflineHint')}`
+    : t('chargeAccessibilityLabel');
+
+  const renderTab = (route: (typeof state.routes)[number], index: number) => {
+    const { options } = descriptors[route.key];
+    const isFocused = state.index === index;
+    const routeConfig = ROUTE_ICONS[route.name] || { active: 'ellipse', inactive: 'ellipse-outline', labelKey: route.name };
+    const label = t(routeConfig.labelKey);
+
+    const onPress = () => {
+      const event = navigation.emit({
+        type: 'tabPress',
+        target: route.key,
+        canPreventDefault: true,
+      });
+      if (!isFocused && !event.defaultPrevented) {
+        navigation.navigate(route.name, route.params);
+      }
+    };
+
+    return (
+      <TouchableOpacity
+        key={route.key}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={isFocused ? { selected: true } : {}}
+        accessibilityLabel={options.tabBarAccessibilityLabel || label}
+        style={styles.tab}
+        activeOpacity={0.6}
+      >
+        <Ionicons
+          name={isFocused ? routeConfig.active : routeConfig.inactive}
+          size={ICON_SIZE}
+          color={isFocused ? colors.primary : colors.textSecondary}
+        />
+        <Text
+          style={[
+            styles.label,
+            {
+              color: isFocused ? colors.primary : colors.textSecondary,
+              fontFamily: isFocused ? fonts.semiBold : fonts.medium,
+            },
+          ]}
+          maxFontSizeMultiplier={1.3}
+        >
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View
@@ -119,54 +190,72 @@ export const FloatingTabBar = memo(function FloatingTabBar({
           />
         )}
 
-        {state.routes.map((route, index) => {
-          const { options } = descriptors[route.key];
-          const isFocused = state.index === index;
-          const routeConfig = ROUTE_ICONS[route.name] || { active: 'ellipse', inactive: 'ellipse-outline', labelKey: route.name };
-          const label = t(routeConfig.labelKey);
+        {state.routes.slice(0, centerInsertIndex).map((route) =>
+          renderTab(route, state.routes.indexOf(route))
+        )}
 
-          const onPress = () => {
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name, route.params);
-            }
-          };
+        {/* Spacer under the raised center Charge action */}
+        <View style={styles.centerSlot} pointerEvents="none" />
 
-          return (
-            <TouchableOpacity
-              key={route.key}
-              onPress={onPress}
-              accessibilityRole="button"
-              accessibilityState={isFocused ? { selected: true } : {}}
-              accessibilityLabel={options.tabBarAccessibilityLabel || label}
-              style={styles.tab}
-              activeOpacity={0.6}
-            >
-              <Ionicons
-                name={isFocused ? routeConfig.active : routeConfig.inactive}
-                size={ICON_SIZE}
-                color={isFocused ? colors.primary : colors.textMuted}
-              />
-              <Text
-                style={[
-                  styles.label,
-                  {
-                    color: isFocused ? colors.primary : colors.textMuted,
-                    fontFamily: isFocused ? fonts.semiBold : fonts.medium,
-                  },
-                ]}
-                maxFontSizeMultiplier={1.2}
-              >
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+        {state.routes.slice(centerInsertIndex).map((route) =>
+          renderTab(route, state.routes.indexOf(route))
+        )}
       </View>
+
+      {/* Raised center Charge action — persistent quick-charge entry point.
+          Anchored to the spacer slot's actual x: with an odd tab count the
+          slices are uneven (e.g. 3/2), so centering on the bar would overlap
+          the last tab of the wider slice. */}
+      <View
+        style={[
+          styles.centerActionWrap,
+          containerWidth > 0 && {
+            left: centerInsertIndex * ((containerWidth - CENTER_SLOT_WIDTH) / routeCount),
+            right: undefined,
+            width: CENTER_SLOT_WIDTH,
+          },
+        ]}
+        pointerEvents="box-none"
+      >
+        <TouchableOpacity
+          onPress={() => {
+            if (!chargeDisabled) setQuickChargeVisible(true);
+          }}
+          disabled={chargeDisabled}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={chargeAccessibilityLabel}
+          accessibilityHint={isOffline ? undefined : t('chargeAccessibilityHint')}
+          accessibilityState={{ disabled: chargeDisabled }}
+          style={[styles.centerAction, chargeDisabled && styles.centerActionDisabled]}
+          hitSlop={{ top: 4, bottom: 4, left: 8, right: 8 }}
+        >
+          <LinearGradient
+            colors={isDark ? brandGradient : brandGradientLight}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.centerActionCircle}
+          >
+            <Ionicons
+              name={isOffline ? 'cloud-offline' : 'flash'}
+              size={22}
+              color={colors.onPrimary}
+            />
+          </LinearGradient>
+          <Text
+            style={[styles.centerActionLabel, { color: isOffline ? colors.textSecondary : colors.primary }]}
+            maxFontSizeMultiplier={1.2}
+            numberOfLines={1}
+          >
+            {chargeLabel}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <QuickChargeBottomSheet
+        visible={quickChargeVisible}
+        onClose={() => setQuickChargeVisible(false)}
+      />
     </View>
   );
 });
@@ -204,7 +293,39 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   label: {
+    fontSize: 11,
+    letterSpacing: 0.1,
+  },
+  centerSlot: {
+    width: CENTER_SLOT_WIDTH,
+    height: TAB_BAR_HEIGHT,
+  },
+  centerActionWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: -CHARGE_BUTTON_RAISE,
+    alignItems: 'center',
+  },
+  centerAction: {
+    alignItems: 'center',
+    width: CENTER_SLOT_WIDTH,
+  },
+  centerActionDisabled: {
+    opacity: 0.45,
+  },
+  centerActionCircle: {
+    width: CHARGE_BUTTON_SIZE,
+    height: CHARGE_BUTTON_SIZE,
+    borderRadius: CHARGE_BUTTON_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.md,
+  },
+  centerActionLabel: {
     fontSize: 10,
+    fontFamily: fonts.semiBold,
+    marginTop: 2,
     letterSpacing: 0.1,
   },
 });

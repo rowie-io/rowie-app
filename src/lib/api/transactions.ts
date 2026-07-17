@@ -18,8 +18,13 @@ export interface Refund {
 
 export interface Transaction {
   id: string;
+  // Underlying source row id (orders / table_sessions / tickets). Prefer
+  // `sourceId ?? id` when fetching detail / refunding — older cached rows
+  // may not have it yet.
+  sourceId?: string;
   amount: number;
   amountRefunded: number;
+  currency?: string; // per-transaction currency; fall back to org currency
   status: 'succeeded' | 'pending' | 'failed' | 'refunded' | 'partially_refunded' | 'cancelled';
   description: string | null;
   customerName: string | null;
@@ -56,7 +61,7 @@ export interface TransactionDetail extends Transaction {
 
 export interface TransactionsListParams {
   limit?: number;
-  starting_after?: string;
+  offset?: number;
   status?: string;
   catalog_id?: string;
   device_id?: string;
@@ -79,7 +84,7 @@ export const transactionsApi = {
   list: (params?: TransactionsListParams) => {
     const searchParams = new URLSearchParams();
     if (params?.limit) searchParams.append('limit', params.limit.toString());
-    if (params?.starting_after) searchParams.append('starting_after', params.starting_after);
+    if (params?.offset !== undefined) searchParams.append('offset', params.offset.toString());
     if (params?.status) searchParams.append('status', params.status);
     if (params?.catalog_id) searchParams.append('catalog_id', params.catalog_id);
     if (params?.device_id) searchParams.append('device_id', params.device_id);

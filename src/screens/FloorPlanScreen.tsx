@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  AccessibilityInfo,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
@@ -18,18 +19,26 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../context/CatalogContext';
 import { useCart } from '../context/CartContext';
+import { useSocketEvent, SocketEvents } from '../context/SocketContext';
 import { floorPlansApi, sessionsApi, type Table, type Session } from '../lib/api/sessions';
 import { fonts } from '../lib/fonts';
 import { useTranslations } from '../lib/i18n';
 import { TableTile } from '../components/TableTile';
+import { EmptyState } from '../components/EmptyState';
 import { TABLE_STATUS_COLORS, type TableStatus } from '../lib/tableStatus';
 
 type RouteParams = {
   FloorPlan: {
     mode?: 'view' | 'send';
     floorPlanId?: string;
+    /** Entering with this set starts merge mode for the given session —
+     *  used by SessionDetail's "Merge with another table" action. */
+    mergeSessionId?: string;
   };
 };
+
+/** AsyncStorage flag for the one-time "hold a table for more options" hint. */
+const LONG_PRESS_HINT_KEY = 'rowie_fp_longpress_hint_dismissed';
 
 // Legend covers the 5 live-runtime states. `merged` / `unavailable` exist on
 // the vendor's editor canvas but aren't yet surfaced to the mobile POS.
@@ -239,6 +248,51 @@ export function FloorPlanScreen() {
     return () => clearInterval(id);
   }, []);
 
+  // OS reduce-motion — read once + subscribe. Passed to tiles so the
+  // new-items pulse degrades to a static highlight ring.
+  const [reduceMotion, setReduceMotion] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotion(enabled);
+    }).catch(() => {});
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => {
+      mounted = false;
+      sub.remove();
+    };
+  }, []);
+
+  // New-items pulse: when SESSION_ITEMS_ADDED lands for a table on this floor,
+  // briefly highlight that tile so a fresh round draws the eye. The global
+  // SocketEventHandlers already invalidates the sessions query (badge count
+  // updates); this only drives the transient attention cue.
+  const [pulseTableId, setPulseTableId] = useState<string | null>(null);
+  const pulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleItemsAdded = useCallback((data: any) => {
+    if (!data?.tableId) return;
+    setPulseTableId(data.tableId);
+    if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
+    pulseTimerRef.current = setTimeout(() => setPulseTableId(null), 2600);
+  }, []);
+  useSocketEvent(SocketEvents.SESSION_ITEMS_ADDED, handleItemsAdded);
+  useEffect(() => () => {
+    if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
+  }, []);
+
+  // One-time discoverability hint for the long-press table actions (merge /
+  // unmerge). Shown under the legend until dismissed.
+  const [showLongPressHint, setShowLongPressHint] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem(LONG_PRESS_HINT_KEY).then((v) => {
+      if (!v) setShowLongPressHint(true);
+    }).catch(() => {});
+  }, []);
+  const dismissLongPressHint = useCallback(() => {
+    setShowLongPressHint(false);
+    AsyncStorage.setItem(LONG_PRESS_HINT_KEY, '1').catch(() => {});
+  }, []);
+
   // Map sessions to tables. Index secondaries too so a QR scan on a merged
   // table (or a stray UI click on it during a merge race) lands on the right
   // session.
@@ -276,6 +330,16 @@ export function FloorPlanScreen() {
   // and tapping one fires `POST /sessions/{id}/merge`. Cancelling via the
   // banner clears the state without mutating anything.
   const [mergeSessionId, setMergeSessionId] = useState<string | null>(null);
+
+  // SessionDetail's "Merge with another table" action navigates here with
+  // `mergeSessionId` set — enter merge mode as if the operator had picked it
+  // from the long-press sheet.
+  useEffect(() => {
+    if (route.params?.mergeSessionId) {
+      setMergeSessionId(route.params.mergeSessionId);
+    }
+  }, [route.params?.mergeSessionId]);
+
   const mergeMutation = useMutation({
     mutationFn: ({ sessionId, tableId }: { sessionId: string; tableId: string }) =>
       sessionsApi.mergeTables(sessionId, tableId),
@@ -285,7 +349,7 @@ export function FloorPlanScreen() {
       queryClient.invalidateQueries({ queryKey: ['floor-plans'] });
     },
     onError: (err: any) => {
-      Alert.alert('Merge failed', err?.error || err?.message || 'Could not merge that table.');
+      Alert.alert(t('mergeFailedTitle'), err?.error || err?.message || t('mergeFailedMessage'));
     },
   });
 
@@ -350,7 +414,7 @@ export function FloorPlanScreen() {
       queryClient.invalidateQueries({ queryKey: ['floor-plans'] });
     },
     onError: (err: any) => {
-      Alert.alert('Unmerge failed', err?.error || err?.message || 'Could not split that table.');
+      Alert.alert(t('unmergeFailedTitle'), err?.error || err?.message || t('unmergeFailedMessage'));
     },
   });
 
@@ -358,36 +422,38 @@ export function FloorPlanScreen() {
     if (mergeSessionId) return; // already in merge mode — long-press is a no-op
     const session = tableSessionMap.get(table.id);
     if (!session) return; // empty table: nothing to do via long-press (yet)
+    // Long-press has been discovered — stop showing the hint.
+    dismissLongPressHint();
     const merged = session.mergedTableIds || [];
     const isPrimary = session.tableId === table.id;
     const options: Array<{ text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }> = [];
     if (isPrimary) {
       options.push({
-        text: 'Merge with another table',
+        text: t('mergeAction'),
         onPress: () => setMergeSessionId(session.id),
       });
       if (merged.length > 0) {
         options.push({
-          text: `Unmerge (${merged.length})`,
+          text: t('unmergeCountAction', { count: merged.length }),
           style: 'destructive',
           onPress: () => {
             // Pop a follow-up sheet listing secondaries to unmerge. Most flows
             // only merge one extra table, so doing them one-tap is fine.
-            const secondaryLabels = tables.filter((t) => merged.includes(t.id));
+            const secondaryLabels = tables.filter((tbl) => merged.includes(tbl.id));
             const followUp: typeof options = secondaryLabels.map((s) => ({
-              text: `Unmerge ${s.label}`,
+              text: t('unmergeLabelAction', { label: s.label }),
               onPress: () => unmergeMutation.mutate({ sessionId: session.id, tableId: s.id }),
             }));
-            followUp.push({ text: 'Cancel', style: 'cancel' });
-            Alert.alert('Unmerge which table?', '', followUp);
+            followUp.push({ text: t('cancel'), style: 'cancel' });
+            Alert.alert(t('unmergeTitle'), '', followUp);
           },
         });
       }
     }
-    options.push({ text: 'Cancel', style: 'cancel' });
+    options.push({ text: t('cancel'), style: 'cancel' });
     if (options.length === 1) return; // nothing actionable
-    Alert.alert(`Table ${table.label}`, '', options);
-  }, [mergeSessionId, tableSessionMap, tables, unmergeMutation]);
+    Alert.alert(t('tableSheetTitle', { label: table.label }), '', options);
+  }, [mergeSessionId, tableSessionMap, tables, unmergeMutation, t, dismissLongPressHint]);
 
   // Pro gate — non-Pro accounts shouldn't be here even if they reach the
   // screen via a stale nav stack or a deeplink. Defensive sibling to the
@@ -518,15 +584,11 @@ export function FloorPlanScreen() {
           </Text>
           <View style={{ width: 24 }} />
         </View>
-        <View style={styles.center}>
-          <Ionicons name="grid-outline" size={48} color={colors.textMuted} />
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-            {t('noFloorPlansTitle')}
-          </Text>
-          <Text style={[styles.emptySubtext, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-            {t('noFloorPlansSubtitle')}
-          </Text>
-        </View>
+        <EmptyState
+          icon="grid-outline"
+          title={t('noFloorPlansTitle')}
+          subtitle={t('noFloorPlansSubtitle')}
+        />
       </SafeAreaView>
     );
   }
@@ -650,17 +712,17 @@ export function FloorPlanScreen() {
             style={{ color: '#E9D5FF', fontFamily: fonts.semiBold, fontSize: 13, flex: 1 }}
             maxFontSizeMultiplier={1.5}
           >
-            Tap a free table to merge it in.
+            {t('mergeBannerText')}
           </Text>
           <TouchableOpacity
             onPress={() => setMergeSessionId(null)}
             accessibilityRole="button"
-            accessibilityLabel="Cancel merge"
+            accessibilityLabel={t('cancelMergeLabel')}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             style={{ marginLeft: 12 }}
           >
             <Text style={{ color: '#F5F5F4', fontFamily: fonts.bold, fontSize: 13 }} maxFontSizeMultiplier={1.3}>
-              Cancel
+              {t('cancel')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -675,11 +737,11 @@ export function FloorPlanScreen() {
           <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('loadingTables')} />
         </View>
       ) : tables.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-            {t('noTablesOnFloorPlan')}
-          </Text>
-        </View>
+        <EmptyState
+          icon="restaurant-outline"
+          title={t('noTablesOnFloorPlan')}
+          subtitle={t('noTablesSubtitle')}
+        />
       ) : (
         <ScrollView
           style={styles.canvasOuter}
@@ -721,6 +783,8 @@ export function FloorPlanScreen() {
                     now={tick}
                     effectiveCapacity={effectiveCapacities.get(table.id)}
                     mergeTargetMode={!!mergeSessionId && isAvailableTarget}
+                    pulse={pulseTableId === table.id}
+                    reduceMotion={reduceMotion}
                   />
                 );
               })}
@@ -730,31 +794,62 @@ export function FloorPlanScreen() {
       )}
 
       {/* Legend — matches the vendor portal's runtime legend so a server
-          reading the chip on phone and dashboard sees the same vocabulary. */}
-      <View style={[styles.legend, { borderTopColor: colors.border }]}>
-        {LEGEND_STATES.map((status) => {
-          const palette = TABLE_STATUS_COLORS[status];
-          return (
-            <View key={status} style={styles.legendItem}>
-              <View
-                style={[
-                  styles.legendDot,
-                  {
-                    backgroundColor: palette.fill,
-                    borderColor: palette.border,
-                    borderWidth: 1,
-                  },
-                ]}
-              />
-              <Text
-                style={[styles.legendText, { color: colors.textSecondary }]}
-                maxFontSizeMultiplier={1.5}
-              >
-                {palette.label}
-              </Text>
-            </View>
-          );
-        })}
+          reading the chip on phone and dashboard sees the same vocabulary.
+          Swatches mirror the tile treatment (fill + 2px border + status
+          glyph) so they're actually matchable against the canvas. */}
+      <View style={[styles.legendWrap, { borderTopColor: colors.border }]}>
+        <View style={styles.legend}>
+          {LEGEND_STATES.map((status) => {
+            const palette = TABLE_STATUS_COLORS[status];
+            return (
+              <View key={status} style={styles.legendItem}>
+                <View
+                  style={[
+                    styles.legendSwatch,
+                    {
+                      backgroundColor: palette.fill,
+                      borderColor: palette.border,
+                    },
+                  ]}
+                >
+                  {palette.icon && (
+                    <Ionicons
+                      name={palette.icon as keyof typeof Ionicons.glyphMap}
+                      size={9}
+                      color={status === 'check_requested' ? palette.text : palette.border}
+                    />
+                  )}
+                </View>
+                <Text
+                  style={[styles.legendText, { color: colors.textSecondary }]}
+                  maxFontSizeMultiplier={1.5}
+                >
+                  {t(`tableStatus_${status}`)}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+        {/* One-time discoverability hint for long-press table actions. */}
+        {showLongPressHint && (
+          <View style={styles.hintRow}>
+            <Ionicons name="information-circle-outline" size={14} color={colors.textSecondary} />
+            <Text
+              style={[styles.hintText, { color: colors.textSecondary }]}
+              maxFontSizeMultiplier={1.5}
+            >
+              {t('longPressHint')}
+            </Text>
+            <TouchableOpacity
+              onPress={dismissLongPressHint}
+              accessibilityRole="button"
+              accessibilityLabel={t('dismissHintLabel')}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Ionicons name="close" size={14} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -828,24 +923,44 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     textAlign: 'center',
   },
+  legendWrap: {
+    borderTopWidth: 1,
+    paddingVertical: 10,
+    gap: 6,
+  },
   legend: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
+    columnGap: 14,
+    rowGap: 6,
+    paddingHorizontal: 12,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
-  legendDot: {
-    width: 8,
-    height: 8,
+  legendSwatch: {
+    width: 16,
+    height: 16,
     borderRadius: 4,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   legendText: {
+    fontSize: 12,
+    fontFamily: fonts.regular,
+  },
+  hintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+  },
+  hintText: {
     fontSize: 12,
     fontFamily: fonts.regular,
   },

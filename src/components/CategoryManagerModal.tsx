@@ -204,9 +204,9 @@ export function CategoryManagerModal({
                 accessibilityLabel={isCreating ? tc('creating') : tc('create')}
               >
                 {isCreating ? (
-                  <ActivityIndicator size="small" color="#fff" accessibilityLabel={tc('creating')} />
+                  <ActivityIndicator size="small" color={colors.onPrimary} accessibilityLabel={tc('creating')} />
                 ) : (
-                  <Ionicons name="add" size={24} color="#fff" />
+                  <Ionicons name="add" size={24} color={colors.onPrimary} />
                 )}
               </TouchableOpacity>
             </View>

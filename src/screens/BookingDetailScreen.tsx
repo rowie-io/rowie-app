@@ -11,13 +11,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useTerminal } from '../context/StripeTerminalContext';
 import { useSocketEvent, SocketEvents } from '../context/SocketContext';
 import { useTapToPayGuard } from '../hooks/useTapToPayGuard';
-import { bookingsApi, isBookingPaid, type Booking } from '../lib/api/bookings';
+import { bookingsApi, isBookingPaid, type Booking, type BookingStatus } from '../lib/api/bookings';
+import { apiClient } from '../lib/api/client';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { formatCurrency } from '../utils/currency';
 import { fonts } from '../lib/fonts';
 import { useTranslations } from '../lib/i18n';
@@ -27,18 +29,30 @@ type RouteParams = {
   BookingDetail: { bookingId: string };
 };
 
+// Targets the API accepts per current status (PATCH /bookings/{id}/status —
+// see rowie-api bookings.ts validTransitions). 'seated' does not exist in the
+// booking_status enum; confirmed bookings go straight to completed / no_show.
+const STATUS_ACTIONS: Partial<Record<BookingStatus, BookingStatus[]>> = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['completed', 'no_show', 'cancelled'],
+  partially_refunded: ['completed', 'no_show', 'cancelled'],
+};
+
 export function BookingDetailScreen() {
   const { colors } = useTheme();
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'BookingDetail'>>();
   const { bookingId } = route.params;
-  const { currency } = useAuth();
+  const { currency, user } = useAuth();
   const { isProcessing: isTerminalProcessing } = useTerminal();
   const { guardCheckout } = useTapToPayGuard();
   const queryClient = useQueryClient();
   const t = useTranslations('bookings');
 
   const [isCreatingPI, setIsCreatingPI] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  // Which status button is in flight — drives the per-button spinner.
+  const [pendingStatus, setPendingStatus] = useState<BookingStatus | null>(null);
 
   const bookingQuery = useQuery({
     queryKey: ['bookings', bookingId],
@@ -58,6 +72,46 @@ export function BookingDetailScreen() {
     [bookingId, queryClient],
   );
   useSocketEvent(SocketEvents.BOOKING_UPDATED, handleBookingUpdated);
+  // Cancel / complete transitions are emitted as their own events, not
+  // BOOKING_UPDATED — subscribe to both so the screen doesn't go stale.
+  useSocketEvent(SocketEvents.BOOKING_CANCELLED, handleBookingUpdated);
+  useSocketEvent(SocketEvents.BOOKING_COMPLETED, handleBookingUpdated);
+
+  // API-side the route is owner/admin-only (403 otherwise) — hide the
+  // buttons entirely for staff so they never hit a dead end.
+  const canManageStatus = user?.role === 'owner' || user?.role === 'admin';
+
+  const statusMutation = useMutation({
+    mutationFn: ({ status, cancellationReason }: { status: BookingStatus; cancellationReason?: string }) =>
+      apiClient.patch<{ booking: Booking }>(`/bookings/${bookingId}/status`, {
+        status,
+        ...(cancellationReason ? { cancellationReason } : {}),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bookings', bookingId] });
+      queryClient.invalidateQueries({ queryKey: ['bookings'] });
+    },
+    onError: (error: any) => {
+      // apiClient throws ApiError {error, ...} — prefer `.error` so the API's
+      // reason (e.g. invalid transition) isn't masked.
+      Alert.alert(t('statusUpdateErrorTitle'), error?.error || error?.message || t('statusUpdateErrorMessage'));
+    },
+    onSettled: () => {
+      setPendingStatus(null);
+    },
+  });
+
+  const applyStatus = useCallback((status: BookingStatus) => {
+    if (statusMutation.isPending) return;
+    setPendingStatus(status);
+    statusMutation.mutate({ status });
+  }, [statusMutation]);
+
+  const confirmCancel = useCallback(() => {
+    setShowCancelConfirm(false);
+    setPendingStatus('cancelled');
+    statusMutation.mutate({ status: 'cancelled' });
+  }, [statusMutation]);
 
   const handleTakePayment = useCallback(async () => {
     if (!booking) return;
@@ -99,7 +153,7 @@ export function BookingDetailScreen() {
   if (bookingQuery.isLoading) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-        <Header onBack={() => navigation.goBack()} title={t('detailHeaderTitle')} colors={colors} />
+        <Header onBack={() => navigation.goBack()} title={t('detailHeaderTitle')} colors={colors} backLabel={t('goBack')} />
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.primary} accessibilityLabel={t('loading')} />
         </View>
@@ -110,7 +164,7 @@ export function BookingDetailScreen() {
   if (bookingQuery.isError || !booking) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-        <Header onBack={() => navigation.goBack()} title={t('detailHeaderTitle')} colors={colors} />
+        <Header onBack={() => navigation.goBack()} title={t('detailHeaderTitle')} colors={colors} backLabel={t('goBack')} />
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: colors.text }]} maxFontSizeMultiplier={1.3} accessibilityRole="alert">
             {t('errorTitle')}
@@ -126,9 +180,12 @@ export function BookingDetailScreen() {
   const subtotal = formatCurrency(booking.price, cardCurrency);
   const tax = formatCurrency(booking.taxAmount, cardCurrency);
 
+  const statusMeta = getStatusMeta(booking.status, colors, t);
+  const availableActions = canManageStatus ? (STATUS_ACTIONS[booking.status] ?? []) : [];
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <Header onBack={() => navigation.goBack()} title={t('detailHeaderTitle')} colors={colors} />
+      <Header onBack={() => navigation.goBack()} title={t('detailHeaderTitle')} colors={colors} backLabel={t('goBack')} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -144,23 +201,31 @@ export function BookingDetailScreen() {
                 #{booking.bookingNumber}
               </Text>
             </View>
-            <View
-              style={[
-                styles.badge,
-                paid ? { backgroundColor: '#22C55E20' } : { backgroundColor: colors.primary + '20' },
-              ]}
-            >
-              <Ionicons
-                name={paid ? 'checkmark-circle' : 'time-outline'}
-                size={14}
-                color={paid ? '#22C55E' : colors.primary}
-              />
-              <Text
-                style={[styles.badgeText, { color: paid ? '#22C55E' : colors.primary }]}
-                maxFontSizeMultiplier={1.3}
+            <View style={styles.badgeColumn}>
+              <View
+                style={[
+                  styles.badge,
+                  paid ? { backgroundColor: '#22C55E20' } : { backgroundColor: colors.primary + '20' },
+                ]}
               >
-                {paid ? t('paidBadge') : t('unpaidBadge')}
-              </Text>
+                <Ionicons
+                  name={paid ? 'checkmark-circle' : 'time-outline'}
+                  size={14}
+                  color={paid ? '#22C55E' : colors.primary}
+                />
+                <Text
+                  style={[styles.badgeText, { color: paid ? '#22C55E' : colors.primary }]}
+                  maxFontSizeMultiplier={1.3}
+                >
+                  {paid ? t('paidBadge') : t('unpaidBadge')}
+                </Text>
+              </View>
+              <View style={[styles.badge, { backgroundColor: statusMeta.color + '20' }]}>
+                <View style={[styles.statusDot, { backgroundColor: statusMeta.color }]} />
+                <Text style={[styles.badgeText, { color: statusMeta.color }]} maxFontSizeMultiplier={1.3}>
+                  {statusMeta.label}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -205,9 +270,62 @@ export function BookingDetailScreen() {
             {booking.paymentType === 'pay_now' ? t('paymentTypePayNow') : t('paymentTypePayAtAppointment')}
           </Text>
         </View>
+
+        {/* Status actions — contextual to the current booking state */}
+        {availableActions.length > 0 ? (
+          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
+              {t('actionsTitle')}
+            </Text>
+            {availableActions.includes('confirmed') && (
+              <StatusActionButton
+                icon="checkmark-circle-outline"
+                label={t('confirmAction')}
+                variant="primary"
+                colors={colors}
+                loading={pendingStatus === 'confirmed'}
+                disabled={statusMutation.isPending}
+                onPress={() => applyStatus('confirmed')}
+              />
+            )}
+            {availableActions.includes('completed') && (
+              <StatusActionButton
+                icon="checkmark-done-outline"
+                label={t('completeAction')}
+                variant="primary"
+                colors={colors}
+                loading={pendingStatus === 'completed'}
+                disabled={statusMutation.isPending}
+                onPress={() => applyStatus('completed')}
+              />
+            )}
+            {availableActions.includes('no_show') && (
+              <StatusActionButton
+                icon="eye-off-outline"
+                label={t('noShowAction')}
+                variant="secondary"
+                colors={colors}
+                loading={pendingStatus === 'no_show'}
+                disabled={statusMutation.isPending}
+                onPress={() => applyStatus('no_show')}
+              />
+            )}
+            {availableActions.includes('cancelled') && (
+              <StatusActionButton
+                icon="close-circle-outline"
+                label={t('cancelAction')}
+                variant="destructive"
+                colors={colors}
+                loading={pendingStatus === 'cancelled'}
+                disabled={statusMutation.isPending}
+                onPress={() => setShowCancelConfirm(true)}
+              />
+            )}
+          </View>
+        ) : null}
       </ScrollView>
 
-      {!paid && booking.paymentType !== 'pay_now' ? (
+      {!paid && booking.paymentType !== 'pay_now' && booking.status !== 'cancelled' ? (
         <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.border }]}>
           <TouchableOpacity
             onPress={handleTakePayment}
@@ -223,9 +341,9 @@ export function BookingDetailScreen() {
             accessibilityLabel={t('takePaymentAccessibilityLabel', { amount })}
           >
             {isCreatingPI ? (
-              <ActivityIndicator size="small" color="#fff" accessibilityLabel={t('loading')} />
+              <ActivityIndicator size="small" color={colors.onPrimary} accessibilityLabel={t('loading')} />
             ) : (
-              <Ionicons name="card" size={20} color="#fff" />
+              <Ionicons name="card" size={20} color={colors.onPrimary} />
             )}
             <Text style={styles.payButtonText} maxFontSizeMultiplier={1.3}>
               {t('takePaymentButton', { amount })}
@@ -233,17 +351,99 @@ export function BookingDetailScreen() {
           </TouchableOpacity>
         </View>
       ) : null}
+
+      <ConfirmModal
+        visible={showCancelConfirm}
+        title={t('cancelConfirmTitle')}
+        message={paid ? t('cancelConfirmMessagePaid', { name: booking.customerName }) : t('cancelConfirmMessage', { name: booking.customerName })}
+        confirmText={t('cancelConfirmButton')}
+        cancelText={t('keepBookingButton')}
+        confirmStyle="destructive"
+        onConfirm={confirmCancel}
+        onCancel={() => setShowCancelConfirm(false)}
+      />
     </SafeAreaView>
   );
 }
 
-function Header({ onBack, title, colors }: { onBack: () => void; title: string; colors: any }) {
+function getStatusMeta(
+  status: BookingStatus,
+  colors: any,
+  t: (k: string) => string,
+): { label: string; color: string } {
+  switch (status) {
+    case 'pending':
+      return { label: t('statusPending'), color: colors.warning };
+    case 'confirmed':
+      return { label: t('statusConfirmed'), color: '#3B82F6' };
+    case 'completed':
+      return { label: t('statusCompleted'), color: colors.success };
+    case 'cancelled':
+      return { label: t('statusCancelled'), color: colors.error };
+    case 'no_show':
+      return { label: t('statusNoShow'), color: colors.textMuted };
+    case 'partially_refunded':
+      return { label: t('statusPartiallyRefunded'), color: colors.warning };
+    default:
+      return { label: status, color: colors.textMuted };
+  }
+}
+
+function StatusActionButton({
+  icon,
+  label,
+  variant,
+  colors,
+  loading,
+  disabled,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  variant: 'primary' | 'secondary' | 'destructive';
+  colors: any;
+  loading: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const backgroundColor =
+    variant === 'primary' ? colors.primary : variant === 'destructive' ? colors.errorBg : 'transparent';
+  const contentColor =
+    variant === 'primary' ? '#fff' : variant === 'destructive' ? colors.error : colors.text;
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={disabled}
+      style={[
+        styles.statusActionButton,
+        { backgroundColor },
+        variant === 'secondary' && { borderWidth: 1, borderColor: colors.border },
+        disabled && !loading && { opacity: 0.5 },
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
+    >
+      {loading ? (
+        <ActivityIndicator size="small" color={contentColor} />
+      ) : (
+        <Ionicons name={icon} size={20} color={contentColor} />
+      )}
+      <Text style={[styles.statusActionText, { color: contentColor }]} maxFontSizeMultiplier={1.3}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function Header({ onBack, title, colors, backLabel }: { onBack: () => void; title: string; colors: any; backLabel: string }) {
   return (
     <View style={styles.header}>
       <TouchableOpacity
         onPress={onBack}
         accessibilityRole="button"
-        accessibilityLabel="Back"
+        accessibilityLabel={backLabel}
         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
       >
         <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -343,11 +543,13 @@ const styles = StyleSheet.create({
   },
   customerName: { fontSize: 17, fontFamily: fonts.bold },
   bookingNumber: { fontSize: 13, fontFamily: fonts.regular, marginTop: 2 },
+  badgeColumn: { alignItems: 'flex-end', gap: 6 },
   badge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999,
   },
   badgeText: { fontSize: 12, fontFamily: fonts.semiBold },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   detailText: { flex: 1, fontSize: 14, fontFamily: fonts.regular },
   notesBox: {
@@ -365,10 +567,16 @@ const styles = StyleSheet.create({
   amountValue: { fontSize: 14 },
   divider: { height: 1, marginVertical: 4 },
   paymentTypeNote: { fontSize: 12, fontFamily: fonts.regular, marginTop: 6 },
+  statusActionButton: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, paddingVertical: 13, borderRadius: 12, minHeight: 48,
+  },
+  statusActionText: { fontSize: 15, fontFamily: fonts.semiBold },
   footer: { padding: 16, borderTopWidth: 1 },
   payButton: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 10, paddingVertical: 16, borderRadius: 14, minHeight: 52,
   },
-  payButtonText: { color: '#fff', fontSize: 16, fontFamily: fonts.bold },
+  // Dark stone on amber fill — white fails contrast (see colors.onPrimary)
+  payButtonText: { color: '#1C1917', fontSize: 16, fontFamily: fonts.bold },
 });

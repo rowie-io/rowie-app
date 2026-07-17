@@ -71,9 +71,9 @@ function PaymentSetupRequired({ colors, isManager }: { colors: any; isManager: b
           accessibilityLabel={t('setUpPaymentsLabel')}
           accessibilityHint={t('setUpPaymentsHint')}
         >
-          <Ionicons name="card" size={18} color="#fff" />
+          <Ionicons name="card" size={18} color={colors.onPrimary} />
           <Text style={styles.buttonText} maxFontSizeMultiplier={1.3}>{t('setUpPaymentsLabel')}</Text>
-          <Ionicons name="open-outline" size={16} color="#fff" />
+          <Ionicons name="open-outline" size={16} color={colors.onPrimary} />
         </TouchableOpacity>
       )}
     </View>
@@ -439,7 +439,7 @@ function NoCatalogsWelcome({ colors, isDark, isManager, onQuickCharge }: { color
                 accessibilityLabel={createCatalogMutation.isPending ? tc('creating') : tc('create')}
               >
                 {createCatalogMutation.isPending ? (
-                  <ActivityIndicator size="small" color="#fff" accessibilityLabel={tc('creating')} />
+                  <ActivityIndicator size="small" color={colors.onPrimary} accessibilityLabel={tc('creating')} />
                 ) : (
                   <Text style={styles.modalSaveButtonText} maxFontSizeMultiplier={1.3}>{tc('create')}</Text>
                 )}
@@ -782,7 +782,7 @@ const createSimpleStyles = (colors: any) =>
     buttonText: {
       fontSize: 16,
       fontFamily: fonts.semiBold,
-      color: '#fff',
+      color: colors.onPrimary,
     },
   });
 
@@ -1023,7 +1023,7 @@ const createWelcomeStyles = (colors: any, isDark: boolean) => {
       opacity: 0.5,
     },
     modalSaveButtonText: {
-      color: '#fff',
+      color: colors.onPrimary,
       fontSize: 16,
       fontFamily: fonts.semiBold,
     },

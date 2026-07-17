@@ -35,7 +35,9 @@ interface ThemeProviderProps {
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
   const systemColorScheme = useColorScheme();
-  const [theme, setThemeState] = useState<ThemeMode>('dark');
+  // No stored preference → follow the OS appearance. Users who previously
+  // picked light/dark/system keep their stored choice (loaded below).
+  const [theme, setThemeState] = useState<ThemeMode>('system');
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Determine if we should use dark mode

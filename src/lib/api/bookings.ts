@@ -3,10 +3,10 @@ import { apiClient } from './client';
 export type BookingStatus =
   | 'pending'
   | 'confirmed'
-  | 'seated'
   | 'completed'
   | 'cancelled'
-  | 'no_show';
+  | 'no_show'
+  | 'partially_refunded';
 
 // API-side these come from the bookings.payment_type column. 'pay_now' = paid
 // online at booking; 'pay_at_visit' / 'pay_at_event' = vendor takes payment

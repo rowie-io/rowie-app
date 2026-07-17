@@ -11,14 +11,19 @@ export interface TerminalLocation {
 
 export interface CreatePaymentIntentParams {
   amount: number; // In dollars (will be converted to cents by API)
+  // Tip portion of `amount`, also in BASE currency units (dollars). The API
+  // excludes it from the platform-fee base so tips go 100% to the merchant;
+  // omitting it falls back to legacy behaviour (fee computed on the full
+  // amount, overstating the fee by the tip percentage).
+  tipAmount?: number;
   currency?: string;
   description?: string;
   metadata?: Record<string, string>;
   receiptEmail?: string;
   captureMethod?: 'automatic' | 'manual'; // For manual card, use 'automatic'
   paymentMethodType?: 'card_present' | 'card'; // 'card' for manual entry, 'card_present' for tap to pay
-  orderId?: string; // For split payments
-  isQuickCharge?: boolean; // Whether this is a quick charge (no order)
+  // NOTE: order linkage goes through `metadata.orderId` — the API's Zod schema
+  // strips unknown top-level keys, so do NOT add orderId/isQuickCharge here.
 }
 
 export interface PaymentIntent {
@@ -151,7 +156,7 @@ export const stripeTerminalApi = {
    * Cancel a pending action on a reader
    */
   cancelReaderAction: (readerId: string) =>
-    apiClient.post<{ readerId: string; status: string }>(
+    apiClient.post<{ success: boolean; readerId: string }>(
       `/stripe/terminal/readers/${readerId}/cancel-action`,
       {}
     ),

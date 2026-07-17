@@ -156,7 +156,7 @@ export function UpgradeScreen() {
         {/* Hero */}
         <View style={styles.hero}>
           <View style={styles.proBadge}>
-            <Ionicons name="diamond" size={24} color="#fff" />
+            <Ionicons name="diamond" size={24} color={colors.onPrimary} />
           </View>
           <Text style={styles.heroTitle} maxFontSizeMultiplier={1.2}>{t('heroTitle')}</Text>
           <Text style={styles.heroSubtitle} maxFontSizeMultiplier={1.5}>
@@ -215,10 +215,10 @@ export function UpgradeScreen() {
             ]}
           >
             {purchasing ? (
-              <ActivityIndicator size="small" color="#fff" accessibilityLabel={tc('loading')} />
+              <ActivityIndicator size="small" color={colors.onPrimary} accessibilityLabel={tc('loading')} />
             ) : (
               <>
-                <Ionicons name="diamond" size={20} color="#fff" />
+                <Ionicons name="diamond" size={20} color={colors.onPrimary} />
                 <Text style={styles.subscribeButtonText} maxFontSizeMultiplier={1.3}>
                   {t('subscribeButtonText', { price })}
                 </Text>
@@ -427,7 +427,7 @@ const createStyles = (colors: any) => {
     subscribeButtonText: {
       fontSize: 17,
       fontFamily: fonts.semiBold,
-      color: '#fff',
+      color: colors.onPrimary,
     },
     restoreButton: {
       alignItems: 'center',

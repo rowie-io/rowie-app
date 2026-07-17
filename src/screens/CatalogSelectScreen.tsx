@@ -169,7 +169,7 @@ export function CatalogSelectScreen() {
           <Ionicons
             name="grid-outline"
             size={24}
-            color={isSelected ? '#fff' : colors.primary}
+            color={isSelected ? colors.onPrimary : colors.primary}
           />
         </View>
         <View style={styles.catalogInfo}>
@@ -214,8 +214,14 @@ export function CatalogSelectScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      {/* Header */}
+      {/* Header — modal-style screens close with an X at the TOP-LEFT
+          (matches Checkout) so dismissal is consistent across the app. */}
       <View style={styles.header}>
+        {isModal && (
+          <TouchableOpacity style={styles.closeButton} onPress={handleClose} accessibilityRole="button" accessibilityLabel={t('closeAccessibilityLabel')}>
+            <Ionicons name="close" size={24} color={colors.text} />
+          </TouchableOpacity>
+        )}
         <View style={styles.headerContent}>
           <Text style={styles.title} maxFontSizeMultiplier={1.2}>{isModal ? t('switchMenuTitle') : t('selectMenuTitle')}</Text>
           <Text style={styles.subtitle} maxFontSizeMultiplier={1.5}>
@@ -224,11 +230,6 @@ export function CatalogSelectScreen() {
               : t('selectMenuSubtitle')}
           </Text>
         </View>
-        {isModal && (
-          <TouchableOpacity style={styles.closeButton} onPress={handleClose} accessibilityRole="button" accessibilityLabel={t('closeAccessibilityLabel')}>
-            <Ionicons name="close" size={24} color={colors.text} />
-          </TouchableOpacity>
-        )}
       </View>
 
       {activeCatalogs.length === 0 ? (
@@ -276,8 +277,8 @@ const createStyles = (colors: any) => {
       height: 44,
       alignItems: 'center',
       justifyContent: 'center',
-      marginTop: -8,
-      marginRight: -8,
+      marginTop: -4,
+      marginRight: 14,
       backgroundColor: colors.card,
       borderRadius: 14,
       borderWidth: 1,
