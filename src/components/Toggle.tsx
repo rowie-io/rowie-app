@@ -69,6 +69,7 @@ export function Toggle({ value, onValueChange, disabled = false, accessibilityLa
       onPress={handlePress}
       disabled={disabled}
       style={[styles.touchable, disabled && styles.disabled]}
+      hitSlop={{ left: 8, right: 8 }}
       accessibilityRole="switch"
       accessibilityState={{ checked: value }}
       accessibilityLabel={accessibilityLabel || t('defaultLabel')}
@@ -83,7 +84,9 @@ export function Toggle({ value, onValueChange, disabled = false, accessibilityLa
 
 const styles = StyleSheet.create({
   touchable: {
-    // Wrapper for touch handling
+    // 44pt minimum touch target (iOS HIG) with the 24pt track centered
+    minHeight: 44,
+    justifyContent: 'center',
   },
   track: {
     width: TRACK_WIDTH,

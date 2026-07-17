@@ -78,6 +78,15 @@ export function PaymentProcessingScreen() {
   const isServerDriven = preferredReader?.readerType === 'internet';
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Subtle elapsed indicator so the vendor can tell "slow" from "hung" while
+  // waiting for a tap (server-driven flows can sit here for up to 2 minutes).
+  const [elapsedSec, setElapsedSec] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => setElapsedSec((s) => s + 1), 1000);
+    return () => clearInterval(interval);
+  }, []);
+  const elapsedLabel = `${Math.floor(elapsedSec / 60)}:${String(elapsedSec % 60).padStart(2, '0')}`;
+
   // Navigate to PaymentResult via stack reset.
   // On SUCCESS: reset to [MainTabs, PaymentResult] — Checkout must NOT be in the
   // stack because clearCart() empties the cart, and Checkout's useEffect calls
@@ -259,6 +268,7 @@ export function PaymentProcessingScreen() {
 
       let errorMessage = error.message || t('paymentFailed');
       const lower = errorMessage.toLowerCase();
+      let isNetworkDrop = false;
 
       if (lower.includes('command was canceled') ||
           lower.includes('command was cancelled')) {
@@ -278,6 +288,8 @@ export function PaymentProcessingScreen() {
         lower.includes('unreachable')
       ) {
         errorMessage = t('paymentNetworkDropVerifyHistory');
+        // PaymentResult shows a direct "Check History" action for this case.
+        isNetworkDrop = true;
       }
 
       navigateToResult({
@@ -288,6 +300,7 @@ export function PaymentProcessingScreen() {
         orderNumber,
         customerEmail,
         errorMessage,
+        isNetworkDrop,
         preorderId,
         sessionId,
         sessionTipAmount,
@@ -326,6 +339,9 @@ export function PaymentProcessingScreen() {
             orderNumber,
             customerEmail,
             errorMessage: t('paymentTimedOut'),
+            // Timeout = the tap may still have completed reader-side —
+            // PaymentResult offers a direct "Check History" action.
+            isNetworkDrop: true,
             preorderId,
             sessionId,
             sessionTipAmount,
@@ -341,6 +357,7 @@ export function PaymentProcessingScreen() {
 
       let errorMessage = error.message || t('failedToSendToReader');
       const lower = errorMessage.toLowerCase();
+      let isNetworkDrop = false;
 
       if (errorMessage.includes('No such terminal.reader')) {
         errorMessage = t('readerNotFound');
@@ -358,6 +375,7 @@ export function PaymentProcessingScreen() {
         lower.includes('unreachable')
       ) {
         errorMessage = t('paymentNetworkDropVerifyHistory');
+        isNetworkDrop = true;
       }
 
       navigateToResult({
@@ -368,6 +386,7 @@ export function PaymentProcessingScreen() {
         orderNumber,
         customerEmail,
         errorMessage,
+        isNetworkDrop,
         preorderId,
         sessionId,
         sessionTipAmount,
@@ -415,6 +434,13 @@ export function PaymentProcessingScreen() {
 
           {/* Status */}
           <Text style={styles.statusText} maxFontSizeMultiplier={1.5} accessibilityRole="text" accessibilityLiveRegion="polite">{statusText}</Text>
+
+          {/* Elapsed indicator (appears after a few seconds) */}
+          {elapsedSec >= 5 && (
+            <Text style={styles.elapsedText} maxFontSizeMultiplier={1.5}>
+              {t('elapsedTime', { time: elapsedLabel })}
+            </Text>
+          )}
 
           {/* Reader info for server-driven */}
           {isServerDriven && preferredReader && (
@@ -472,6 +498,14 @@ const createStyles = (colors: any) => {
       fontFamily: fonts.medium,
       color: colors.textSecondary,
       textAlign: 'center',
+    },
+    elapsedText: {
+      fontSize: 13,
+      fontFamily: fonts.regular,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginTop: 10,
+      fontVariant: ['tabular-nums'],
     },
     readerLabel: {
       fontSize: 13,

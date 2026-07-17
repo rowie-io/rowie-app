@@ -6,15 +6,14 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { fonts } from '../lib/fonts';
-import { shadows } from '../lib/shadows';
 import { authService } from '../lib/api';
 import { Input } from '../components/Input';
+import { GradientButton } from '../components/ui/GradientButton';
 import { useTheme } from '../context/ThemeContext';
 import { useTranslations } from '../lib/i18n';
 import { isValidEmail } from '../lib/validation';
@@ -36,9 +35,8 @@ export function ForgotPasswordScreen() {
       return;
     }
     if (!isValidEmail(email)) {
-      // Validate format inline so users don't hit the API with garbage
-      // (Cognito returns a generic UserNotFound which leaks UX) — surface a
-      // clear, actionable message immediately.
+      // Validate format inline so users don't hit the API with garbage —
+      // surface a clear, actionable message immediately.
       setError(t('emailInvalid'));
       return;
     }
@@ -81,15 +79,13 @@ export function ForgotPasswordScreen() {
                   {t('checkSpamFolder')}
                 </Text>
 
-                <TouchableOpacity
-                  style={styles.button}
+                <GradientButton
+                  label={t('backToLogin')}
                   onPress={() => navigation.goBack()}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
+                  size="lg"
+                  style={styles.button}
                   accessibilityLabel={t('backToLoginAccessibilityLabel')}
-                >
-                  <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>{t('backToLogin')}</Text>
-                </TouchableOpacity>
+                />
 
                 <TouchableOpacity
                   onPress={() => {
@@ -164,6 +160,9 @@ export function ForgotPasswordScreen() {
                     autoCapitalize="none"
                     autoCorrect={false}
                     autoComplete="email"
+                    textContentType="username"
+                    returnKeyType="go"
+                    onSubmitEditing={handleSubmit}
                     accessibilityLabel={t('emailAccessibilityLabel')}
                     accessibilityHint={t('forgotPasswordEmailAccessibilityHint')}
                   />
@@ -172,24 +171,14 @@ export function ForgotPasswordScreen() {
                   </Text>
                 </View>
 
-                <TouchableOpacity
-                  style={[styles.button, loading && styles.buttonDisabled]}
+                <GradientButton
+                  label={loading ? t('sendingButton') : t('resetPasswordButton')}
                   onPress={handleSubmit}
-                  disabled={loading}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
+                  loading={loading}
+                  size="lg"
+                  style={styles.button}
                   accessibilityLabel={loading ? t('sendingResetEmailAccessibilityLabel') : t('resetPasswordAccessibilityLabel')}
-                  accessibilityState={{ disabled: loading, busy: loading }}
-                >
-                  {loading ? (
-                    <View style={styles.buttonContent}>
-                      <ActivityIndicator color={themeColors.text} size="small" accessibilityLabel={t('sendingResetEmailAccessibilityLabel')} />
-                      <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>{t('sendingButton')}</Text>
-                    </View>
-                  ) : (
-                    <Text maxFontSizeMultiplier={1.3} style={styles.buttonText}>{t('resetPasswordButton')}</Text>
-                  )}
-                </TouchableOpacity>
+                />
               </View>
             </View>
           </View>
@@ -302,27 +291,7 @@ const createStyles = (themeColors: { background: string; card: string; border: s
     marginLeft: 4,
   },
   button: {
-    backgroundColor: themeColors.primary,
-    borderRadius: 20,
-    paddingVertical: 16,
-    alignItems: 'center',
     marginTop: 8,
-    ...shadows.md,
-    shadowColor: themeColors.primary,
-    shadowOpacity: 0.3,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontFamily: fonts.semiBold,
-    color: '#fff',
   },
   // Success styles
   successIcon: {

@@ -63,7 +63,9 @@ export function StripeOnboardingScreen() {
         try {
           const createResponse = await stripeConnectApi.createAccount();
           logger.log('[StripeOnboarding] Account created, got URL:', createResponse.onboardingUrl);
-          setOnboardingUrl(createResponse.onboardingUrl);
+          // onboardingUrl is omitted when the account is already complete or
+          // under review — nothing to load in the WebView in that case.
+          setOnboardingUrl(createResponse.onboardingUrl ?? null);
           return;
         } catch (createErr: any) {
           logger.error('[StripeOnboarding] Failed to create account:', createErr);
@@ -120,10 +122,10 @@ export function StripeOnboardingScreen() {
     if (!url || url === 'about:blank') return true;
 
     // Block only our callback URL — Stripe redirects here when onboarding completes.
-    // The callback is configured as {dashboardUrl}/banking (e.g. portal.rowie.io/banking)
-    // Covers: portal.rowie.io, dev.rowie.io, rowie.io, localhost:*
+    // The callback is configured as {dashboardUrl}/banking (e.g. portal.rowie.eu/banking)
+    // Covers: portal.rowie.eu, dev.rowie.eu, rowie.eu, localhost:*.
     const isCallbackRedirect =
-      url.includes('rowie.io') || url.includes('localhost');
+      url.includes('rowie.eu') || url.includes('localhost');
 
     if (isCallbackRedirect) {
       logger.log('[StripeOnboarding] Detected callback redirect, closing:', url);
@@ -334,7 +336,7 @@ const createStyles = (colors: any) =>
       marginTop: 8,
     },
     retryButtonText: {
-      color: '#fff',
+      color: colors.onPrimary,
       fontSize: 16,
       fontWeight: '600',
     },

@@ -68,6 +68,10 @@ export function TransactionDetailScreen() {
 
   const isLoading = sourceType === 'preorder' ? isLoadingPreorder : isLoadingTransaction;
 
+  // Per-transaction currency (multi-currency history). Falls back to the
+  // org's current currency for preorders and rows that predate `currency`.
+  const txCurrency = transaction?.currency || currency;
+
   const refundMutation = useMutation({
     mutationFn: (amountCents: number | undefined) =>
       transactionsApi.refund(id, amountCents !== undefined ? { amount: amountCents } : undefined),
@@ -102,8 +106,8 @@ export function TransactionDetailScreen() {
   const handleRefund = () => {
     // Pre-fill the input with the full refundable balance — most refunds are
     // full, and Lewis explicitly wants the partial path to be opt-in.
-    const baseUnits = fromSmallestUnit(refundableCents, currency);
-    setRefundAmountInput(isZeroDecimal(currency) ? String(baseUnits) : baseUnits.toFixed(2));
+    const baseUnits = fromSmallestUnit(refundableCents, txCurrency);
+    setRefundAmountInput(isZeroDecimal(txCurrency) ? String(baseUnits) : baseUnits.toFixed(2));
     setRefundAmountError(null);
     setShowRefundModal(true);
   };
@@ -114,9 +118,9 @@ export function TransactionDetailScreen() {
       setRefundAmountError(t('refundAmountInvalid'));
       return;
     }
-    const requestedCents = toSmallestUnit(parsed, currency);
+    const requestedCents = toSmallestUnit(parsed, txCurrency);
     if (requestedCents > refundableCents) {
-      setRefundAmountError(t('refundAmountTooHigh', { max: formatCents(refundableCents, currency) }));
+      setRefundAmountError(t('refundAmountTooHigh', { max: formatCents(refundableCents, txCurrency) }));
       return;
     }
     setRefundAmountError(null);
@@ -344,14 +348,14 @@ export function TransactionDetailScreen() {
               </View>
               <Text maxFontSizeMultiplier={1.3} style={styles.modalTitle}>{t('refundModalTitle')}</Text>
               <Text maxFontSizeMultiplier={1.5} style={styles.modalMessage}>
-                {t('refundAmountHint', { max: formatCents(refundableCents, currency) })}
+                {t('refundAmountHint', { max: formatCents(refundableCents, txCurrency) })}
               </Text>
               <View style={styles.refundAmountRow}>
-                <Text maxFontSizeMultiplier={1.3} style={styles.refundAmountSymbol}>{getCurrencySymbol(currency)}</Text>
+                <Text maxFontSizeMultiplier={1.3} style={styles.refundAmountSymbol}>{getCurrencySymbol(txCurrency)}</Text>
                 <TextInput
                   value={refundAmountInput}
                   onChangeText={(v) => { setRefundAmountInput(v); setRefundAmountError(null); }}
-                  keyboardType={isZeroDecimal(currency) ? 'number-pad' : 'decimal-pad'}
+                  keyboardType={isZeroDecimal(txCurrency) ? 'number-pad' : 'decimal-pad'}
                   placeholder="0.00"
                   placeholderTextColor={colors.textMuted}
                   style={styles.refundAmountInput}
@@ -435,8 +439,13 @@ export function TransactionDetailScreen() {
     );
   }
 
+  // Refundable while any balance remains — the refund modal supports partial
+  // refunds, so a prior partial refund must not lock out the rest.
   const canRefund =
-    transaction.status === 'succeeded' && transaction.amountRefunded === 0;
+    (transaction.status === 'succeeded' || transaction.status === 'partially_refunded') &&
+    transaction.amountRefunded < transaction.amount;
+  const isPartiallyRefunded =
+    transaction.amountRefunded > 0 && transaction.amountRefunded < transaction.amount;
 
   return (
     <View style={{ flex: 1 }}>
@@ -460,7 +469,7 @@ export function TransactionDetailScreen() {
         <View style={styles.amountCard}>
           <Text maxFontSizeMultiplier={1.5} style={styles.amountLabel}>{t('detailAmountLabel')}</Text>
           <Text maxFontSizeMultiplier={1.2} style={styles.amount}>
-            {formatCents(transaction.amount, currency)}
+            {formatCents(transaction.amount, txCurrency)}
           </Text>
           <View
             style={[
@@ -482,6 +491,14 @@ export function TransactionDetailScreen() {
                 transaction.status.slice(1).replace('_', ' ')}
             </Text>
           </View>
+          {isPartiallyRefunded && (
+            <Text maxFontSizeMultiplier={1.5} style={[styles.partialRefundNote, { color: colors.warning }]}>
+              {t('refundedOfTotal', {
+                refunded: formatCents(transaction.amountRefunded, txCurrency),
+                total: formatCents(transaction.amount, txCurrency),
+              })}
+            </Text>
+          )}
         </View>
 
         {/* Details Section */}
@@ -527,14 +544,14 @@ export function TransactionDetailScreen() {
           {transaction.cashTendered != null && transaction.cashTendered > 0 && (
             <View style={styles.detailRow}>
               <Text maxFontSizeMultiplier={1.5} style={styles.detailLabel}>{t('detailLabelCashTendered')}</Text>
-              <Text maxFontSizeMultiplier={1.5} style={styles.detailValue}>{formatCents(transaction.cashTendered, currency)}</Text>
+              <Text maxFontSizeMultiplier={1.5} style={styles.detailValue}>{formatCents(transaction.cashTendered, txCurrency)}</Text>
             </View>
           )}
 
           {transaction.cashChange != null && transaction.cashChange > 0 && (
             <View style={styles.detailRow}>
               <Text maxFontSizeMultiplier={1.5} style={styles.detailLabel}>{t('detailLabelChangeGiven')}</Text>
-              <Text maxFontSizeMultiplier={1.5} style={styles.detailValue}>{formatCents(transaction.cashChange, currency)}</Text>
+              <Text maxFontSizeMultiplier={1.5} style={styles.detailValue}>{formatCents(transaction.cashChange, txCurrency)}</Text>
             </View>
           )}
 
@@ -549,7 +566,7 @@ export function TransactionDetailScreen() {
             <View style={styles.detailRow}>
               <Text maxFontSizeMultiplier={1.5} style={styles.detailLabel}>{t('detailLabelAmountRefunded')}</Text>
               <Text maxFontSizeMultiplier={1.5} style={[styles.detailValue, { color: colors.warning }]}>
-                {formatCents(transaction.amountRefunded, currency)}
+                {formatCents(transaction.amountRefunded, txCurrency)}
               </Text>
             </View>
           )}
@@ -582,7 +599,7 @@ export function TransactionDetailScreen() {
                   </Text>
                 </View>
                 <Text maxFontSizeMultiplier={1.5} style={styles.paymentBreakdownAmount}>
-                  {formatCents(payment.amount, currency)}
+                  {formatCents(payment.amount, txCurrency)}
                 </Text>
               </View>
             ))}
@@ -597,7 +614,7 @@ export function TransactionDetailScreen() {
               <View key={refund.id} style={styles.refundItem}>
                 <View>
                   <Text maxFontSizeMultiplier={1.5} style={styles.refundAmount}>
-                    -{formatCents(refund.amount, currency)}
+                    -{formatCents(refund.amount, txCurrency)}
                   </Text>
                   <Text maxFontSizeMultiplier={1.5} style={styles.refundDate}>
                     {formatDate(refund.created)}
@@ -650,9 +667,9 @@ export function TransactionDetailScreen() {
                     accessibilityState={{ disabled: sendingReceipt || !receiptEmail.trim() }}
                   >
                     {sendingReceipt ? (
-                      <ActivityIndicator size="small" color="#fff" accessibilityLabel={t('sendingReceipt')} />
+                      <ActivityIndicator size="small" color={colors.onPrimary} accessibilityLabel={t('sendingReceipt')} />
                     ) : (
-                      <Ionicons name="send" size={18} color="#fff" />
+                      <Ionicons name="send" size={18} color={colors.onPrimary} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -671,7 +688,7 @@ export function TransactionDetailScreen() {
               onPress={handleRefund}
               disabled={refundMutation.isPending}
               accessibilityRole="button"
-              accessibilityLabel={t('issueRefundAccessibilityLabel', { amount: formatCents(transaction.amount, currency) })}
+              accessibilityLabel={t('issueRefundAccessibilityLabel', { amount: formatCents(transaction.amount, txCurrency) })}
               accessibilityState={{ disabled: refundMutation.isPending }}
             >
               {refundMutation.isPending ? (
@@ -703,14 +720,14 @@ export function TransactionDetailScreen() {
             </View>
             <Text maxFontSizeMultiplier={1.3} style={styles.modalTitle}>{t('refundModalTitle')}</Text>
             <Text maxFontSizeMultiplier={1.5} style={styles.modalMessage}>
-              {t('refundAmountHint', { max: formatCents(refundableCents, currency) })}
+              {t('refundAmountHint', { max: formatCents(refundableCents, txCurrency) })}
             </Text>
             <View style={styles.refundAmountRow}>
-              <Text maxFontSizeMultiplier={1.3} style={styles.refundAmountSymbol}>{getCurrencySymbol(currency)}</Text>
+              <Text maxFontSizeMultiplier={1.3} style={styles.refundAmountSymbol}>{getCurrencySymbol(txCurrency)}</Text>
               <TextInput
                 value={refundAmountInput}
                 onChangeText={(v) => { setRefundAmountInput(v); setRefundAmountError(null); }}
-                keyboardType={isZeroDecimal(currency) ? 'number-pad' : 'decimal-pad'}
+                keyboardType={isZeroDecimal(txCurrency) ? 'number-pad' : 'decimal-pad'}
                 placeholder="0.00"
                 placeholderTextColor={colors.textMuted}
                 style={styles.refundAmountInput}
@@ -852,6 +869,11 @@ const createStyles = (colors: any) => {
     statusText: {
       fontSize: 14,
       fontWeight: '500',
+    },
+    partialRefundNote: {
+      fontSize: 13,
+      fontFamily: fonts.medium,
+      marginTop: 8,
     },
     section: {
       padding: 20,

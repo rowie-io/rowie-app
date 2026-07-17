@@ -1,7 +1,14 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { Product } from '../lib/api/products';
 import { useAuth } from './AuthContext';
+
+// Light tap confirmation for every successful add/increment. Fire-and-forget:
+// haptics are unavailable on web/some devices — never let that throw.
+function addToCartHaptic() {
+  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+}
 
 // Service mode picks the order-attribution path:
 // - 'table_service' = cart is sent to a table session (picked at send-time on the floor plan)
@@ -123,6 +130,7 @@ export function CartProvider({ children }: CartProviderProps) {
   // If same product with different notes, add as new item
   const addItem = useCallback((product: Product, quantity: number = 1, notes?: string) => {
     const cartKey = generateCartKey(product.id, notes);
+    addToCartHaptic();
 
     setItems((currentItems) => {
       const existingIndex = currentItems.findIndex(
@@ -209,6 +217,7 @@ export function CartProvider({ children }: CartProviderProps) {
 
   // Increment item quantity by 1 using cartKey
   const incrementItem = useCallback((cartKey: string) => {
+    addToCartHaptic();
     setItems((currentItems) =>
       currentItems.map((item) =>
         item.cartKey === cartKey

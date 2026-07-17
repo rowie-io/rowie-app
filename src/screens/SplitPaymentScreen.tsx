@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,10 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
-  TextInput,
+  Pressable,
   KeyboardAvoidingView,
   Platform,
-  Vibration,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp, CommonActions } from '@react-navigation/native';
@@ -28,6 +28,7 @@ import { shadows } from '../lib/shadows';
 import { CardField, useConfirmPayment, CardFieldInput, initStripe } from '@stripe/stripe-react-native';
 import { config } from '../lib/config';
 import { useTranslations } from '../lib/i18n';
+import { KeypadButton } from '../components/Keypad';
 
 type RouteParams = {
   SplitPayment: {
@@ -39,6 +40,14 @@ type RouteParams = {
 };
 
 type PaymentMethod = 'card' | 'cash' | 'tap_to_pay';
+type AmountField = 'amount' | 'tendered';
+
+const KEYPAD_ROWS = [
+  ['1', '2', '3'],
+  ['4', '5', '6'],
+  ['7', '8', '9'],
+  ['.', '0', 'backspace'],
+];
 
 export function SplitPaymentScreen() {
   const { colors, isDark } = useTheme();
@@ -67,8 +76,51 @@ export function SplitPaymentScreen() {
   const [cardDetails, setCardDetails] = useState<CardFieldInput.Details | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [cashTendered, setCashTendered] = useState('');
+  // Which amount field the in-app keypad edits (OS decimal-pad replaced with
+  // the same large keypad pattern used by QuickCharge / CashPayment).
+  const [activeField, setActiveField] = useState<AmountField>('amount');
+  const { width: screenWidth } = useWindowDimensions();
 
   const styles = createStyles(colors, isDark);
+
+  // The tendered field only exists for cash — snap the keypad back to the
+  // amount field when the method changes away from cash.
+  useEffect(() => {
+    if (selectedMethod !== 'cash' && activeField !== 'amount') {
+      setActiveField('amount');
+    }
+  }, [selectedMethod, activeField]);
+
+  // Keypad key sizing inside the payment form card (screen padding 20 + form
+  // padding 20 on each side, 2 gaps of 10).
+  const keypadButtonWidth = useMemo(
+    () => Math.min(104, Math.max(64, Math.floor((screenWidth - 100) / 3))),
+    [screenWidth]
+  );
+
+  // Shared digit handling for both amount fields: one decimal point max,
+  // two decimals max, no decimal point for zero-decimal currencies.
+  const applyKeypadKey = useCallback((prev: string, key: string): string => {
+    if (key === 'backspace') return prev.slice(0, -1);
+    if (key === '.') {
+      if (isZeroDecimal(currency) || prev.includes('.')) return prev;
+      return prev + '.';
+    }
+    if (!isZeroDecimal(currency)) {
+      const parts = prev.split('.');
+      if (parts[1] && parts[1].length >= 2) return prev;
+    }
+    if (prev.replace('.', '').length >= 8) return prev;
+    return prev + key;
+  }, [currency]);
+
+  const handleKeypadKey = useCallback((key: string) => {
+    if (activeField === 'tendered') {
+      setCashTendered((prev) => applyKeypadKey(prev, key));
+    } else {
+      setPaymentAmount((prev) => applyKeypadKey(prev, key));
+    }
+  }, [activeField, applyKeypadKey]);
 
   // Fetch existing payments
   const fetchPayments = useCallback(async () => {
@@ -137,10 +189,20 @@ export function SplitPaymentScreen() {
     try {
       const isServerDriven = preferredReader?.readerType === 'internet';
 
-      // Create payment intent via API
+      // Create payment intent via API. Order linkage MUST go through
+      // metadata.orderId — the API's Zod schema strips unknown top-level keys
+      // and only reads metadata.orderId for webhook/receipt attribution.
+      // No top-level tipAmount here: split legs are arbitrary slices of the
+      // order total, so the tip portion of a leg isn't attributable —
+      // the platform fee falls back to the full leg amount (legacy behaviour).
       const piResponse = await stripeTerminalApi.createPaymentIntent({
         amount: fromSmallestUnit(amount, currency), // Convert smallest unit to base unit for API
         currency, // Multi-currency support — never assume USD
+        metadata: {
+          orderId,
+          orderNumber,
+          isQuickCharge: 'false',
+        },
       });
 
       if (isServerDriven) {
@@ -209,11 +271,17 @@ export function SplitPaymentScreen() {
 
     setIsProcessing(true);
     try {
+      // Order linkage goes through metadata.orderId — top-level orderId /
+      // isQuickCharge were silently stripped by the API's Zod schema, leaving
+      // these PIs unattributed. (See the tap-to-pay leg above re: no tipAmount.)
       const paymentIntent = await stripeTerminalApi.createPaymentIntent({
         amount: fromSmallestUnit(amount, currency),
         currency, // Multi-currency support — never assume USD
-        orderId,
-        isQuickCharge: false,
+        metadata: {
+          orderId,
+          orderNumber,
+          isQuickCharge: 'false',
+        },
         captureMethod: 'automatic',
         paymentMethodType: 'card',
       });
@@ -293,6 +361,7 @@ export function SplitPaymentScreen() {
     setCashTendered('');
     setCardDetails(null);
     setSelectedMethod('tap_to_pay');
+    setActiveField('amount');
   };
 
   // Stripe's minimum charge varies by currency (e.g. $0.50 USD, £0.30 GBP,
@@ -485,7 +554,7 @@ export function SplitPaymentScreen() {
                           <Ionicons
                             name={getPaymentMethodIcon(method)}
                             size={20}
-                            color={belowMin ? colors.textMuted : selectedMethod === method ? '#fff' : colors.text}
+                            color={belowMin ? colors.textMuted : selectedMethod === method ? colors.onPrimary : colors.text}
                           />
                           <Text
                             style={[
@@ -512,20 +581,24 @@ export function SplitPaymentScreen() {
                     </View>
                   )}
 
-                  {/* Amount Input */}
+                  {/* Amount Input (in-app keypad below edits the active field) */}
                   <View style={styles.inputGroup}>
                     <Text style={styles.inputLabel} maxFontSizeMultiplier={1.5}>{t('paymentAmount')}</Text>
-                    <View style={styles.amountInputContainer}>
+                    <Pressable
+                      style={[styles.amountInputContainer, activeField === 'amount' && styles.amountFieldActive]}
+                      onPress={() => setActiveField('amount')}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('paymentAmountAccessibility')}
+                      accessibilityState={{ selected: activeField === 'amount' }}
+                    >
                       <Text style={styles.dollarSign} maxFontSizeMultiplier={1.3}>{getCurrencySymbol(currency)}</Text>
-                      <TextInput
-                        style={styles.amountInput}
-                        value={paymentAmount}
-                        onChangeText={setPaymentAmount}
-                        keyboardType="decimal-pad"
-                        placeholder={isZeroDecimal(currency) ? t('zeroDecimalPlaceholder') : t('decimalPlaceholder')}
-                        placeholderTextColor={colors.textMuted}
-                        accessibilityLabel={t('paymentAmountAccessibility')}
-                      />
+                      <Text
+                        style={[styles.amountValue, !paymentAmount && styles.amountPlaceholder]}
+                        maxFontSizeMultiplier={1.3}
+                        numberOfLines={1}
+                      >
+                        {paymentAmount || (isZeroDecimal(currency) ? t('zeroDecimalPlaceholder') : t('decimalPlaceholder'))}
+                      </Text>
                       <TouchableOpacity
                         style={styles.remainingButton}
                         onPress={handlePayRemaining}
@@ -534,25 +607,29 @@ export function SplitPaymentScreen() {
                       >
                         <Text style={styles.remainingButtonText} maxFontSizeMultiplier={1.3}>{t('remainingButton')}</Text>
                       </TouchableOpacity>
-                    </View>
+                    </Pressable>
                   </View>
 
                   {/* Cash Tendered (for cash payments) */}
                   {selectedMethod === 'cash' && (
                     <View style={styles.inputGroup}>
                       <Text style={styles.inputLabel} maxFontSizeMultiplier={1.5}>{t('cashTenderedLabel')}</Text>
-                      <View style={styles.amountInputContainer}>
+                      <Pressable
+                        style={[styles.amountInputContainer, activeField === 'tendered' && styles.amountFieldActive]}
+                        onPress={() => setActiveField('tendered')}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('cashTenderedAmountAccessibility')}
+                        accessibilityState={{ selected: activeField === 'tendered' }}
+                      >
                         <Text style={styles.dollarSign} maxFontSizeMultiplier={1.3}>{getCurrencySymbol(currency)}</Text>
-                        <TextInput
-                          style={styles.amountInput}
-                          value={cashTendered}
-                          onChangeText={setCashTendered}
-                          keyboardType="decimal-pad"
-                          placeholder={isZeroDecimal(currency) ? t('zeroDecimalPlaceholder') : t('decimalPlaceholder')}
-                          placeholderTextColor={colors.textMuted}
-                          accessibilityLabel={t('cashTenderedAmountAccessibility')}
-                        />
-                      </View>
+                        <Text
+                          style={[styles.amountValue, !cashTendered && styles.amountPlaceholder]}
+                          maxFontSizeMultiplier={1.3}
+                          numberOfLines={1}
+                        >
+                          {cashTendered || (isZeroDecimal(currency) ? t('zeroDecimalPlaceholder') : t('decimalPlaceholder'))}
+                        </Text>
+                      </Pressable>
                       {/* Change calculation */}
                       {cashTendered && paymentAmount && (
                         <View style={styles.changeDisplay}>
@@ -564,6 +641,28 @@ export function SplitPaymentScreen() {
                       )}
                     </View>
                   )}
+
+                  {/* In-app keypad — edits the highlighted amount field */}
+                  <View style={styles.keypadContainer}>
+                    {KEYPAD_ROWS.map((row, rowIndex) => (
+                      <View key={rowIndex} style={styles.keypadRow}>
+                        {row.map((key) => (
+                          <KeypadButton
+                            key={key}
+                            keyValue={key}
+                            onPress={handleKeypadKey}
+                            colors={colors}
+                            buttonSize={keypadButtonWidth}
+                            buttonHeight={52}
+                            backgroundColor={colors.surface}
+                            pressedBackgroundColor={colors.background}
+                            disabled={key === '.' && isZeroDecimal(currency)}
+                            accessibilityLabel={key === 'backspace' ? t('deleteKey') : key === '.' ? t('decimalPoint') : key}
+                          />
+                        ))}
+                      </View>
+                    ))}
+                  </View>
 
                   {/* Card Entry (for manual card payments) */}
                   {selectedMethod === 'card' && (
@@ -812,6 +911,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
+      minHeight: 44,
       paddingVertical: 12,
       borderRadius: 12,
       backgroundColor: colors.surface,
@@ -831,7 +931,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       color: colors.text,
     },
     methodButtonTextSelected: {
-      color: '#fff',
+      color: colors.onPrimary,
     },
     methodButtonTextDisabled: {
       color: colors.textMuted,
@@ -875,6 +975,11 @@ const createStyles = (colors: any, isDark: boolean) =>
       borderWidth: 1,
       borderColor: colors.border,
       paddingHorizontal: 14,
+      minHeight: 52,
+    },
+    amountFieldActive: {
+      borderColor: colors.primary,
+      borderWidth: 1.5,
     },
     dollarSign: {
       fontSize: 20,
@@ -882,12 +987,24 @@ const createStyles = (colors: any, isDark: boolean) =>
       color: colors.textSecondary,
       marginRight: 4,
     },
-    amountInput: {
+    amountValue: {
       flex: 1,
       fontSize: 20,
       fontFamily: fonts.semiBold,
       color: colors.text,
       paddingVertical: 14,
+    },
+    amountPlaceholder: {
+      color: colors.textMuted,
+    },
+    keypadContainer: {
+      marginBottom: 8,
+    },
+    keypadRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      gap: 10,
+      marginBottom: 10,
     },
     remainingButton: {
       backgroundColor: colors.primary + '20',

@@ -38,7 +38,9 @@
     "item": "item",
     "items": "items",
     "noCategory": "Geen categorie",
-    "percentSymbol": "%"
+    "percentSymbol": "%",
+    "undo": "Ongedaan maken",
+    "removedFromCart": "{name} verwijderd"
   },
   "auth": {
     "loginTitle": "Inloggen",
@@ -385,7 +387,12 @@
     "goToCartAccessibilityLabelSingular": "Ga naar winkelwagen, {count} item",
     "goToCartAccessibilityLabelPlural": "Ga naar winkelwagen, {count} items",
     "goToCartButton": "Naar winkelwagen",
-    "switchToMenuAccessibilityLabel": "Wissel naar menu {name}"
+    "switchToMenuAccessibilityLabel": "Wissel naar menu {name}",
+    "longPressNotesHint": "Tip: houd een item ingedrukt om een notitie toe te voegen",
+    "dismissHintAccessibilityLabel": "Tip sluiten",
+    "quickChargeLabel": "Afrekenen",
+    "quickChargeOfflineLabel": "Offline",
+    "quickChargeOfflineNotice": "niet beschikbaar offline"
   },
   "checkout": {
     "tapToPayLabel": "Tap to Pay on iPhone",
@@ -476,7 +483,9 @@
     "cancelHoldAccessibilityLabel": "Vasthouden annuleren",
     "holdingOrderAccessibilityLabel": "Bestelling vasthouden",
     "closeHoldDialogAccessibilityLabel": "Vasthoudvenster sluiten",
-    "subtotalWithCountSingular": "Subtotaal ({count} artikel)"
+    "subtotalWithCountSingular": "Subtotaal ({count} artikel)",
+    "chargesDisabledPayHint": "Betalingen zijn niet beschikbaar totdat je betalingsinstellingen zijn voltooid.",
+    "offlinePayHint": "Geen internetverbinding — betalingen zijn niet beschikbaar totdat je weer online bent."
   },
   "payment": {
     "preparingPayment": "Betaling voorbereiden...",
@@ -619,7 +628,10 @@
     "cashReceived": "Contant ontvangen",
     "splitComplete": "Gesplitste betaling voltooid",
     "cardPaymentComplete": "Kaartbetaling voltooid",
-    "splitMethodsBadge": "Betaald met meerdere methoden"
+    "splitMethodsBadge": "Betaald met meerdere methoden",
+    "checkHistory": "Geschiedenis controleren",
+    "elapsedTime": "Verstreken {time}",
+    "tenderQuickAmountAccessibility": "Ontvangen contant geld instellen op {amount}"
   },
   "settings": {
     "title": "Instellingen",
@@ -679,7 +691,7 @@
     "sectionAbout": "OVER",
     "learnTapToPay": "Leer {tapToPayName}",
     "contactSupport": "Neem contact op met support",
-    "contactSupportAccessibilityHint": "Opent e-mail naar support@rowie.io",
+    "contactSupportAccessibilityHint": "Opent e-mail naar support@rowie.eu",
     "termsOfUse": "Gebruiksvoorwaarden",
     "privacyPolicy": "Privacybeleid",
     "signOut": "Uitloggen",
@@ -688,7 +700,7 @@
     "biometricNeedsRelogin": "Meld je af en weer aan en kies Inschakelen wanneer daarom wordt gevraagd om biometrisch inloggen in te schakelen.",
     "errorBiometricToggle": "{action} van biometrische login mislukt.",
     "deleteAccountAlertTitle": "Account verwijderen",
-    "deleteAccountAlertMessage": "Je account wordt onmiddellijk gedeactiveerd en na 30 dagen definitief verwijderd. Al je gegevens worden verwijderd en dit kan niet ongedaan worden gemaakt.\n\nJe kunt binnen 30 dagen contact opnemen met support@rowie.io om te annuleren.",
+    "deleteAccountAlertMessage": "Je account wordt onmiddellijk gedeactiveerd en na 30 dagen definitief verwijderd. Al je gegevens worden verwijderd en dit kan niet ongedaan worden gemaakt.\n\nJe kunt binnen 30 dagen contact opnemen met support@rowie.eu om te annuleren.",
     "deleteAccountAlertCancel": "Annuleren",
     "deleteAccountAlertConfirm": "Account verwijderen",
     "deleteAccountScheduledTitle": "Accountverwijdering gepland",
@@ -696,7 +708,7 @@
     "deleteAccountAlreadyScheduledTitle": "Al gepland",
     "deleteAccountAlreadyScheduledMessage": "Je account is al gepland voor verwijdering.",
     "deleteAccountErrorTitle": "Fout",
-    "deleteAccountErrorMessage": "Verwijderingsverzoek verwerken mislukt. Probeer het opnieuw of neem contact op met support@rowie.io.",
+    "deleteAccountErrorMessage": "Verwijderingsverzoek verwerken mislukt. Probeer het opnieuw of neem contact op met support@rowie.eu.",
     "subscriptionStatusFreePlan": "Gratis plan",
     "subscriptionStatusCancelsOn": "Wordt geannuleerd op {date}",
     "subscriptionStatusCanceled": "Geannuleerd",
@@ -712,7 +724,15 @@
     "changePasswordAccessibilityHint": "Werk het wachtwoord van je account bij",
     "bookings": "Bookings",
     "bookingsSubtitle": "Take payment for pay-at-appointment bookings",
-    "bookingsAccessibilityHint": "Opens the bookings list"
+    "bookingsAccessibilityHint": "Opens the bookings list",
+    "posModeSectionTitle": "POS-modus",
+    "posModeTableService": "Tafelservice",
+    "posModeTableServiceSubtitle": "Kies vóór elke bestelling een tafel. Bestellingen worden aan tafels gekoppeld.",
+    "posModeTableServiceDisabledSubtitle": "Geen plattegronden ingesteld voor deze locatie. Voeg er een toe in het verkopersportaal om dit in te schakelen.",
+    "posModeQuickService": "Snelservice",
+    "posModeQuickServiceSubtitle": "Balie-/QSR-/foodtruckmodus. Bestellingen gaan direct naar afrekenen, zonder tafel.",
+    "posModeTableServiceAccessibilityLabel": "Tafelservicemodus",
+    "posModeQuickServiceAccessibilityLabel": "Snelservicemodus"
   },
   "changePassword": {
     "title": "Wachtwoord wijzigen",
@@ -847,7 +867,13 @@
     "receiptSentMessage": "Bon verzonden naar {email}",
     "receiptErrorTitle": "Fout",
     "receiptErrorMessage": "Bon verzenden mislukt",
-    "goBackAccessibilityLabel": "Ga terug"
+    "goBackAccessibilityLabel": "Ga terug",
+    "searchPlaceholder": "Zoek op e-mail, naam of bedrag",
+    "searchAccessibilityLabel": "Transacties zoeken",
+    "clearSearchAccessibilityLabel": "Zoekopdracht wissen",
+    "noResultsTitle": "Geen overeenkomende transacties",
+    "noResultsSubtitle": "Probeer een andere zoekopdracht of filter.",
+    "refundedOfTotal": "{refunded} van {total} terugbetaald"
   },
   "tapToPay": {
     "settingsHeaderTitle": "Betalingsinstellingen",
@@ -984,7 +1010,13 @@
     "readerConnecting": "Verbinden...",
     "readerConnectingAccessibilityLabel": "Verbinden met lezer",
     "readerConnectToAccessibilityLabel": "Verbinden met {name}",
-    "readerTapToConnect": "Tik om te verbinden"
+    "readerTapToConnect": "Tik om te verbinden",
+    "readerDeleteConfirmTitle": "Lezer verwijderen?",
+    "readerDeleteConfirmMessage": "“{name}” wordt verwijderd uit je Stripe-account. Je kunt hem later opnieuw registreren.",
+    "readerDeleteConfirmButton": "Verwijderen",
+    "educationSkipConfirmTitle": "Later instellen?",
+    "educationSkipConfirmMessage": "Je kunt Tap to Pay altijd instellen via Instellingen → Tap to Pay.",
+    "educationSkipConfirmConfirm": "Later instellen"
   },
   "upgrade": {
     "goBackAccessibilityLabel": "Ga terug",
@@ -1070,7 +1102,21 @@
     "noScansYetText": "Nog geen scans",
     "ticketVerifiedMessage": "Ticket geverifieerd",
     "unknownTier": "Onbekend",
-    "failedToVerifyTicketMessage": "Ticket verifiëren mislukt"
+    "failedToVerifyTicketMessage": "Ticket verifiëren mislukt",
+    "washAlreadyUsedTitle": "Al gescand",
+    "washWrongEventTitle": "Verkeerd evenement",
+    "washEventCancelledTitle": "Evenement geannuleerd",
+    "washNetworkErrorTitle": "Kon niet verifiëren",
+    "washNetworkErrorMessage": "Controleer je verbinding en scan het ticket opnieuw",
+    "torchOnAccessibilityLabel": "Zaklamp aanzetten",
+    "torchOffAccessibilityLabel": "Zaklamp uitzetten",
+    "manualEntryAccessibilityLabel": "Ticketcode handmatig invoeren",
+    "manualEntryTitle": "Ticketcode invoeren",
+    "manualEntrySubtitle": "Typ de code die onder de QR-code van het ticket staat",
+    "manualEntryPlaceholder": "Ticketcode",
+    "manualEntrySubmit": "Verifiëren",
+    "feedbackMuteAccessibilityLabel": "Scanfeedback dempen",
+    "feedbackUnmuteAccessibilityLabel": "Scanfeedback aanzetten"
   },
   "preorders": {
     "tabNew": "Nieuw",
@@ -1197,7 +1243,7 @@
     "loading": "Laden",
     "loadingTables": "Tafels laden",
     "noFloorPlansTitle": "Geen plattegronden geconfigureerd",
-    "noFloorPlansSubtitle": "Stel plattegronden in via het verkopersportaal",
+    "noFloorPlansSubtitle": "Maak je plattegrond in het Rowie-portaal op portal.rowie.eu → Tafels",
     "noTablesOnFloorPlan": "Geen tafels op deze plattegrond",
     "noMenuTitle": "Geen menu geselecteerd",
     "noMenuMessage": "Selecteer een menu voordat je een sessie start.",
@@ -1218,8 +1264,31 @@
     "statusCleaning": "schoonmaken",
     "tableAccessibilityLabel": "{label}, {status}",
     "tableAccessibilityLabelWithSession": "{label}, {status}, {count} items",
+    "tableAccessibilityLabelWithSessionOne": "{label}, {status}, 1 item",
     "filterAccessibilityLabel": "{name}",
-    "seatSingular": "{count} stoel"
+    "seatSingular": "{count} stoel",
+    "tableStatus_empty": "Beschikbaar",
+    "tableStatus_active": "Bezet",
+    "tableStatus_aging": "Wacht lang",
+    "tableStatus_urgent": "Urgent",
+    "tableStatus_check_requested": "Rekening gevraagd",
+    "tableStatus_merged": "Samengevoegd",
+    "tableStatus_unavailable": "Niet beschikbaar",
+    "mergeInto": "Samenvoegen met {label}",
+    "mergeAction": "Samenvoegen met een andere tafel",
+    "unmergeCountAction": "Splitsen ({count})",
+    "unmergeLabelAction": "{label} splitsen",
+    "unmergeTitle": "Welke tafel splitsen?",
+    "tableSheetTitle": "Tafel {label}",
+    "mergeBannerText": "Tik op een vrije tafel om samen te voegen.",
+    "cancelMergeLabel": "Samenvoegen annuleren",
+    "mergeFailedTitle": "Samenvoegen mislukt",
+    "mergeFailedMessage": "Kon die tafel niet samenvoegen.",
+    "unmergeFailedTitle": "Splitsen mislukt",
+    "unmergeFailedMessage": "Kon die tafel niet splitsen.",
+    "longPressHint": "Tip: houd een tafel ingedrukt voor meer opties",
+    "dismissHintLabel": "Tip verbergen",
+    "noTablesSubtitle": "Voeg tafels toe aan deze plattegrond in het Rowie-portaal op portal.rowie.eu → Tafels"
   },
   "sessionDetail": {
     "addItems": "Items toevoegen",
@@ -1313,7 +1382,45 @@
     "tipPercentAccessibility": "Fooi {pct}%",
     "tipPercentLabel": "{pct}%",
     "totalLabel": "Totaal",
-    "totalToCharge": "Totaal af te boeken"
+    "totalToCharge": "Totaal af te boeken",
+    "closeLabel": "Sluiten",
+    "saveButton": "Opslaan",
+    "editQuantityAction": "Aantal bewerken",
+    "editNotesAction": "Notities bewerken",
+    "removeAction": "Verwijderen",
+    "itemSheetMessage": "Pas dit item aan vóór het afrekenen.",
+    "removeConfirmTitle": "Item verwijderen?",
+    "removeConfirmMessage": "{quantity}× {name} uit deze sessie verwijderen?",
+    "invalidQtyTitle": "Ongeldig aantal",
+    "invalidQtyMessage": "Het aantal moet minstens 1 zijn. Gebruik Verwijderen om het item te wissen.",
+    "updateFailedTitle": "Bijwerken mislukt",
+    "updateFailedMessage": "Kon het item niet bijwerken.",
+    "statusUpdateFailedMessage": "Kon de itemstatus niet bijwerken.",
+    "removeFailedTitle": "Verwijderen mislukt",
+    "removeFailedMessage": "Kon het item niet verwijderen.",
+    "itemActionsLabel": "Acties voor {name}",
+    "qtyPlaceholder": "Aantal",
+    "quantityLabel": "Aantal",
+    "notesPlaceholder": "Itemnotities (bijv. zonder ui)",
+    "itemNotesLabel": "Itemnotities",
+    "roundItemsSingular": "{count} item",
+    "roundItemsPlural": "{count} items",
+    "roundCollapseLabel": "Ronde {number} inklappen",
+    "roundExpandLabel": "Ronde {number} uitklappen",
+    "statusPendingSnackbar": "Ronde {number} markeren als {status}…",
+    "exactAmount": "Gepast",
+    "exactAmountAccessibility": "Gepast bedrag {amount}",
+    "quickTenderLabel": "Snelle bedragen",
+    "mergeAction": "Samenvoegen met een andere tafel",
+    "unmergeLabelAction": "{label} splitsen",
+    "unmergeUnknownAction": "Tafel splitsen",
+    "unmergeFailedTitle": "Splitsen mislukt",
+    "unmergeFailedMessage": "Kon die tafel niet splitsen.",
+    "tableActionsLabel": "Tafelacties",
+    "nothingToChargeTitle": "Niets af te rekenen",
+    "nothingToChargeMessage": "Deze sessie heeft een totaal van nul.",
+    "couldNotStartPaymentTitle": "Kon betaling niet starten",
+    "couldNotStartPaymentMessage": "Kan geen betaalintentie aanmaken."
   },
   "addItemsToSession": {
     "headerTitle": "Items toevoegen",
@@ -1586,7 +1693,10 @@
       "chargeAmount": "Reken {amount} af",
       "invalidAmountTitle": "Ongeldig bedrag",
       "minimumCharge": "Minimumbedrag is {amount}",
-      "quickChargeDescription": "Snelle betaling - {amount}"
+      "quickChargeDescription": "Snelle betaling - {amount}",
+      "deleteKey": "Laatste cijfer verwijderen",
+      "clearAmount": "Bedrag wissen",
+      "closeAccessibilityLabel": "Snelle betaling sluiten"
     },
     "floatingTabBar": {
       "menuLabel": "Menu",
@@ -1594,7 +1704,12 @@
       "ordersLabel": "Bestellingen",
       "historyLabel": "Geschiedenis",
       "eventsLabel": "Evenementen",
-      "accountLabel": "Account"
+      "accountLabel": "Account",
+      "chargeLabel": "Afrekenen",
+      "chargeOfflineLabel": "Offline",
+      "chargeAccessibilityLabel": "Snelle betaling",
+      "chargeAccessibilityHint": "Opent het toetsenblok voor snelle betaling",
+      "chargeOfflineHint": "niet beschikbaar offline"
     },
     "screenHeader": {
       "goBack": "Ga terug"
@@ -1640,6 +1755,29 @@
     "alreadyPaidTitle": "Already paid",
     "alreadyPaidMessage": "This booking has already been paid.",
     "paymentErrorTitle": "Couldn't start payment",
-    "paymentErrorMessage": "We couldn't start the payment. Please try again."
+    "paymentErrorMessage": "We couldn't start the payment. Please try again.",
+    "next30DaysLabel": "Komende 30 dagen",
+    "emptyDayTitle": "Geen boekingen op deze dag",
+    "emptyDaySubtitle": "Kies een andere dag of bekijk de komende 30 dagen.",
+    "emptySearchTitle": "Geen overeenkomende boekingen",
+    "emptySearchSubtitle": "Probeer een andere naam of wis de zoekopdracht.",
+    "statusPending": "In afwachting",
+    "statusConfirmed": "Bevestigd",
+    "statusCompleted": "Voltooid",
+    "statusCancelled": "Geannuleerd",
+    "statusNoShow": "Niet verschenen",
+    "statusPartiallyRefunded": "Gedeeltelijk terugbetaald",
+    "actionsTitle": "Boekingsacties",
+    "confirmAction": "Boeking bevestigen",
+    "completeAction": "Markeren als voltooid",
+    "noShowAction": "Markeren als niet verschenen",
+    "cancelAction": "Boeking annuleren",
+    "cancelConfirmTitle": "Boeking annuleren?",
+    "cancelConfirmMessage": "Dit annuleert de boeking van {name}. Dit kan niet ongedaan worden gemaakt.",
+    "cancelConfirmMessagePaid": "Dit annuleert de boeking van {name} en betaalt de online betaling automatisch terug. Dit kan niet ongedaan worden gemaakt.",
+    "cancelConfirmButton": "Boeking annuleren",
+    "keepBookingButton": "Boeking behouden",
+    "statusUpdateErrorTitle": "Kon boeking niet bijwerken",
+    "statusUpdateErrorMessage": "Probeer het opnieuw."
   }
 }

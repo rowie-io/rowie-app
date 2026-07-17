@@ -38,7 +38,9 @@
     "item": "tuote",
     "items": "tuotetta",
     "noCategory": "Ei kategoriaa",
-    "percentSymbol": "%"
+    "percentSymbol": "%",
+    "undo": "Kumoa",
+    "removedFromCart": "{name} poistettu"
   },
   "auth": {
     "loginTitle": "Kirjaudu sisään",
@@ -385,7 +387,12 @@
     "goToCartAccessibilityLabelSingular": "Siirry koriin, {count} tuote",
     "goToCartAccessibilityLabelPlural": "Siirry koriin, {count} tuotetta",
     "goToCartButton": "Siirry koriin",
-    "switchToMenuAccessibilityLabel": "Vaihda valikkoon {name}"
+    "switchToMenuAccessibilityLabel": "Vaihda valikkoon {name}",
+    "longPressNotesHint": "Vinkki: lisää huomautus painamalla tuotetta pitkään",
+    "dismissHintAccessibilityLabel": "Hylkää vinkki",
+    "quickChargeLabel": "Veloita",
+    "quickChargeOfflineLabel": "Offline",
+    "quickChargeOfflineNotice": "ei käytettävissä offline-tilassa"
   },
   "checkout": {
     "tapToPayLabel": "Tap to Pay on iPhone",
@@ -476,7 +483,9 @@
     "cancelHoldAccessibilityLabel": "Peruuta tilauksen pidätys",
     "holdingOrderAccessibilityLabel": "Pidetään tilausta",
     "closeHoldDialogAccessibilityLabel": "Sulje tilauksen pidätysikkuna",
-    "subtotalWithCountSingular": "Välisumma ({count} tuote)"
+    "subtotalWithCountSingular": "Välisumma ({count} tuote)",
+    "chargesDisabledPayHint": "Maksut eivät ole käytettävissä, ennen kuin maksuasetukset on viimeistelty.",
+    "offlinePayHint": "Ei internet-yhteyttä — maksut eivät ole käytettävissä, ennen kuin yhteys palautuu."
   },
   "payment": {
     "preparingPayment": "Valmistellaan maksua...",
@@ -619,7 +628,10 @@
     "cashReceived": "Käteinen vastaanotettu",
     "splitComplete": "Jaettu maksu valmis",
     "cardPaymentComplete": "Korttimaksu valmis",
-    "splitMethodsBadge": "Maksettu useilla menetelmillä"
+    "splitMethodsBadge": "Maksettu useilla menetelmillä",
+    "checkHistory": "Tarkista historia",
+    "elapsedTime": "Kulunut {time}",
+    "tenderQuickAmountAccessibility": "Aseta vastaanotettu käteinen summaan {amount}"
   },
   "settings": {
     "title": "Asetukset",
@@ -679,7 +691,7 @@
     "sectionAbout": "TIETOJA",
     "learnTapToPay": "Lisätietoja: {tapToPayName}",
     "contactSupport": "Ota yhteyttä tukeen",
-    "contactSupportAccessibilityHint": "Avaa sähköpostin osoitteeseen support@rowie.io",
+    "contactSupportAccessibilityHint": "Avaa sähköpostin osoitteeseen support@rowie.eu",
     "termsOfUse": "Käyttöehdot",
     "privacyPolicy": "Tietosuojakäytäntö",
     "signOut": "Kirjaudu ulos",
@@ -688,7 +700,7 @@
     "biometricNeedsRelogin": "Kirjaudu ulos ja takaisin sisään, valitse sitten Ota käyttöön, kun sitä pyydetään, ottaaksesi biometrisen kirjautumisen käyttöön.",
     "errorBiometricToggle": "Biometrisen kirjautumisen {action} epäonnistui.",
     "deleteAccountAlertTitle": "Poista tili",
-    "deleteAccountAlertMessage": "Tilisi deaktivoidaan välittömästi ja poistetaan pysyvästi 30 päivän kuluttua. Kaikki tietosi poistetaan eikä tätä voi kumota.\n\nVoit ottaa yhteyttä osoitteeseen support@rowie.io 30 päivän kuluessa peruuttaaksesi.",
+    "deleteAccountAlertMessage": "Tilisi deaktivoidaan välittömästi ja poistetaan pysyvästi 30 päivän kuluttua. Kaikki tietosi poistetaan eikä tätä voi kumota.\n\nVoit ottaa yhteyttä osoitteeseen support@rowie.eu 30 päivän kuluessa peruuttaaksesi.",
     "deleteAccountAlertCancel": "Peruuta",
     "deleteAccountAlertConfirm": "Poista tili",
     "deleteAccountScheduledTitle": "Tilin poisto ajoitettu",
@@ -696,7 +708,7 @@
     "deleteAccountAlreadyScheduledTitle": "Jo ajoitettu",
     "deleteAccountAlreadyScheduledMessage": "Tilisi on jo ajoitettu poistettavaksi.",
     "deleteAccountErrorTitle": "Virhe",
-    "deleteAccountErrorMessage": "Poistopyynnön käsittely epäonnistui. Yritä uudelleen tai ota yhteyttä osoitteeseen support@rowie.io.",
+    "deleteAccountErrorMessage": "Poistopyynnön käsittely epäonnistui. Yritä uudelleen tai ota yhteyttä osoitteeseen support@rowie.eu.",
     "subscriptionStatusFreePlan": "Ilmainen paketti",
     "subscriptionStatusCancelsOn": "Peruuntuu {date}",
     "subscriptionStatusCanceled": "Peruutettu",
@@ -712,7 +724,15 @@
     "changePasswordAccessibilityHint": "Päivitä tilisi salasana",
     "bookings": "Bookings",
     "bookingsSubtitle": "Take payment for pay-at-appointment bookings",
-    "bookingsAccessibilityHint": "Opens the bookings list"
+    "bookingsAccessibilityHint": "Opens the bookings list",
+    "posModeSectionTitle": "POS-tila",
+    "posModeTableService": "Pöytäpalvelu",
+    "posModeTableServiceSubtitle": "Valitse pöytä ennen jokaista tilausta. Tilaukset kohdistetaan pöytiin.",
+    "posModeTableServiceDisabledSubtitle": "Tälle toimipisteelle ei ole pohjapiirroksia. Lisää sellainen myyjäportaalissa ottaaksesi käyttöön.",
+    "posModeQuickService": "Pikapalvelu",
+    "posModeQuickServiceSubtitle": "Tiski-/pikaruoka-/ruokarekkatila. Tilaukset siirtyvät suoraan kassalle ilman pöytää.",
+    "posModeTableServiceAccessibilityLabel": "Pöytäpalvelutila",
+    "posModeQuickServiceAccessibilityLabel": "Pikapalvelutila"
   },
   "changePassword": {
     "title": "Vaihda salasana",
@@ -847,7 +867,13 @@
     "receiptSentMessage": "Kuitti lähetetty osoitteeseen {email}",
     "receiptErrorTitle": "Virhe",
     "receiptErrorMessage": "Kuitin lähetys epäonnistui",
-    "goBackAccessibilityLabel": "Takaisin"
+    "goBackAccessibilityLabel": "Takaisin",
+    "searchPlaceholder": "Hae sähköpostilla, nimellä tai summalla",
+    "searchAccessibilityLabel": "Hae tapahtumia",
+    "clearSearchAccessibilityLabel": "Tyhjennä haku",
+    "noResultsTitle": "Ei vastaavia tapahtumia",
+    "noResultsSubtitle": "Kokeile toista hakua tai suodatinta.",
+    "refundedOfTotal": "Hyvitetty {refunded} / {total}"
   },
   "tapToPay": {
     "settingsHeaderTitle": "Maksuasetukset",
@@ -984,7 +1010,13 @@
     "readerConnecting": "Yhdistetään...",
     "readerConnectingAccessibilityLabel": "Yhdistetään lukijaan",
     "readerConnectToAccessibilityLabel": "Yhdistä lukijaan {name}",
-    "readerTapToConnect": "Napauta yhdistääksesi"
+    "readerTapToConnect": "Napauta yhdistääksesi",
+    "readerDeleteConfirmTitle": "Poistetaanko lukija?",
+    "readerDeleteConfirmMessage": "”{name}” poistetaan Stripe-tililtäsi. Voit rekisteröidä sen myöhemmin uudelleen.",
+    "readerDeleteConfirmButton": "Poista",
+    "educationSkipConfirmTitle": "Määritä myöhemmin?",
+    "educationSkipConfirmMessage": "Voit määrittää Tap to Payn milloin tahansa kohdassa Asetukset → Tap to Pay.",
+    "educationSkipConfirmConfirm": "Määritä myöhemmin"
   },
   "upgrade": {
     "goBackAccessibilityLabel": "Takaisin",
@@ -1070,7 +1102,21 @@
     "noScansYetText": "Ei vielä skannauksia",
     "ticketVerifiedMessage": "Lippu vahvistettu",
     "unknownTier": "Tuntematon",
-    "failedToVerifyTicketMessage": "Lipun vahvistus epäonnistui"
+    "failedToVerifyTicketMessage": "Lipun vahvistus epäonnistui",
+    "washAlreadyUsedTitle": "Jo skannattu",
+    "washWrongEventTitle": "Väärä tapahtuma",
+    "washEventCancelledTitle": "Tapahtuma peruttu",
+    "washNetworkErrorTitle": "Vahvistus epäonnistui",
+    "washNetworkErrorMessage": "Tarkista yhteys ja skannaa lippu uudelleen",
+    "torchOnAccessibilityLabel": "Sytytä taskulamppu",
+    "torchOffAccessibilityLabel": "Sammuta taskulamppu",
+    "manualEntryAccessibilityLabel": "Syötä lippukoodi käsin",
+    "manualEntryTitle": "Syötä lippukoodi",
+    "manualEntrySubtitle": "Kirjoita lipun QR-koodin alla näkyvä koodi",
+    "manualEntryPlaceholder": "Lippukoodi",
+    "manualEntrySubmit": "Vahvista",
+    "feedbackMuteAccessibilityLabel": "Mykistä skannauspalaute",
+    "feedbackUnmuteAccessibilityLabel": "Ota skannauspalaute käyttöön"
   },
   "preorders": {
     "tabNew": "Uudet",
@@ -1197,7 +1243,7 @@
     "loading": "Ladataan",
     "loadingTables": "Ladataan pöytiä",
     "noFloorPlansTitle": "Ei pohjapiirustuksia määritetty",
-    "noFloorPlansSubtitle": "Määritä pohjapiirustukset myyjäportaalissa",
+    "noFloorPlansSubtitle": "Luo pohjapiirros Rowie-portaalissa osoitteessa portal.rowie.eu → Pöydät",
     "noTablesOnFloorPlan": "Ei pöytiä tässä pohjapiirustuksessa",
     "noMenuTitle": "Ei valittua menua",
     "noMenuMessage": "Valitse menu ennen istunnon aloittamista.",
@@ -1218,8 +1264,31 @@
     "statusCleaning": "siivous",
     "tableAccessibilityLabel": "{label}, {status}",
     "tableAccessibilityLabelWithSession": "{label}, {status}, {count} tuotetta",
+    "tableAccessibilityLabelWithSessionOne": "{label}, {status}, 1 tuote",
     "filterAccessibilityLabel": "{name}",
-    "seatSingular": "{count} paikka"
+    "seatSingular": "{count} paikka",
+    "tableStatus_empty": "Vapaa",
+    "tableStatus_active": "Varattu",
+    "tableStatus_aging": "Odottaa",
+    "tableStatus_urgent": "Kiireellinen",
+    "tableStatus_check_requested": "Lasku pyydetty",
+    "tableStatus_merged": "Yhdistetty",
+    "tableStatus_unavailable": "Ei käytettävissä",
+    "mergeInto": "Yhdistä pöytään {label}",
+    "mergeAction": "Yhdistä toiseen pöytään",
+    "unmergeCountAction": "Erota ({count})",
+    "unmergeLabelAction": "Erota {label}",
+    "unmergeTitle": "Mikä pöytä erotetaan?",
+    "tableSheetTitle": "Pöytä {label}",
+    "mergeBannerText": "Napauta vapaata pöytää yhdistääksesi sen.",
+    "cancelMergeLabel": "Peruuta yhdistäminen",
+    "mergeFailedTitle": "Yhdistäminen epäonnistui",
+    "mergeFailedMessage": "Pöytää ei voitu yhdistää.",
+    "unmergeFailedTitle": "Erottaminen epäonnistui",
+    "unmergeFailedMessage": "Pöytää ei voitu erottaa.",
+    "longPressHint": "Vinkki: paina pöytää pitkään nähdäksesi lisää vaihtoehtoja",
+    "dismissHintLabel": "Piilota vinkki",
+    "noTablesSubtitle": "Lisää pöytiä tähän pohjapiirrokseen Rowie-portaalissa osoitteessa portal.rowie.eu → Pöydät"
   },
   "sessionDetail": {
     "addItems": "Lisää tuotteita",
@@ -1313,7 +1382,45 @@
     "tipPercentAccessibility": "Tippi {pct}%",
     "tipPercentLabel": "{pct}%",
     "totalLabel": "Yhteensä",
-    "totalToCharge": "Veloitettava yhteensä"
+    "totalToCharge": "Veloitettava yhteensä",
+    "closeLabel": "Sulje",
+    "saveButton": "Tallenna",
+    "editQuantityAction": "Muokkaa määrää",
+    "editNotesAction": "Muokkaa muistiinpanoja",
+    "removeAction": "Poista",
+    "itemSheetMessage": "Muokkaa tuotetta ennen tilin sulkemista.",
+    "removeConfirmTitle": "Poistetaanko tuote?",
+    "removeConfirmMessage": "Poistetaanko {quantity}× {name} tästä istunnosta?",
+    "invalidQtyTitle": "Virheellinen määrä",
+    "invalidQtyMessage": "Määrän on oltava vähintään 1. Poista tuote Poista-toiminnolla.",
+    "updateFailedTitle": "Päivitys epäonnistui",
+    "updateFailedMessage": "Tuotetta ei voitu päivittää.",
+    "statusUpdateFailedMessage": "Tuotteen tilaa ei voitu päivittää.",
+    "removeFailedTitle": "Poisto epäonnistui",
+    "removeFailedMessage": "Tuotetta ei voitu poistaa.",
+    "itemActionsLabel": "Toiminnot tuotteelle {name}",
+    "qtyPlaceholder": "Määrä",
+    "quantityLabel": "Määrä",
+    "notesPlaceholder": "Tuotteen muistiinpanot (esim. ei sipulia)",
+    "itemNotesLabel": "Tuotteen muistiinpanot",
+    "roundItemsSingular": "{count} tuote",
+    "roundItemsPlural": "{count} tuotetta",
+    "roundCollapseLabel": "Pienennä kierros {number}",
+    "roundExpandLabel": "Laajenna kierros {number}",
+    "statusPendingSnackbar": "Merkitään kierros {number} tilaan {status}…",
+    "exactAmount": "Tasan",
+    "exactAmountAccessibility": "Tarkka summa {amount}",
+    "quickTenderLabel": "Pikasummat",
+    "mergeAction": "Yhdistä toiseen pöytään",
+    "unmergeLabelAction": "Erota {label}",
+    "unmergeUnknownAction": "Erota pöytä",
+    "unmergeFailedTitle": "Erottaminen epäonnistui",
+    "unmergeFailedMessage": "Pöytää ei voitu erottaa.",
+    "tableActionsLabel": "Pöydän toiminnot",
+    "nothingToChargeTitle": "Ei veloitettavaa",
+    "nothingToChargeMessage": "Tämän istunnon summa on nolla.",
+    "couldNotStartPaymentTitle": "Maksua ei voitu aloittaa",
+    "couldNotStartPaymentMessage": "Maksutapahtumaa ei voitu luoda."
   },
   "addItemsToSession": {
     "headerTitle": "Lisää tuotteita",
@@ -1586,7 +1693,10 @@
       "chargeAmount": "Veloita {amount}",
       "invalidAmountTitle": "Virheellinen summa",
       "minimumCharge": "Minimiveloitus on {amount}",
-      "quickChargeDescription": "Pikaveloitus - {amount}"
+      "quickChargeDescription": "Pikaveloitus - {amount}",
+      "deleteKey": "Poista viimeinen numero",
+      "clearAmount": "Tyhjennä summa",
+      "closeAccessibilityLabel": "Sulje pikaveloitus"
     },
     "floatingTabBar": {
       "menuLabel": "Menu",
@@ -1594,7 +1704,12 @@
       "ordersLabel": "Tilaukset",
       "historyLabel": "Historia",
       "eventsLabel": "Tapahtumat",
-      "accountLabel": "Tili"
+      "accountLabel": "Tili",
+      "chargeLabel": "Veloita",
+      "chargeOfflineLabel": "Offline",
+      "chargeAccessibilityLabel": "Pikaveloitus",
+      "chargeAccessibilityHint": "Avaa pikaveloitusnäppäimistön",
+      "chargeOfflineHint": "ei käytettävissä offline-tilassa"
     },
     "screenHeader": {
       "goBack": "Takaisin"
@@ -1640,6 +1755,29 @@
     "alreadyPaidTitle": "Already paid",
     "alreadyPaidMessage": "This booking has already been paid.",
     "paymentErrorTitle": "Couldn't start payment",
-    "paymentErrorMessage": "We couldn't start the payment. Please try again."
+    "paymentErrorMessage": "We couldn't start the payment. Please try again.",
+    "next30DaysLabel": "Seuraavat 30 päivää",
+    "emptyDayTitle": "Ei varauksia tälle päivälle",
+    "emptyDaySubtitle": "Valitse toinen päivä tai näytä seuraavat 30 päivää.",
+    "emptySearchTitle": "Ei vastaavia varauksia",
+    "emptySearchSubtitle": "Kokeile toista nimeä tai tyhjennä haku.",
+    "statusPending": "Odottaa",
+    "statusConfirmed": "Vahvistettu",
+    "statusCompleted": "Valmis",
+    "statusCancelled": "Peruttu",
+    "statusNoShow": "Ei saapunut",
+    "statusPartiallyRefunded": "Osittain hyvitetty",
+    "actionsTitle": "Varauksen toiminnot",
+    "confirmAction": "Vahvista varaus",
+    "completeAction": "Merkitse valmiiksi",
+    "noShowAction": "Merkitse saapumatta jääneeksi",
+    "cancelAction": "Peru varaus",
+    "cancelConfirmTitle": "Perutaanko varaus?",
+    "cancelConfirmMessage": "Tämä peruu asiakkaan {name} varauksen. Tätä ei voi kumota.",
+    "cancelConfirmMessagePaid": "Tämä peruu asiakkaan {name} varauksen ja hyvittää verkkomaksun automaattisesti. Tätä ei voi kumota.",
+    "cancelConfirmButton": "Peru varaus",
+    "keepBookingButton": "Säilytä varaus",
+    "statusUpdateErrorTitle": "Varauksen päivitys epäonnistui",
+    "statusUpdateErrorMessage": "Yritä uudelleen."
   }
 }

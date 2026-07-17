@@ -20,6 +20,7 @@ import { useTranslations } from '../lib/i18n';
 import { useTerminal, classifyReaderType } from '../context/StripeTerminalContext';
 import type { PreferredReader } from '../context/StripeTerminalContext';
 import { stripeTerminalApi, TerminalReader } from '../lib/api/stripe-terminal';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { fonts } from '../lib/fonts';
 
 export function ReaderManagementScreen() {
@@ -47,6 +48,9 @@ export function ReaderManagementScreen() {
   const [registrationCode, setRegistrationCode] = useState('');
   const [readerLabel, setReaderLabel] = useState('');
   const [connectingSerial, setConnectingSerial] = useState<string | null>(null);
+  // Reader awaiting delete confirmation — deleting unregisters it from the
+  // Stripe account, so it must never fire from a single tap.
+  const [readerToDelete, setReaderToDelete] = useState<TerminalReader | null>(null);
 
   // Fetch registered readers
   const { data: readersData, isLoading, refetch } = useQuery({
@@ -131,12 +135,14 @@ export function ReaderManagementScreen() {
         {
           text: t('readerActionDelete'),
           style: 'destructive',
-          onPress: () => deleteMutation.mutate(reader.id),
+          // Confirmation modal before the irreversible delete — see the
+          // <ConfirmModal> at the bottom of this screen.
+          onPress: () => setReaderToDelete(reader),
         },
         { text: tc('cancel'), style: 'cancel' },
       ]
     );
-  }, [preferredReader, setPreferredReader, clearPreferredReader, deleteMutation]);
+  }, [preferredReader, setPreferredReader, clearPreferredReader]);
 
   const handleBluetoothScan = useCallback(async () => {
     try {
@@ -319,7 +325,7 @@ export function ReaderManagementScreen() {
     primaryButtonText: {
       fontSize: 15,
       fontFamily: fonts.semiBold,
-      color: '#FFFFFF',
+      color: colors.onPrimary,
     },
     secondaryButton: {
       flex: 1,
@@ -514,7 +520,7 @@ export function ReaderManagementScreen() {
                     accessibilityLabel={t('readerRegisterAccessibilityLabel')}
                   >
                     {registerMutation.isPending ? (
-                      <ActivityIndicator size="small" color="#FFFFFF" accessibilityLabel={t('readerRegistering')} />
+                      <ActivityIndicator size="small" color={colors.onPrimary} accessibilityLabel={t('readerRegistering')} />
                     ) : (
                       <Text style={styles.primaryButtonText} maxFontSizeMultiplier={1.3}>{t('readerRegister')}</Text>
                     )}
@@ -647,6 +653,22 @@ export function ReaderManagementScreen() {
         <View style={{ height: insets.bottom + 32 }} />
       </ScrollView>
 
+      {/* Destructive-action confirmation for reader deletion */}
+      <ConfirmModal
+        visible={readerToDelete !== null}
+        title={t('readerDeleteConfirmTitle')}
+        message={t('readerDeleteConfirmMessage', { name: readerToDelete?.label || readerToDelete?.deviceType || '' })}
+        confirmText={t('readerDeleteConfirmButton')}
+        cancelText={tc('cancel')}
+        confirmStyle="destructive"
+        onConfirm={() => {
+          if (readerToDelete) {
+            deleteMutation.mutate(readerToDelete.id);
+          }
+          setReaderToDelete(null);
+        }}
+        onCancel={() => setReaderToDelete(null)}
+      />
     </View>
   );
 }

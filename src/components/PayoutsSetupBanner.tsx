@@ -73,7 +73,7 @@ export function PayoutsSetupBanner({ compact = false }: PayoutsSetupBannerProps)
           accessibilityHint={t('messageManager')}
         >
           <Text style={styles.buttonText} maxFontSizeMultiplier={1.3}>{tc('completeSetup')}</Text>
-          <Ionicons name="open-outline" size={16} color="#fff" />
+          <Ionicons name="open-outline" size={16} color={colors.onPrimary} />
         </TouchableOpacity>
       )}
     </View>
@@ -133,7 +133,7 @@ const createStyles = (colors: any, compact: boolean, isDark: boolean) =>
     buttonText: {
       fontSize: 15,
       fontWeight: '600',
-      color: '#fff',
+      color: colors.onPrimary,
     },
     // Compact banner styles
     compactContainer: {

@@ -162,12 +162,6 @@ export const catalogProductsApi = {
   listRaw: (catalogId: string) => apiClient.get<CatalogProduct[]>(`/catalogs/${catalogId}/products`),
 
   /**
-   * Get a single product in a catalog (returns raw CatalogProduct structure)
-   */
-  getRaw: (catalogId: string, catalogProductId: string) =>
-    apiClient.get<CatalogProduct>(`/catalogs/${catalogId}/products/${catalogProductId}`),
-
-  /**
    * Add a product to a catalog
    */
   add: (catalogId: string, data: CreateCatalogProductData) =>
@@ -186,12 +180,13 @@ export const catalogProductsApi = {
     apiClient.delete(`/catalogs/${catalogId}/products/${catalogProductId}`),
 
   /**
-   * Bulk add products to a catalog
+   * Bulk add products to a catalog. The API expects
+   * `{ products: [{ productId, price }] }`, so the default price is applied
+   * to every product in the batch.
    */
   bulkAdd: (catalogId: string, productIds: string[], defaultPrice: number) =>
     apiClient.post<{ added: number }>(`/catalogs/${catalogId}/products/bulk`, {
-      productIds,
-      defaultPrice,
+      products: productIds.map((productId) => ({ productId, price: defaultPrice })),
     }),
 
   /**
@@ -212,13 +207,5 @@ export const productsApi = {
   list: async (catalogId: string): Promise<Product[]> => {
     const catalogProducts = await catalogProductsApi.listRaw(catalogId);
     return catalogProducts.map(flattenCatalogProduct);
-  },
-
-  /**
-   * Get a single product by ID (returns flattened structure)
-   */
-  get: async (catalogId: string, catalogProductId: string): Promise<Product> => {
-    const catalogProduct = await catalogProductsApi.getRaw(catalogId, catalogProductId);
-    return flattenCatalogProduct(catalogProduct);
   },
 };

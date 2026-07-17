@@ -11,7 +11,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     orientation: 'portrait',
     icon: './assets/logo-dark.png',
     userInterfaceStyle: 'dark',
-    newArchEnabled: true,
     scheme: 'rowie',
     splash: {
       image: './assets/rowie-wordmark.png',
@@ -40,7 +39,6 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         monochromeImage: './assets/adaptive-icon-foreground.png',
         backgroundColor: '#000000',
       },
-      edgeToEdgeEnabled: true,
       permissions: [
         'android.permission.NFC',
         'android.permission.ACCESS_FINE_LOCATION',
@@ -53,6 +51,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
     plugins: [
       'expo-font',
+      'expo-secure-store',
+      '@react-native-community/datetimepicker',
       './plugins/withProximityReaderDiscovery',
       [
         '@stripe/stripe-terminal-react-native',

@@ -38,7 +38,9 @@
     "item": "artikel",
     "items": "artiklar",
     "noCategory": "Ingen kategori",
-    "percentSymbol": "%"
+    "percentSymbol": "%",
+    "undo": "Ångra",
+    "removedFromCart": "{name} borttagen"
   },
   "auth": {
     "loginTitle": "Logga in",
@@ -385,7 +387,12 @@
     "goToCartAccessibilityLabelSingular": "Gå till varukorgen, {count} artikel",
     "goToCartAccessibilityLabelPlural": "Gå till varukorgen, {count} artiklar",
     "goToCartButton": "Gå till varukorgen",
-    "switchToMenuAccessibilityLabel": "Byt till menyn {name}"
+    "switchToMenuAccessibilityLabel": "Byt till menyn {name}",
+    "longPressNotesHint": "Tips: håll in en vara för att lägga till en anteckning",
+    "dismissHintAccessibilityLabel": "Stäng tips",
+    "quickChargeLabel": "Debitera",
+    "quickChargeOfflineLabel": "Offline",
+    "quickChargeOfflineNotice": "otillgänglig offline"
   },
   "checkout": {
     "tapToPayLabel": "Tap to Pay on iPhone",
@@ -476,7 +483,9 @@
     "cancelHoldAccessibilityLabel": "Avbryt parkering",
     "holdingOrderAccessibilityLabel": "Parkerar beställning",
     "closeHoldDialogAccessibilityLabel": "Stäng parkeringsdialogen",
-    "subtotalWithCountSingular": "Delsumma ({count} artikel)"
+    "subtotalWithCountSingular": "Delsumma ({count} artikel)",
+    "chargesDisabledPayHint": "Betalningar är inte tillgängliga förrän din betalningskonfiguration är klar.",
+    "offlinePayHint": "Ingen internetanslutning — betalningar är otillgängliga tills du är online igen."
   },
   "payment": {
     "preparingPayment": "Förbereder betalning...",
@@ -619,7 +628,10 @@
     "cashReceived": "Kontanter mottagna",
     "splitComplete": "Delad betalning slutförd",
     "cardPaymentComplete": "Kortbetalning slutförd",
-    "splitMethodsBadge": "Betald med flera metoder"
+    "splitMethodsBadge": "Betald med flera metoder",
+    "checkHistory": "Kontrollera historik",
+    "elapsedTime": "Förfluten tid {time}",
+    "tenderQuickAmountAccessibility": "Ange mottagen kontant till {amount}"
   },
   "settings": {
     "title": "Inställningar",
@@ -679,7 +691,7 @@
     "sectionAbout": "OM",
     "learnTapToPay": "Lär dig om {tapToPayName}",
     "contactSupport": "Kontakta support",
-    "contactSupportAccessibilityHint": "Öppnar e-post till support@rowie.io",
+    "contactSupportAccessibilityHint": "Öppnar e-post till support@rowie.eu",
     "termsOfUse": "Användarvillkor",
     "privacyPolicy": "Integritetspolicy",
     "signOut": "Logga ut",
@@ -688,7 +700,7 @@
     "biometricNeedsRelogin": "Logga ut och logga in igen, välj sedan Aktivera när du uppmanas för att aktivera biometrisk inloggning.",
     "errorBiometricToggle": "Kunde inte {action} biometrisk inloggning.",
     "deleteAccountAlertTitle": "Radera konto",
-    "deleteAccountAlertMessage": "Ditt konto inaktiveras omedelbart och raderas permanent efter 30 dagar. Alla dina data tas bort och detta kan inte ångras.\n\nDu kan kontakta support@rowie.io inom 30 dagar för att avbryta.",
+    "deleteAccountAlertMessage": "Ditt konto inaktiveras omedelbart och raderas permanent efter 30 dagar. Alla dina data tas bort och detta kan inte ångras.\n\nDu kan kontakta support@rowie.eu inom 30 dagar för att avbryta.",
     "deleteAccountAlertCancel": "Avbryt",
     "deleteAccountAlertConfirm": "Radera konto",
     "deleteAccountScheduledTitle": "Kontoradering schemalagd",
@@ -696,7 +708,7 @@
     "deleteAccountAlreadyScheduledTitle": "Redan schemalagt",
     "deleteAccountAlreadyScheduledMessage": "Ditt konto är redan schemalagt för radering.",
     "deleteAccountErrorTitle": "Fel",
-    "deleteAccountErrorMessage": "Kunde inte bearbeta raderingsbegäran. Försök igen eller kontakta support@rowie.io.",
+    "deleteAccountErrorMessage": "Kunde inte bearbeta raderingsbegäran. Försök igen eller kontakta support@rowie.eu.",
     "subscriptionStatusFreePlan": "Gratisabonnemang",
     "subscriptionStatusCancelsOn": "Avslutas den {date}",
     "subscriptionStatusCanceled": "Avslutad",
@@ -712,7 +724,15 @@
     "changePasswordAccessibilityHint": "Uppdatera lösenordet för ditt konto",
     "bookings": "Bookings",
     "bookingsSubtitle": "Take payment for pay-at-appointment bookings",
-    "bookingsAccessibilityHint": "Opens the bookings list"
+    "bookingsAccessibilityHint": "Opens the bookings list",
+    "posModeSectionTitle": "POS-läge",
+    "posModeTableService": "Bordsservering",
+    "posModeTableServiceSubtitle": "Välj ett bord före varje beställning. Beställningar knyts till bord.",
+    "posModeTableServiceDisabledSubtitle": "Inga planritningar har ställts in för den här platsen. Lägg till en i säljarportalen för att aktivera.",
+    "posModeQuickService": "Snabbservering",
+    "posModeQuickServiceSubtitle": "Disk-/QSR-/foodtruck-läge. Beställningar går direkt till kassan, utan bord.",
+    "posModeTableServiceAccessibilityLabel": "Bordsserveringsläge",
+    "posModeQuickServiceAccessibilityLabel": "Snabbserveringsläge"
   },
   "changePassword": {
     "title": "Byt lösenord",
@@ -847,7 +867,13 @@
     "receiptSentMessage": "Kvitto skickat till {email}",
     "receiptErrorTitle": "Fel",
     "receiptErrorMessage": "Kunde inte skicka kvittot",
-    "goBackAccessibilityLabel": "Gå tillbaka"
+    "goBackAccessibilityLabel": "Gå tillbaka",
+    "searchPlaceholder": "Sök på e-post, namn eller belopp",
+    "searchAccessibilityLabel": "Sök transaktioner",
+    "clearSearchAccessibilityLabel": "Rensa sökningen",
+    "noResultsTitle": "Inga matchande transaktioner",
+    "noResultsSubtitle": "Prova en annan sökning eller ett annat filter.",
+    "refundedOfTotal": "Återbetalat {refunded} av {total}"
   },
   "tapToPay": {
     "settingsHeaderTitle": "Betalningsinställningar",
@@ -984,7 +1010,13 @@
     "readerConnecting": "Ansluter...",
     "readerConnectingAccessibilityLabel": "Ansluter till läsare",
     "readerConnectToAccessibilityLabel": "Anslut till {name}",
-    "readerTapToConnect": "Tryck för att ansluta"
+    "readerTapToConnect": "Tryck för att ansluta",
+    "readerDeleteConfirmTitle": "Ta bort läsaren?",
+    "readerDeleteConfirmMessage": "”{name}” tas bort från ditt Stripe-konto. Du kan registrera den igen senare.",
+    "readerDeleteConfirmButton": "Ta bort",
+    "educationSkipConfirmTitle": "Konfigurera senare?",
+    "educationSkipConfirmMessage": "Du kan när som helst konfigurera Tap to Pay under Inställningar → Tap to Pay.",
+    "educationSkipConfirmConfirm": "Konfigurera senare"
   },
   "upgrade": {
     "goBackAccessibilityLabel": "Gå tillbaka",
@@ -1070,7 +1102,21 @@
     "noScansYetText": "Inga skanningar ännu",
     "ticketVerifiedMessage": "Biljett verifierad",
     "unknownTier": "Okänd",
-    "failedToVerifyTicketMessage": "Kunde inte verifiera biljetten"
+    "failedToVerifyTicketMessage": "Kunde inte verifiera biljetten",
+    "washAlreadyUsedTitle": "Redan skannad",
+    "washWrongEventTitle": "Fel evenemang",
+    "washEventCancelledTitle": "Evenemanget inställt",
+    "washNetworkErrorTitle": "Kunde inte verifiera",
+    "washNetworkErrorMessage": "Kontrollera anslutningen och skanna biljetten igen",
+    "torchOnAccessibilityLabel": "Slå på ficklampan",
+    "torchOffAccessibilityLabel": "Stäng av ficklampan",
+    "manualEntryAccessibilityLabel": "Ange biljettkoden manuellt",
+    "manualEntryTitle": "Ange biljettkod",
+    "manualEntrySubtitle": "Skriv koden som visas under biljettens QR-kod",
+    "manualEntryPlaceholder": "Biljettkod",
+    "manualEntrySubmit": "Verifiera",
+    "feedbackMuteAccessibilityLabel": "Stäng av skanningsfeedback",
+    "feedbackUnmuteAccessibilityLabel": "Slå på skanningsfeedback"
   },
   "preorders": {
     "tabNew": "Nya",
@@ -1197,7 +1243,7 @@
     "loading": "Laddar",
     "loadingTables": "Laddar bord",
     "noFloorPlansTitle": "Inga planritningar konfigurerade",
-    "noFloorPlansSubtitle": "Konfigurera planritningar i säljarportalen",
+    "noFloorPlansSubtitle": "Skapa din planlösning i Rowie-portalen på portal.rowie.eu → Bord",
     "noTablesOnFloorPlan": "Inga bord på denna planritning",
     "noMenuTitle": "Ingen meny vald",
     "noMenuMessage": "Välj en meny innan du startar en session.",
@@ -1218,8 +1264,31 @@
     "statusCleaning": "städning",
     "tableAccessibilityLabel": "{label}, {status}",
     "tableAccessibilityLabelWithSession": "{label}, {status}, {count} artiklar",
+    "tableAccessibilityLabelWithSessionOne": "{label}, {status}, 1 artikel",
     "filterAccessibilityLabel": "{name}",
-    "seatSingular": "{count} sittplats"
+    "seatSingular": "{count} sittplats",
+    "tableStatus_empty": "Ledigt",
+    "tableStatus_active": "Upptaget",
+    "tableStatus_aging": "Väntar",
+    "tableStatus_urgent": "Brådskande",
+    "tableStatus_check_requested": "Nota begärd",
+    "tableStatus_merged": "Sammanslaget",
+    "tableStatus_unavailable": "Otillgängligt",
+    "mergeInto": "Slå ihop med {label}",
+    "mergeAction": "Slå ihop med ett annat bord",
+    "unmergeCountAction": "Dela upp ({count})",
+    "unmergeLabelAction": "Dela upp {label}",
+    "unmergeTitle": "Vilket bord ska delas upp?",
+    "tableSheetTitle": "Bord {label}",
+    "mergeBannerText": "Tryck på ett ledigt bord för att slå ihop.",
+    "cancelMergeLabel": "Avbryt sammanslagning",
+    "mergeFailedTitle": "Sammanslagning misslyckades",
+    "mergeFailedMessage": "Det gick inte att slå ihop bordet.",
+    "unmergeFailedTitle": "Uppdelning misslyckades",
+    "unmergeFailedMessage": "Det gick inte att dela upp bordet.",
+    "longPressHint": "Tips: håll ett bord intryckt för fler alternativ",
+    "dismissHintLabel": "Dölj tips",
+    "noTablesSubtitle": "Lägg till bord i den här planlösningen i Rowie-portalen på portal.rowie.eu → Bord"
   },
   "sessionDetail": {
     "addItems": "Lägg till artiklar",
@@ -1313,7 +1382,45 @@
     "tipPercentAccessibility": "Dricks {pct}%",
     "tipPercentLabel": "{pct}%",
     "totalLabel": "Totalt",
-    "totalToCharge": "Totalt att debitera"
+    "totalToCharge": "Totalt att debitera",
+    "closeLabel": "Stäng",
+    "saveButton": "Spara",
+    "editQuantityAction": "Ändra antal",
+    "editNotesAction": "Redigera anteckningar",
+    "removeAction": "Ta bort",
+    "itemSheetMessage": "Justera artikeln innan notan stängs.",
+    "removeConfirmTitle": "Ta bort artikeln?",
+    "removeConfirmMessage": "Ta bort {quantity}× {name} från denna session?",
+    "invalidQtyTitle": "Ogiltigt antal",
+    "invalidQtyMessage": "Antalet måste vara minst 1. Använd Ta bort för att radera artikeln.",
+    "updateFailedTitle": "Uppdatering misslyckades",
+    "updateFailedMessage": "Det gick inte att uppdatera artikeln.",
+    "statusUpdateFailedMessage": "Det gick inte att uppdatera artikelns status.",
+    "removeFailedTitle": "Borttagning misslyckades",
+    "removeFailedMessage": "Det gick inte att ta bort artikeln.",
+    "itemActionsLabel": "Åtgärder för {name}",
+    "qtyPlaceholder": "Antal",
+    "quantityLabel": "Antal",
+    "notesPlaceholder": "Artikelanteckningar (t.ex. utan lök)",
+    "itemNotesLabel": "Artikelanteckningar",
+    "roundItemsSingular": "{count} artikel",
+    "roundItemsPlural": "{count} artiklar",
+    "roundCollapseLabel": "Fäll ihop runda {number}",
+    "roundExpandLabel": "Fäll ut runda {number}",
+    "statusPendingSnackbar": "Markerar runda {number} som {status}…",
+    "exactAmount": "Jämnt",
+    "exactAmountAccessibility": "Jämnt belopp {amount}",
+    "quickTenderLabel": "Snabba belopp",
+    "mergeAction": "Slå ihop med ett annat bord",
+    "unmergeLabelAction": "Dela upp {label}",
+    "unmergeUnknownAction": "Dela upp bord",
+    "unmergeFailedTitle": "Uppdelning misslyckades",
+    "unmergeFailedMessage": "Det gick inte att dela upp bordet.",
+    "tableActionsLabel": "Bordsåtgärder",
+    "nothingToChargeTitle": "Inget att debitera",
+    "nothingToChargeMessage": "Denna session har en nollsumma.",
+    "couldNotStartPaymentTitle": "Det gick inte att starta betalningen",
+    "couldNotStartPaymentMessage": "Det gick inte att skapa betalningsintentionen."
   },
   "addItemsToSession": {
     "headerTitle": "Lägg till artiklar",
@@ -1586,7 +1693,10 @@
       "chargeAmount": "Debitera {amount}",
       "invalidAmountTitle": "Ogiltigt belopp",
       "minimumCharge": "Minsta debitering är {amount}",
-      "quickChargeDescription": "Snabbdebitering - {amount}"
+      "quickChargeDescription": "Snabbdebitering - {amount}",
+      "deleteKey": "Radera sista siffran",
+      "clearAmount": "Rensa belopp",
+      "closeAccessibilityLabel": "Stäng snabbdebitering"
     },
     "floatingTabBar": {
       "menuLabel": "Meny",
@@ -1594,7 +1704,12 @@
       "ordersLabel": "Beställningar",
       "historyLabel": "Historik",
       "eventsLabel": "Evenemang",
-      "accountLabel": "Konto"
+      "accountLabel": "Konto",
+      "chargeLabel": "Debitera",
+      "chargeOfflineLabel": "Offline",
+      "chargeAccessibilityLabel": "Snabbdebitering",
+      "chargeAccessibilityHint": "Öppnar knappsatsen för snabbdebitering",
+      "chargeOfflineHint": "otillgänglig offline"
     },
     "screenHeader": {
       "goBack": "Gå tillbaka"
@@ -1640,6 +1755,29 @@
     "alreadyPaidTitle": "Already paid",
     "alreadyPaidMessage": "This booking has already been paid.",
     "paymentErrorTitle": "Couldn't start payment",
-    "paymentErrorMessage": "We couldn't start the payment. Please try again."
+    "paymentErrorMessage": "We couldn't start the payment. Please try again.",
+    "next30DaysLabel": "Kommande 30 dagar",
+    "emptyDayTitle": "Inga bokningar denna dag",
+    "emptyDaySubtitle": "Välj en annan dag eller visa de kommande 30 dagarna.",
+    "emptySearchTitle": "Inga matchande bokningar",
+    "emptySearchSubtitle": "Prova ett annat namn eller rensa sökningen.",
+    "statusPending": "Väntar",
+    "statusConfirmed": "Bekräftad",
+    "statusCompleted": "Slutförd",
+    "statusCancelled": "Avbokad",
+    "statusNoShow": "Uteblev",
+    "statusPartiallyRefunded": "Delvis återbetald",
+    "actionsTitle": "Bokningsåtgärder",
+    "confirmAction": "Bekräfta bokning",
+    "completeAction": "Markera som slutförd",
+    "noShowAction": "Markera som utebliven",
+    "cancelAction": "Avboka bokning",
+    "cancelConfirmTitle": "Avboka bokningen?",
+    "cancelConfirmMessage": "Detta avbokar {name}s bokning. Det går inte att ångra.",
+    "cancelConfirmMessagePaid": "Detta avbokar {name}s bokning och återbetalar onlinebetalningen automatiskt. Det går inte att ångra.",
+    "cancelConfirmButton": "Avboka bokning",
+    "keepBookingButton": "Behåll bokning",
+    "statusUpdateErrorTitle": "Kunde inte uppdatera bokningen",
+    "statusUpdateErrorMessage": "Försök igen."
   }
 }

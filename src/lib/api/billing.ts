@@ -29,26 +29,4 @@ export const billingService = {
   getSubscriptionInfo: async (): Promise<SubscriptionInfo> => {
     return apiClient.get<SubscriptionInfo>('/billing/subscription-info');
   },
-
-  /**
-   * Validate an Apple App Store receipt and activate/update subscription
-   */
-  validateAppleReceipt: async (receiptData: string): Promise<{ success: boolean; subscription?: SubscriptionInfo }> => {
-    return apiClient.post<{ success: boolean; subscription?: SubscriptionInfo }>('/billing/validate-apple-receipt', {
-      receipt_data: receiptData,
-    });
-  },
-
-  /**
-   * Validate a Google Play purchase and activate/update subscription
-   */
-  validateGooglePurchase: async (
-    purchaseToken: string,
-    productId: string
-  ): Promise<{ success: boolean; subscription?: SubscriptionInfo }> => {
-    return apiClient.post<{ success: boolean; subscription?: SubscriptionInfo }>('/billing/validate-google-purchase', {
-      purchase_token: purchaseToken,
-      product_id: productId,
-    });
-  },
 };

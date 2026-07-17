@@ -7,8 +7,8 @@
  */
 
 import { Platform } from 'react-native';
-import { config } from './config';
 import logger from './logger';
+import { apiClient } from './api/client';
 import { getSecureItem } from './api/secureStorage';
 
 // Storage key for access token (must match auth.ts)
@@ -433,26 +433,20 @@ class IAPService {
         return { valid: true };
       }
 
-      const response = await fetch(`${config.apiUrl}/billing/validate-receipt`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
-        body: JSON.stringify({
-          platform: Platform.OS,
-          productId,
-          receipt,
-          transactionId,
-        }),
+      // Go through apiClient so X-Session-Version + 401 refresh-retry apply
+      const data = await apiClient.post<{
+        valid: boolean;
+        isActive?: boolean;
+        expiresAt?: string;
+        isTrialPeriod?: boolean;
+        autoRenewing?: boolean;
+      }>('/billing/validate-receipt', {
+        platform: Platform.OS,
+        productId,
+        receipt,
+        transactionId,
       });
 
-      if (!response.ok) {
-        logger.error('[IAP] Receipt validation failed:', response.status);
-        return { valid: false };
-      }
-
-      const data = await response.json();
       return {
         valid: data.valid,
         isActive: data.isActive,
@@ -463,51 +457,6 @@ class IAPService {
     } catch (error) {
       logger.error('[IAP] Error validating receipt:', error);
       return { valid: false };
-    }
-  }
-
-  /**
-   * Check current subscription status
-   */
-  async checkSubscriptionStatus(): Promise<SubscriptionStatus> {
-    try {
-      // Get auth token for authenticated request
-      const accessToken = await getSecureItem(ACCESS_TOKEN_KEY);
-      if (!accessToken) {
-        logger.log('[IAP] No access token, cannot check subscription status');
-        return { isActive: false };
-      }
-
-      // Check with backend
-      const response = await fetch(`${config.apiUrl}/billing/subscription-info`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const isActive = data.status === 'active' || data.status === 'trialing';
-        return {
-          isActive,
-          productId: data.tier === 'pro' ? 'rowieproplan' : undefined,
-          expiresAt: data.current_period_end ? new Date(data.current_period_end) : undefined,
-          isTrialPeriod: data.status === 'trialing',
-          autoRenewing: !data.cancel_at,
-        };
-      }
-
-      // Fallback to restore purchases (only on native)
-      if (this.isAvailable()) {
-        return await this.restorePurchases();
-      }
-
-      return { isActive: false };
-    } catch (error) {
-      logger.error('[IAP] Error checking subscription status:', error);
-      return { isActive: false };
     }
   }
 }

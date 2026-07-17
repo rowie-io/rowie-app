@@ -9,6 +9,7 @@ export type {
   LoginCredentials,
   LoginResponse,
   Subscription,
+  AccessibleLocation,
 } from './auth';
 
 export { catalogsApi } from './catalogs';

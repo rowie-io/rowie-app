@@ -12,6 +12,15 @@ export interface ComputedRates {
   manualCard: { starter: string; pro: string };
 }
 
+// Location the user can operate in (from /auth/me and /auth/login).
+// Owners/admins get all org locations; staff get their user_locations rows.
+export interface AccessibleLocation {
+  id: string;
+  name: string;
+  isDefault?: boolean;
+  [key: string]: any;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -21,7 +30,6 @@ export interface User {
   avatarUrl?: string;
   organizationId: string;
   role: string;
-  cognitoUsername?: string;
   emailAlerts?: boolean;
   marketingEmails?: boolean;
   weeklyReports?: boolean;
@@ -37,6 +45,9 @@ export interface User {
   // callers fall back to 'US'. API may or may not populate it — the field
   // is optional and the fallback path is the runtime guarantee.
   country?: string;
+  // Returned at the top level of /auth/me (and /auth/login) alongside the
+  // user fields, so it lands on the object stored as `profile.user`.
+  accessibleLocations?: AccessibleLocation[];
 }
 
 export interface Organization {
@@ -78,6 +89,9 @@ export interface LoginResponse {
   tokens: AuthTokens;
   sessionVersion: number; // For single session enforcement
   subscription?: Subscription; // Subscription info returned from login
+  // Top-level sibling of user/organization in the login payload (unlike
+  // /auth/me, where it sits on the user object itself)
+  accessibleLocations?: AccessibleLocation[];
 }
 
 class AuthService {
@@ -108,21 +122,6 @@ class AuthService {
       },
     });
 
-    // Extract Cognito username from the access token
-    if (response.tokens.accessToken) {
-      try {
-        const tokenParts = response.tokens.accessToken.split('.');
-        if (tokenParts.length === 3) {
-          const payload = JSON.parse(atob(tokenParts[1]));
-          const cognitoUsername = payload['cognito:username'] || payload.username || payload.sub;
-          if (cognitoUsername) {
-            response.user.cognitoUsername = cognitoUsername;
-          }
-        }
-      } catch (error) {
-        logger.error('[AuthService] Error parsing token:', error);
-      }
-    }
     logger.log('[AuthService] Login complete', { hasUser: !!response.user });
 
     await this.saveAuthData(response);
@@ -137,25 +136,26 @@ class AuthService {
     const biometricEnabled = await isBiometricLoginEnabled();
     logger.log('[AuthService] Logout - biometric enabled:', biometricEnabled);
 
-    // Clear auth data immediately for instant logout
-    await this.clearAuthData();
-
-    // If biometric is NOT enabled, clear stored credentials too
-    if (!biometricEnabled) {
-      logger.log('[AuthService] Clearing stored credentials (biometric disabled)');
-      await clearStoredCredentials();
-    }
-
-    // Invalidate token on server
+    // Invalidate token on server FIRST (best-effort) — the request needs the
+    // Authorization header, so tokens must still be present when it's sent
     if (refreshToken) {
       logger.log('[AuthService] Invalidating token on server...');
       try {
         await apiClient.post('/auth/logout', { refreshToken });
         logger.log('[AuthService] Token invalidated on server');
       } catch (error) {
-        // Silently handle error - user is already logged out locally
+        // Silently handle error - local logout proceeds regardless
         logger.log('[AuthService] Token invalidation failed (non-critical)');
       }
+    }
+
+    // Clear auth data regardless of server outcome
+    await this.clearAuthData();
+
+    // If biometric is NOT enabled, clear stored credentials too
+    if (!biometricEnabled) {
+      logger.log('[AuthService] Clearing stored credentials (biometric disabled)');
+      await clearStoredCredentials();
     }
   }
 
@@ -179,82 +179,34 @@ class AuthService {
   }
 
   /**
-   * Refresh tokens using a provided refresh token
-   * Used for biometric login where the token is stored in SecureStore, not AsyncStorage
-   * @param refreshToken - The refresh token to use
-   * @param providedUsername - Optional cognitoUsername (for biometric login where user data is cleared)
+   * Refresh tokens using a provided refresh token.
+   * Used for biometric login where the token is stored in SecureStore, not AsyncStorage.
    */
-  async refreshTokensWithToken(refreshToken: string, providedUsername?: string): Promise<AuthTokens | null> {
+  async refreshTokensWithToken(refreshToken: string): Promise<AuthTokens | null> {
     logger.log('[AuthService] refreshTokensWithToken called', {
       hasRefreshToken: !!refreshToken,
-      hasProvidedUsername: !!providedUsername,
     });
 
-    const accessToken = await this.getAccessToken();
-
-    let cognitoUsername: string | undefined = providedUsername;
-
-    // If no username provided, try to get it from stored data
-    if (!cognitoUsername) {
-      const user = await this.getUser();
-      if (user?.cognitoUsername) {
-        cognitoUsername = user.cognitoUsername;
-      } else if (accessToken) {
-        // Try to extract Cognito username from the access token
-        try {
-          const tokenParts = accessToken.split('.');
-          if (tokenParts.length === 3) {
-            const payload = JSON.parse(atob(tokenParts[1]));
-            cognitoUsername = payload['cognito:username'] || payload.username || payload.email;
-          }
-        } catch (error) {
-          // Ignore token parsing errors
-        }
-      }
-    }
-
-    logger.log('[AuthService] Resolved cognitoUsername', { hasUsername: !!cognitoUsername });
-
     try {
-      logger.log('[AuthService] Calling /auth/refresh...');
-      const tokens = await apiClient.post<AuthTokens>('/auth/refresh', {
-        refreshToken,
-        username: cognitoUsername,
-      });
+      const tokens = await apiClient.post<AuthTokens>('/auth/refresh', { refreshToken });
 
-      logger.log('[AuthService] Got new tokens, saving...');
+      // Refresh tokens are single-use: the API rotates them, so the response
+      // carries a NEW refresh token and the one we just sent is now dead.
+      // Persisting both is mandatory — dropping the new refresh token would
+      // strand the session at the next refresh.
       await this.saveTokens(tokens);
-
-      // Extract and save cognitoUsername from new access token
-      if (tokens.accessToken) {
-        try {
-          const tokenParts = tokens.accessToken.split('.');
-          if (tokenParts.length === 3) {
-            const payload = JSON.parse(atob(tokenParts[1]));
-            const extractedUsername = payload['cognito:username'] || payload.username || payload.sub;
-            if (extractedUsername) {
-              // Update stored user with cognitoUsername
-              const storedUser = await this.getUser();
-              if (storedUser) {
-                storedUser.cognitoUsername = extractedUsername;
-                await this.saveUser(storedUser);
-                logger.log('[AuthService] Updated stored user with cognitoUsername');
-              }
-            }
-          }
-        } catch (error) {
-          logger.error('[AuthService] Error extracting cognitoUsername from refreshed token:', error);
-        }
-      }
-
-      // Verify tokens were saved
-      const savedToken = await this.getAccessToken();
-      logger.log('[AuthService] Verified saved token', { hasToken: !!savedToken });
 
       return tokens;
     } catch (error: any) {
       logger.log('[AuthService] Refresh failed:', error?.message);
-      await this.clearAuthData();
+      // Only nuke the session when the server actually REJECTED the refresh
+      // token (401/403 from /auth/refresh — ApiError carries statusCode).
+      // Network failures (fetch TypeError, no statusCode) and 5xx are
+      // transient: keep the tokens so the next attempt can retry.
+      const status = error?.statusCode;
+      if (status === 401 || status === 403) {
+        await this.clearAuthData();
+      }
       throw error;
     }
   }

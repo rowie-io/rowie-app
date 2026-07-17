@@ -269,7 +269,7 @@ export function CatalogSettingsModal({
               accessibilityLabel={isSaving ? tc('saving') : tc('save')}
             >
               {isSaving ? (
-                <ActivityIndicator size="small" color="#fff" accessibilityLabel={tc('saving')} />
+                <ActivityIndicator size="small" color={colors.onPrimary} accessibilityLabel={tc('saving')} />
               ) : (
                 <Text style={styles.saveButtonText} maxFontSizeMultiplier={1.3}>{tc('save')}</Text>
               )}
@@ -683,7 +683,7 @@ const createStyles = (colors: any, isDark: boolean) =>
       opacity: 0.6,
     },
     saveButtonText: {
-      color: '#fff',
+      color: colors.onPrimary,
       fontSize: 16,
       fontWeight: '600',
     },

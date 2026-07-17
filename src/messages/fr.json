@@ -38,7 +38,9 @@
     "item": "article",
     "items": "articles",
     "noCategory": "Aucune catégorie",
-    "percentSymbol": "%"
+    "percentSymbol": "%",
+    "undo": "Annuler",
+    "removedFromCart": "{name} supprimé"
   },
   "auth": {
     "loginTitle": "Connexion",
@@ -385,7 +387,12 @@
     "goToCartAccessibilityLabelSingular": "Voir le panier, {count} article",
     "goToCartAccessibilityLabelPlural": "Voir le panier, {count} articles",
     "goToCartButton": "Voir le panier",
-    "switchToMenuAccessibilityLabel": "Passer au menu {name}"
+    "switchToMenuAccessibilityLabel": "Passer au menu {name}",
+    "longPressNotesHint": "Astuce : maintenez un article pour ajouter une note",
+    "dismissHintAccessibilityLabel": "Ignorer l'astuce",
+    "quickChargeLabel": "Encaisser",
+    "quickChargeOfflineLabel": "Hors ligne",
+    "quickChargeOfflineNotice": "indisponible hors ligne"
   },
   "checkout": {
     "tapToPayLabel": "Tap to Pay on iPhone",
@@ -476,7 +483,9 @@
     "cancelHoldAccessibilityLabel": "Annuler la mise en attente",
     "holdingOrderAccessibilityLabel": "Mise en attente de la commande",
     "closeHoldDialogAccessibilityLabel": "Fermer la boîte de dialogue de mise en attente",
-    "subtotalWithCountSingular": "Sous-total ({count} article)"
+    "subtotalWithCountSingular": "Sous-total ({count} article)",
+    "chargesDisabledPayHint": "Les paiements sont indisponibles tant que la configuration des paiements n'est pas terminée.",
+    "offlinePayHint": "Pas de connexion Internet — les paiements sont indisponibles jusqu'au retour en ligne."
   },
   "payment": {
     "preparingPayment": "Préparation du paiement...",
@@ -619,7 +628,10 @@
     "cashReceived": "Espèces reçues",
     "splitComplete": "Paiement fractionné terminé",
     "cardPaymentComplete": "Paiement par carte terminé",
-    "splitMethodsBadge": "Payé avec plusieurs moyens"
+    "splitMethodsBadge": "Payé avec plusieurs moyens",
+    "checkHistory": "Vérifier l'historique",
+    "elapsedTime": "Écoulé : {time}",
+    "tenderQuickAmountAccessibility": "Définir le montant reçu en espèces à {amount}"
   },
   "settings": {
     "title": "Paramètres",
@@ -679,7 +691,7 @@
     "sectionAbout": "À PROPOS",
     "learnTapToPay": "Découvrir {tapToPayName}",
     "contactSupport": "Contacter le support",
-    "contactSupportAccessibilityHint": "Ouvre un e-mail vers support@rowie.io",
+    "contactSupportAccessibilityHint": "Ouvre un e-mail vers support@rowie.eu",
     "termsOfUse": "Conditions d'utilisation",
     "privacyPolicy": "Politique de confidentialité",
     "signOut": "Se déconnecter",
@@ -688,7 +700,7 @@
     "biometricNeedsRelogin": "Déconnectez-vous puis reconnectez-vous, puis choisissez Activer lorsque vous y êtes invité pour activer la connexion biométrique.",
     "errorBiometricToggle": "Échec de l'{action} de la connexion biométrique.",
     "deleteAccountAlertTitle": "Supprimer le compte",
-    "deleteAccountAlertMessage": "Votre compte sera immédiatement désactivé et définitivement supprimé après 30 jours. Toutes vos données seront effacées et cette action est irréversible.\n\nVous pouvez contacter support@rowie.io dans les 30 jours pour annuler.",
+    "deleteAccountAlertMessage": "Votre compte sera immédiatement désactivé et définitivement supprimé après 30 jours. Toutes vos données seront effacées et cette action est irréversible.\n\nVous pouvez contacter support@rowie.eu dans les 30 jours pour annuler.",
     "deleteAccountAlertCancel": "Annuler",
     "deleteAccountAlertConfirm": "Supprimer le compte",
     "deleteAccountScheduledTitle": "Suppression du compte programmée",
@@ -696,7 +708,7 @@
     "deleteAccountAlreadyScheduledTitle": "Déjà programmé",
     "deleteAccountAlreadyScheduledMessage": "La suppression de votre compte est déjà programmée.",
     "deleteAccountErrorTitle": "Erreur",
-    "deleteAccountErrorMessage": "Échec du traitement de la demande de suppression. Veuillez réessayer ou contacter support@rowie.io.",
+    "deleteAccountErrorMessage": "Échec du traitement de la demande de suppression. Veuillez réessayer ou contacter support@rowie.eu.",
     "subscriptionStatusFreePlan": "Forfait gratuit",
     "subscriptionStatusCancelsOn": "Annulation le {date}",
     "subscriptionStatusCanceled": "Annulé",
@@ -712,7 +724,15 @@
     "changePasswordAccessibilityHint": "Mettez à jour le mot de passe de votre compte",
     "bookings": "Bookings",
     "bookingsSubtitle": "Take payment for pay-at-appointment bookings",
-    "bookingsAccessibilityHint": "Opens the bookings list"
+    "bookingsAccessibilityHint": "Opens the bookings list",
+    "posModeSectionTitle": "Mode POS",
+    "posModeTableService": "Service à table",
+    "posModeTableServiceSubtitle": "Choisissez une table avant chaque commande. Les commandes sont rattachées aux tables.",
+    "posModeTableServiceDisabledSubtitle": "Aucun plan de salle configuré pour cet emplacement. Ajoutez-en un dans le portail vendeur pour l'activer.",
+    "posModeQuickService": "Service rapide",
+    "posModeQuickServiceSubtitle": "Mode comptoir/restauration rapide/food truck. Les commandes vont directement à l'encaissement, sans table.",
+    "posModeTableServiceAccessibilityLabel": "Mode service à table",
+    "posModeQuickServiceAccessibilityLabel": "Mode service rapide"
   },
   "changePassword": {
     "title": "Changer le mot de passe",
@@ -847,7 +867,13 @@
     "receiptSentMessage": "Reçu envoyé à {email}",
     "receiptErrorTitle": "Erreur",
     "receiptErrorMessage": "Échec de l'envoi du reçu",
-    "goBackAccessibilityLabel": "Retour"
+    "goBackAccessibilityLabel": "Retour",
+    "searchPlaceholder": "Rechercher par e-mail, nom ou montant",
+    "searchAccessibilityLabel": "Rechercher des transactions",
+    "clearSearchAccessibilityLabel": "Effacer la recherche",
+    "noResultsTitle": "Aucune transaction correspondante",
+    "noResultsSubtitle": "Essayez une autre recherche ou un autre filtre.",
+    "refundedOfTotal": "{refunded} remboursé sur {total}"
   },
   "tapToPay": {
     "settingsHeaderTitle": "Paramètres de paiement",
@@ -984,7 +1010,13 @@
     "readerConnecting": "Connexion...",
     "readerConnectingAccessibilityLabel": "Connexion au lecteur",
     "readerConnectToAccessibilityLabel": "Se connecter à {name}",
-    "readerTapToConnect": "Appuyez pour connecter"
+    "readerTapToConnect": "Appuyez pour connecter",
+    "readerDeleteConfirmTitle": "Supprimer le lecteur ?",
+    "readerDeleteConfirmMessage": "« {name} » sera supprimé de votre compte Stripe. Vous pourrez l'enregistrer à nouveau plus tard.",
+    "readerDeleteConfirmButton": "Supprimer",
+    "educationSkipConfirmTitle": "Configurer plus tard ?",
+    "educationSkipConfirmMessage": "Vous pouvez configurer Tap to Pay à tout moment dans Réglages → Tap to Pay.",
+    "educationSkipConfirmConfirm": "Configurer plus tard"
   },
   "upgrade": {
     "goBackAccessibilityLabel": "Retour",
@@ -1070,7 +1102,21 @@
     "noScansYetText": "Aucun scan pour le moment",
     "ticketVerifiedMessage": "Billet vérifié",
     "unknownTier": "Inconnu",
-    "failedToVerifyTicketMessage": "Échec de la vérification du billet"
+    "failedToVerifyTicketMessage": "Échec de la vérification du billet",
+    "washAlreadyUsedTitle": "Déjà scanné",
+    "washWrongEventTitle": "Mauvais événement",
+    "washEventCancelledTitle": "Événement annulé",
+    "washNetworkErrorTitle": "Vérification impossible",
+    "washNetworkErrorMessage": "Vérifiez la connexion et scannez à nouveau le billet",
+    "torchOnAccessibilityLabel": "Activer la lampe torche",
+    "torchOffAccessibilityLabel": "Désactiver la lampe torche",
+    "manualEntryAccessibilityLabel": "Saisir le code du billet manuellement",
+    "manualEntryTitle": "Saisir le code du billet",
+    "manualEntrySubtitle": "Saisissez le code affiché sous le QR code du billet",
+    "manualEntryPlaceholder": "Code du billet",
+    "manualEntrySubmit": "Vérifier",
+    "feedbackMuteAccessibilityLabel": "Couper le retour de scan",
+    "feedbackUnmuteAccessibilityLabel": "Réactiver le retour de scan"
   },
   "preorders": {
     "tabNew": "Nouveau",
@@ -1197,7 +1243,7 @@
     "loading": "Chargement",
     "loadingTables": "Chargement des tables",
     "noFloorPlansTitle": "Aucun plan de salle configuré",
-    "noFloorPlansSubtitle": "Configurez les plans de salle dans le portail vendeur",
+    "noFloorPlansSubtitle": "Créez votre plan de salle dans le portail Rowie sur portal.rowie.eu → Tables",
     "noTablesOnFloorPlan": "Aucune table sur ce plan de salle",
     "noMenuTitle": "Aucun menu sélectionné",
     "noMenuMessage": "Veuillez sélectionner un menu avant de démarrer une session.",
@@ -1218,8 +1264,31 @@
     "statusCleaning": "nettoyage",
     "tableAccessibilityLabel": "{label}, {status}",
     "tableAccessibilityLabelWithSession": "{label}, {status}, {count} articles",
+    "tableAccessibilityLabelWithSessionOne": "{label}, {status}, 1 article",
     "filterAccessibilityLabel": "{name}",
-    "seatSingular": "{count} siège"
+    "seatSingular": "{count} siège",
+    "tableStatus_empty": "Disponible",
+    "tableStatus_active": "Occupée",
+    "tableStatus_aging": "En attente",
+    "tableStatus_urgent": "Urgent",
+    "tableStatus_check_requested": "Addition demandée",
+    "tableStatus_merged": "Fusionnée",
+    "tableStatus_unavailable": "Indisponible",
+    "mergeInto": "Fusionner avec {label}",
+    "mergeAction": "Fusionner avec une autre table",
+    "unmergeCountAction": "Séparer ({count})",
+    "unmergeLabelAction": "Séparer {label}",
+    "unmergeTitle": "Quelle table séparer ?",
+    "tableSheetTitle": "Table {label}",
+    "mergeBannerText": "Touchez une table libre pour la fusionner.",
+    "cancelMergeLabel": "Annuler la fusion",
+    "mergeFailedTitle": "Échec de la fusion",
+    "mergeFailedMessage": "Impossible de fusionner cette table.",
+    "unmergeFailedTitle": "Échec de la séparation",
+    "unmergeFailedMessage": "Impossible de séparer cette table.",
+    "longPressHint": "Astuce : maintenez une table pour plus d'options",
+    "dismissHintLabel": "Masquer l'astuce",
+    "noTablesSubtitle": "Ajoutez des tables à ce plan dans le portail Rowie sur portal.rowie.eu → Tables"
   },
   "sessionDetail": {
     "addItems": "Ajouter des articles",
@@ -1313,7 +1382,45 @@
     "tipPercentAccessibility": "Pourboire {pct}%",
     "tipPercentLabel": "{pct}%",
     "totalLabel": "Total",
-    "totalToCharge": "Total à débiter"
+    "totalToCharge": "Total à débiter",
+    "closeLabel": "Fermer",
+    "saveButton": "Enregistrer",
+    "editQuantityAction": "Modifier la quantité",
+    "editNotesAction": "Modifier les notes",
+    "removeAction": "Supprimer",
+    "itemSheetMessage": "Ajustez cet article avant la clôture.",
+    "removeConfirmTitle": "Supprimer l'article ?",
+    "removeConfirmMessage": "Supprimer {quantity}× {name} de cette session ?",
+    "invalidQtyTitle": "Quantité invalide",
+    "invalidQtyMessage": "La quantité doit être d'au moins 1. Utilisez Supprimer pour retirer l'article.",
+    "updateFailedTitle": "Échec de la mise à jour",
+    "updateFailedMessage": "Impossible de mettre à jour l'article.",
+    "statusUpdateFailedMessage": "Impossible de mettre à jour le statut de l'article.",
+    "removeFailedTitle": "Échec de la suppression",
+    "removeFailedMessage": "Impossible de supprimer l'article.",
+    "itemActionsLabel": "Actions pour {name}",
+    "qtyPlaceholder": "Qté",
+    "quantityLabel": "Quantité",
+    "notesPlaceholder": "Notes de l'article (p. ex. sans oignons)",
+    "itemNotesLabel": "Notes de l'article",
+    "roundItemsSingular": "{count} article",
+    "roundItemsPlural": "{count} articles",
+    "roundCollapseLabel": "Réduire la tournée {number}",
+    "roundExpandLabel": "Développer la tournée {number}",
+    "statusPendingSnackbar": "Marquage de la tournée {number} comme {status}…",
+    "exactAmount": "Exact",
+    "exactAmountAccessibility": "Montant exact {amount}",
+    "quickTenderLabel": "Montants rapides",
+    "mergeAction": "Fusionner avec une autre table",
+    "unmergeLabelAction": "Séparer {label}",
+    "unmergeUnknownAction": "Séparer la table",
+    "unmergeFailedTitle": "Échec de la séparation",
+    "unmergeFailedMessage": "Impossible de séparer cette table.",
+    "tableActionsLabel": "Actions de table",
+    "nothingToChargeTitle": "Rien à encaisser",
+    "nothingToChargeMessage": "Cette session a un total de zéro.",
+    "couldNotStartPaymentTitle": "Impossible de démarrer le paiement",
+    "couldNotStartPaymentMessage": "Impossible de créer l'intention de paiement."
   },
   "addItemsToSession": {
     "headerTitle": "Ajouter des articles",
@@ -1585,7 +1692,10 @@
       "chargeAmount": "Facturer {amount}",
       "invalidAmountTitle": "Montant invalide",
       "minimumCharge": "Le montant minimum est de {amount}",
-      "quickChargeDescription": "Charge rapide - {amount}"
+      "quickChargeDescription": "Charge rapide - {amount}",
+      "deleteKey": "Supprimer le dernier chiffre",
+      "clearAmount": "Effacer le montant",
+      "closeAccessibilityLabel": "Fermer la charge rapide"
     },
     "floatingTabBar": {
       "menuLabel": "Menu",
@@ -1593,7 +1703,12 @@
       "ordersLabel": "Commandes",
       "historyLabel": "Historique",
       "eventsLabel": "Événements",
-      "accountLabel": "Compte"
+      "accountLabel": "Compte",
+      "chargeLabel": "Encaisser",
+      "chargeOfflineLabel": "Hors ligne",
+      "chargeAccessibilityLabel": "Charge rapide",
+      "chargeAccessibilityHint": "Ouvre le pavé de charge rapide",
+      "chargeOfflineHint": "indisponible hors ligne"
     },
     "screenHeader": {
       "goBack": "Retour"
@@ -1639,6 +1754,29 @@
     "alreadyPaidTitle": "Already paid",
     "alreadyPaidMessage": "This booking has already been paid.",
     "paymentErrorTitle": "Couldn't start payment",
-    "paymentErrorMessage": "We couldn't start the payment. Please try again."
+    "paymentErrorMessage": "We couldn't start the payment. Please try again.",
+    "next30DaysLabel": "30 prochains jours",
+    "emptyDayTitle": "Aucune réservation ce jour-là",
+    "emptyDaySubtitle": "Choisissez un autre jour ou affichez les 30 prochains jours.",
+    "emptySearchTitle": "Aucune réservation correspondante",
+    "emptySearchSubtitle": "Essayez un autre nom ou effacez la recherche.",
+    "statusPending": "En attente",
+    "statusConfirmed": "Confirmée",
+    "statusCompleted": "Terminée",
+    "statusCancelled": "Annulée",
+    "statusNoShow": "Absence",
+    "statusPartiallyRefunded": "Partiellement remboursée",
+    "actionsTitle": "Actions de réservation",
+    "confirmAction": "Confirmer la réservation",
+    "completeAction": "Marquer comme terminée",
+    "noShowAction": "Marquer comme absence",
+    "cancelAction": "Annuler la réservation",
+    "cancelConfirmTitle": "Annuler la réservation ?",
+    "cancelConfirmMessage": "Cela annule la réservation de {name}. Cette action est irréversible.",
+    "cancelConfirmMessagePaid": "Cela annule la réservation de {name} et rembourse automatiquement le paiement en ligne. Cette action est irréversible.",
+    "cancelConfirmButton": "Annuler la réservation",
+    "keepBookingButton": "Garder la réservation",
+    "statusUpdateErrorTitle": "Impossible de mettre à jour la réservation",
+    "statusUpdateErrorMessage": "Veuillez réessayer."
   }
 }

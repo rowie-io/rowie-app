@@ -17,11 +17,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import PhoneInput, { ICountry, isValidPhoneNumber } from 'react-native-international-phone-number';
+import PhoneInput, { ICountry, isValidPhoneNumber } from '../vendor/phone-input';
 
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { Input } from '../components/Input';
+import { GradientButton } from '../components/ui/GradientButton';
 import { authService } from '../lib/api';
 import { iapService, SUBSCRIPTION_SKUS, SubscriptionProduct } from '../lib/iap';
 import { storeCredentials, isBiometricLoginEnabled } from '../lib/biometricAuth';
@@ -475,9 +476,9 @@ export function SignUpScreen() {
 
     if (!response.ok) {
       logger.error('[SignUp] Signup failed:', data.error || data.message);
-      // API returns {error} (see src/routes/auth/index.ts) — prefer it over
-      // `data.message` which is only sent on success responses.
-      throw new Error(data.error || data.message || t('failedToCreateAccount'));
+      // API error responses are {error: CODE, message: human} (see
+      // src/routes/auth/signup.ts) — show the human message, not the code.
+      throw new Error(data.message || data.error || t('failedToCreateAccount'));
     }
 
     logger.log('[SignUp] ========== ACCOUNT CREATED SUCCESSFULLY ==========');
@@ -631,7 +632,7 @@ export function SignUpScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             autoComplete="email"
-            textContentType="none"
+            textContentType="emailAddress"
             editable={!isFormDisabled}
             error={errors.email}
             accessibilityLabel={t('emailAccessibilityLabel')}
@@ -652,7 +653,9 @@ export function SignUpScreen() {
             onChangeText={onChangePassword}
             placeholder={t('passwordPlaceholderSignUp')}
             secureTextEntry={!showPassword}
-            textContentType="none"
+            autoComplete="new-password"
+            textContentType="newPassword"
+            passwordRules="minlength: 8;"
             editable={!isFormDisabled}
             error={errors.password}
             accessibilityLabel={t('passwordAccessibilityLabel')}
@@ -670,7 +673,8 @@ export function SignUpScreen() {
             onChangeText={onChangeConfirmPassword}
             placeholder={t('confirmPasswordPlaceholder')}
             secureTextEntry={!showPassword}
-            textContentType="none"
+            autoComplete="new-password"
+            textContentType="newPassword"
             editable={!isFormDisabled}
             error={errors.confirmPassword}
             accessibilityLabel={t('confirmPasswordAccessibilityLabel')}
@@ -705,7 +709,7 @@ export function SignUpScreen() {
               placeholder={t('firstNamePlaceholder')}
               autoCapitalize="words"
               autoComplete="given-name"
-              textContentType="none"
+              textContentType="givenName"
               editable={!isFormDisabled}
               error={errors.firstName}
               accessibilityLabel={t('firstNameAccessibilityLabel')}
@@ -721,7 +725,7 @@ export function SignUpScreen() {
               placeholder={t('lastNamePlaceholder')}
               autoCapitalize="words"
               autoComplete="family-name"
-              textContentType="none"
+              textContentType="familyName"
               editable={!isFormDisabled}
               error={errors.lastName}
               accessibilityLabel={t('lastNameAccessibilityLabel')}
@@ -739,7 +743,7 @@ export function SignUpScreen() {
             placeholder={t('businessNamePlaceholder')}
             autoCapitalize="words"
             autoComplete="organization"
-            textContentType="none"
+            textContentType="organizationName"
             editable={!isFormDisabled}
             error={errors.businessName}
             accessibilityLabel={t('businessNameAccessibilityLabel')}
@@ -846,7 +850,7 @@ export function SignUpScreen() {
             errors.acceptTerms && styles.checkboxError,
           ]}>
             {formData.acceptTerms && (
-              <Ionicons name="checkmark" size={14} color="#fff" />
+              <Ionicons name="checkmark" size={14} color={colors.onPrimary} />
             )}
           </View>
           <Text maxFontSizeMultiplier={1.3} style={styles.checkboxLabel}>
@@ -1214,7 +1218,7 @@ export function SignUpScreen() {
                       <Ionicons
                         name={step.icon as any}
                         size={16}
-                        color={isActive ? '#fff' : colors.textMuted}
+                        color={isCurrent ? colors.onPrimary : isActive ? colors.primary : colors.textMuted}
                       />
                     </View>
                     {index < STEP_CONFIG.length - 1 && (
@@ -1272,12 +1276,20 @@ export function SignUpScreen() {
         {/* Footer with button */}
         {currentStep !== 'confirmation' && (
           <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.nextButton, (isLoading || isPurchasing) && styles.buttonDisabled]}
+            <GradientButton
+              label={
+                isLoading || isPurchasing
+                  ? (isPurchasing ? t('processingButton') : t('creatingAccountButton'))
+                  : currentStep === 'plan'
+                    ? formData.selectedPlan === 'pro'
+                      ? t('subscribeToPro')
+                      : t('createAccountButton')
+                    : t('continueButton')
+              }
               onPress={handleNext}
-              disabled={isLoading || isCheckingEmail || isCheckingPassword || isPurchasing}
-              activeOpacity={0.8}
-              accessibilityRole="button"
+              loading={isLoading || isPurchasing}
+              disabled={isCheckingEmail || isCheckingPassword}
+              size="lg"
               accessibilityLabel={
                 isLoading || isPurchasing
                   ? (isPurchasing ? t('processingPurchaseAccessibilityLabel') : t('creatingAccountAccessibilityLabel'))
@@ -1287,30 +1299,7 @@ export function SignUpScreen() {
                       : t('createAccountButton')
                     : t('continueButton')
               }
-              accessibilityState={{ disabled: isLoading || isCheckingEmail || isCheckingPassword || isPurchasing, busy: isLoading || isPurchasing }}
-            >
-              <View style={styles.nextButtonInner}>
-                {isLoading || isPurchasing ? (
-                  <View style={styles.buttonLoadingContent}>
-                    <ActivityIndicator color="#fff" size="small" accessibilityLabel={isPurchasing ? t('processingPurchaseAccessibilityLabel') : t('creatingAccountAccessibilityLabel')} />
-                    <Text maxFontSizeMultiplier={1.3} style={styles.nextButtonText}>
-                      {isPurchasing ? t('processingButton') : t('creatingAccountButton')}
-                    </Text>
-                  </View>
-                ) : (
-                  <>
-                    <Text maxFontSizeMultiplier={1.3} style={styles.nextButtonText}>
-                      {currentStep === 'plan'
-                        ? formData.selectedPlan === 'pro'
-                          ? t('subscribeToPro')
-                          : t('createAccountButton')
-                        : t('continueButton')}
-                    </Text>
-                    <Ionicons name="arrow-forward" size={20} color="#fff" />
-                  </>
-                )}
-              </View>
-            </TouchableOpacity>
+            />
 
             {currentStep === 'account' && (
               <View style={styles.signInRow}>
@@ -1635,7 +1624,7 @@ const createStyles = (colors: any, isDark: boolean) =>
     popularBadgeText: {
       fontSize: 12,
       fontFamily: fonts.semiBold,
-      color: '#fff',
+      color: colors.onPrimary,
     },
     planHeader: {
       marginBottom: 16,
@@ -1867,33 +1856,6 @@ const createStyles = (colors: any, isDark: boolean) =>
       paddingHorizontal: 20,
       paddingTop: 12,
       paddingBottom: 24,
-    },
-    nextButton: {
-      borderRadius: 20,
-      overflow: 'hidden',
-      ...shadows.md,
-    },
-    nextButtonInner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      paddingVertical: 18,
-      backgroundColor: colors.primary,
-      borderRadius: 20,
-    },
-    nextButtonText: {
-      fontSize: 18,
-      fontFamily: fonts.semiBold,
-      color: '#fff',
-    },
-    buttonDisabled: {
-      opacity: 0.5,
-    },
-    buttonLoadingContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
     },
     signInRow: {
       flexDirection: 'row',

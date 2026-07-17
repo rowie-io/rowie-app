@@ -9,9 +9,14 @@ const WEB_SHIMS = {
   '@stripe/stripe-react-native': path.resolve(__dirname, 'src/lib/web-shims/stripe-rn.tsx'),
   '@stripe/stripe-terminal-react-native': path.resolve(__dirname, 'src/lib/web-shims/stripe-terminal.ts'),
   'react-native-iap': path.resolve(__dirname, 'src/lib/web-shims/iap.ts'),
-  'react-native-international-phone-number': path.resolve(__dirname, 'src/lib/web-shims/phone-input.tsx'),
   'react-native-draggable-flatlist': path.resolve(__dirname, 'src/lib/web-shims/draggable-flatlist.tsx'),
 };
+
+// The vendored phone input (src/vendor/phone-input — see src/vendor/README.md)
+// is native-only; shim it on web by RESOLVED path since it's imported via
+// relative specifiers.
+const PHONE_INPUT_VENDOR_DIR = path.resolve(__dirname, 'src/vendor/phone-input');
+const PHONE_INPUT_WEB_SHIM = path.resolve(__dirname, 'src/lib/web-shims/phone-input.tsx');
 
 const defaultResolveRequest = config.resolver.resolveRequest;
 
@@ -19,10 +24,18 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (platform === 'web' && WEB_SHIMS[moduleName]) {
     return { filePath: WEB_SHIMS[moduleName], type: 'sourceFile' };
   }
-  if (defaultResolveRequest) {
-    return defaultResolveRequest(context, moduleName, platform);
+  const resolved = defaultResolveRequest
+    ? defaultResolveRequest(context, moduleName, platform)
+    : context.resolveRequest(context, moduleName, platform);
+  if (
+    platform === 'web' &&
+    resolved &&
+    resolved.type === 'sourceFile' &&
+    resolved.filePath.startsWith(PHONE_INPUT_VENDOR_DIR)
+  ) {
+    return { filePath: PHONE_INPUT_WEB_SHIM, type: 'sourceFile' };
   }
-  return context.resolveRequest(context, moduleName, platform);
+  return resolved;
 };
 
 module.exports = config;

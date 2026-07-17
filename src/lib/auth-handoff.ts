@@ -5,6 +5,7 @@
 
 import { Linking } from 'react-native';
 import { authService } from './api/auth';
+import { apiClient } from './api/client';
 import { config } from './config';
 import logger from './logger';
 
@@ -31,21 +32,18 @@ export async function createVendorDashboardUrl(redirectPath?: string): Promise<s
     // would persist in the external browser's history and be readable by
     // extensions. Instead exchange them for a single-use, 60-second opaque code
     // (server-side, over TLS) and carry only that code in the URL fragment.
-    const resp = await fetch(`${config.apiUrl}/auth/handoff/create`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
-      body: JSON.stringify({ refreshToken, user }),
-    });
-
-    if (!resp.ok) {
-      logger.error('[AuthHandoff] Failed to create handoff code', { status: resp.status });
+    // Sent via apiClient so X-Session-Version + 401 refresh-retry apply.
+    let data: { code?: string };
+    try {
+      data = await apiClient.post<{ code?: string }>('/auth/handoff/create', {
+        refreshToken,
+        user,
+      });
+    } catch (error: any) {
+      logger.error('[AuthHandoff] Failed to create handoff code', { status: error?.statusCode });
       return null;
     }
 
-    const data = (await resp.json()) as { code?: string };
     if (!data?.code) {
       logger.error('[AuthHandoff] Handoff response missing code');
       return null;

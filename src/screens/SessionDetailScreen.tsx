@@ -21,7 +21,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCatalog } from '../context/CatalogContext';
 import { useSocketEvent } from '../context/SocketContext';
 import { SocketEvents } from '../context/SocketContext';
-import { sessionsApi, type SessionItem, type ItemStatus } from '../lib/api/sessions';
+import { sessionsApi, floorPlansApi, type SessionItem, type ItemStatus } from '../lib/api/sessions';
 import { stripeTerminalApi } from '../lib/api';
 import { useTerminal } from '../context/StripeTerminalContext';
 import { useTapToPayGuard } from '../hooks/useTapToPayGuard';
@@ -29,6 +29,7 @@ import { formatCurrency, toSmallestUnit, fromSmallestUnit, isZeroDecimal } from 
 import { fonts } from '../lib/fonts';
 import { shadows } from '../lib/shadows';
 import { useTranslations } from '../lib/i18n';
+import { TipPicker, computeTipBase, CUSTOM_TIP } from '../components/TipPicker';
 
 type RouteParams = {
   SessionDetail: {
@@ -43,6 +44,36 @@ const STATUS_CONFIG: Record<string, { icon: string; color: string; labelKey: str
   ready: { icon: 'checkmark-circle-outline', color: '#22C55E', labelKey: 'itemStatusReady' },
   served: { icon: 'restaurant-outline', color: '#A8A29E', labelKey: 'itemStatusServed' },
 };
+
+// Valid bulk-update targets ('pending' is an insert-time default, never a
+// transition target) and the forward-only rank order the API enforces.
+type RoundTargetStatus = 'sent' | 'preparing' | 'ready' | 'served';
+const ITEM_STATUS_RANK: Record<ItemStatus, number> = {
+  pending: 0,
+  sent: 1,
+  preparing: 2,
+  ready: 3,
+  served: 4,
+};
+
+// Round-header status chips: target status → visual identity.
+const ROUND_CHIP_TARGETS: Array<{ status: RoundTargetStatus; color: string; labelKey: string }> = [
+  { status: 'sent', color: '#3B82F6', labelKey: 'roundActionSent' },
+  { status: 'ready', color: '#22C55E', labelKey: 'roundActionReady' },
+  { status: 'served', color: '#A8A29E', labelKey: 'roundActionServed' },
+];
+
+// The API enforces a forward-only item state machine (a backward transition
+// 409s the whole batch), so a post-hoc "Undo" that reverts the status is
+// impossible. Instead a status tap commits after this grace window, with a
+// Cancel snackbar shown until the request actually fires (delayed-commit
+// pattern). Long enough to react, short enough to feel instant on the KDS.
+const STATUS_COMMIT_DELAY_MS = 3500;
+
+// Cash quick-tender denominations (base units) — matched to the cash payment
+// screen's quick amounts. Zero-decimal currencies get a scaled-up set.
+const CASH_DENOMINATIONS = [5, 10, 20, 50, 100];
+const CASH_DENOMINATIONS_ZERO_DECIMAL = [500, 1000, 2000, 5000, 10000];
 
 export function SessionDetailScreen() {
   const { colors } = useTheme();
@@ -67,10 +98,17 @@ export function SessionDetailScreen() {
   // the Settle button; submits via settleMutation below.
   const [settleModalOpen, setSettleModalOpen] = useState(false);
   const [settleMethod, setSettleMethod] = useState<'cash' | 'tap_to_pay' | 'split'>('tap_to_pay');
-  const [settleTipText, setSettleTipText] = useState(''); // base-unit digits
+  // Same selection model as the close-tab tip modal (percent / custom / none)
+  // so both flows share the TipPicker grid.
+  const [settleTipPct, setSettleTipPct] = useState<number | null>(0);
+  const [settleTipCustomText, setSettleTipCustomText] = useState('');
   const [settleCashTenderedText, setSettleCashTenderedText] = useState(''); // base-unit digits
-  const [settleSplitPieces, setSettleSplitPieces] = useState<Array<{ method: 'cash' | 'tap_to_pay'; amount: number }>>([]);
-  const [settleSplitAddMethod, setSettleSplitAddMethod] = useState<'cash' | 'tap_to_pay'>('cash');
+  // v1 scope: split pieces are record-only — no per-piece charge is collected
+  // here, so tap_to_pay is NOT offered (the API would record it as a pending
+  // order_payment with no PaymentIntent ever created — a phantom tender).
+  // Cash is the only piece method until per-piece Terminal collection lands.
+  const [settleSplitPieces, setSettleSplitPieces] = useState<Array<{ method: 'cash'; amount: number }>>([]);
+  const [settleSplitAddMethod, setSettleSplitAddMethod] = useState<'cash'>('cash');
   const [settleSplitAddAmount, setSettleSplitAddAmount] = useState(''); // base-unit digits
 
   // Tip settings from the catalog — "Tip" screen only shown if enabled.
@@ -140,12 +178,52 @@ export function SessionDetailScreen() {
 
   // Mutations
   const updateStatusMutation = useMutation({
-    mutationFn: ({ itemIds, status }: { itemIds: string[]; status: ItemStatus }) =>
+    mutationFn: ({ itemIds, status }: { itemIds: string[]; status: RoundTargetStatus }) =>
       sessionsApi.updateItemStatus(sessionId, itemIds, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
     },
+    // The API 409s the whole batch on an invalid transition — without this the
+    // kitchen buttons failed silently and staff assumed the round moved.
+    onError: (err: any) => {
+      Alert.alert(t('updateFailedTitle'), err?.error || err?.message || t('statusUpdateFailedMessage'));
+    },
   });
+
+  // ── Delayed-commit status changes (undo affordance) ──────────────────────
+  // See STATUS_COMMIT_DELAY_MS above for why this isn't a true Undo.
+  const [pendingStatus, setPendingStatus] = useState<{
+    roundNumber: number;
+    itemIds: string[];
+    status: RoundTargetStatus;
+  } | null>(null);
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingStatusRef = useRef(pendingStatus);
+  useEffect(() => {
+    pendingStatusRef.current = pendingStatus;
+  }, [pendingStatus]);
+
+  const cancelPendingStatus = useCallback(() => {
+    if (pendingTimerRef.current) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
+    }
+    setPendingStatus(null);
+  }, []);
+
+  // Flush (commit immediately) rather than drop a pending change when the
+  // screen unmounts — a tap made just before navigating away must not be lost.
+  useEffect(() => {
+    return () => {
+      if (pendingTimerRef.current) {
+        clearTimeout(pendingTimerRef.current);
+        pendingTimerRef.current = null;
+        const p = pendingStatusRef.current;
+        if (p) updateStatusMutation.mutate({ itemIds: p.itemIds, status: p.status });
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Edit-item state: long-pressing an item opens an action sheet that routes
   // into one of these modals (qty / notes) or fires removeItemMutation
@@ -164,7 +242,7 @@ export function SessionDetailScreen() {
       setEditMode(null);
     },
     onError: (err: any) => {
-      Alert.alert('Update failed', err?.error || err?.message || 'Could not update the item.');
+      Alert.alert(t('updateFailedTitle'), err?.error || err?.message || t('updateFailedMessage'));
     },
   });
 
@@ -174,8 +252,31 @@ export function SessionDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['sessions', sessionId] });
     },
     onError: (err: any) => {
-      Alert.alert('Remove failed', err?.error || err?.message || 'Could not remove the item.');
+      Alert.alert(t('removeFailedTitle'), err?.error || err?.message || t('removeFailedMessage'));
     },
+  });
+
+  // Unmerge directly from this screen (finding: merge/unmerge shouldn't be
+  // buried in the floor-plan long-press only).
+  const unmergeMutation = useMutation({
+    mutationFn: (tableId: string) => sessionsApi.unmergeTable(sessionId, tableId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['floor-plans'] });
+    },
+    onError: (err: any) => {
+      Alert.alert(t('unmergeFailedTitle'), err?.error || err?.message || t('unmergeFailedMessage'));
+    },
+  });
+
+  // Table labels for the unmerge sheet — only fetched when this session
+  // actually has merged secondaries (cached from the floor-plan screen in the
+  // common case, so this rarely costs a network hit).
+  const mergedTableIds = session?.mergedTableIds || [];
+  const { data: floorPlanDetail } = useQuery({
+    queryKey: ['floor-plans', session?.floorPlanId],
+    queryFn: () => floorPlansApi.get(session!.floorPlanId!),
+    enabled: !!session?.floorPlanId && mergedTableIds.length > 0,
   });
 
   const cancelMutation = useMutation({
@@ -218,20 +319,13 @@ export function SessionDetailScreen() {
   });
 
   // Compute the tip amount (in base unit — dollars) from the current selection.
+  // Percentage math lives in TipPicker's computeTipBase (shared with the
+  // settle modal below).
   const sessionPreTipTotal = session ? session.subtotal + session.taxAmount : 0;
-  const computedTipBase = useMemo(() => {
-    if (selectedTipPct === null) return 0;
-    if (selectedTipPct === -1) {
-      // Custom tip input
-      const parsed = parseFloat(customTipText || '0');
-      if (isNaN(parsed) || parsed < 0) return 0;
-      return parsed;
-    }
-    // Percentage of subtotal (NOT subtotal+tax — tipping on tax is rude)
-    if (!session) return 0;
-    const raw = session.subtotal * (selectedTipPct / 100);
-    return isZeroDecimal(currency) ? Math.round(raw) : Math.round(raw * 100) / 100;
-  }, [selectedTipPct, customTipText, session, currency]);
+  const computedTipBase = useMemo(
+    () => computeTipBase(selectedTipPct, customTipText, session?.subtotal || 0, currency),
+    [selectedTipPct, customTipText, session?.subtotal, currency],
+  );
 
   const handleOpenCloseTabFlow = useCallback(() => {
     // If the menu has the tip screen disabled, skip straight to charging with tip=0.
@@ -279,11 +373,11 @@ export function SessionDetailScreen() {
     },
   });
 
-  // Tip parsed from the modal field. Empty / non-numeric → 0.
-  const settleTipBase = useMemo(() => {
-    const n = parseFloat(settleTipText);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
-  }, [settleTipText]);
+  // Tip from the settle modal's TipPicker selection. Nothing picked → 0.
+  const settleTipBase = useMemo(
+    () => computeTipBase(settleTipPct, settleTipCustomText, session?.subtotal || 0, currency),
+    [settleTipPct, settleTipCustomText, session?.subtotal, currency],
+  );
   const settleTipSmallest = useMemo(
     () => toSmallestUnit(settleTipBase, currency),
     [settleTipBase, currency],
@@ -354,7 +448,7 @@ export function SessionDetailScreen() {
     }
     const totalSmallest = settleTotalSmallest;
     if (totalSmallest <= 0) {
-      Alert.alert('Nothing to charge', 'This session has a zero total.');
+      Alert.alert(t('nothingToChargeTitle'), t('nothingToChargeMessage'));
       return;
     }
     try {
@@ -363,6 +457,9 @@ export function SessionDetailScreen() {
       const idempotencyKey = `pi-session-${sessionId}-${totalSmallest}-${settleTipSmallest}`;
       const paymentIntent = await stripeTerminalApi.createPaymentIntent({
         amount: totalBase,
+        // Top-level tip (base units, like `amount`) so the API excludes it
+        // from the platform-fee base. metadata.tipAmount below is display-only.
+        tipAmount: settleTipBase,
         currency,
         description: `Settle ${session.tableLabel || session.holdName || session.sessionNumber}`,
         metadata: {
@@ -384,16 +481,17 @@ export function SessionDetailScreen() {
       });
     } catch (e: any) {
       setSettleModalOpen(true);
-      Alert.alert('Could not start payment', e?.error || e?.message || 'Unable to create payment intent.');
+      Alert.alert(t('couldNotStartPaymentTitle'), e?.error || e?.message || t('couldNotStartPaymentMessage'));
     }
-  }, [settleMethod, settleTipBase, settleTipSmallest, settleCashTenderedSmallest, settleSplitPieces, settleMutation, session, settleTotalSmallest, sessionId, currency, navigation]);
+  }, [settleMethod, settleTipBase, settleTipSmallest, settleCashTenderedSmallest, settleSplitPieces, settleMutation, session, settleTotalSmallest, sessionId, currency, navigation, t, guardCheckout]);
 
   const handleSettle = useCallback(() => {
     // Reset modal state on open so a previous failed attempt's values don't
     // leak in. Default to Tap to Pay + no tip — matches the most common
     // in-person bar/restaurant close-out.
     setSettleMethod('tap_to_pay');
-    setSettleTipText('');
+    setSettleTipPct(0);
+    setSettleTipCustomText('');
     setSettleCashTenderedText('');
     setSettleSplitPieces([]);
     setSettleSplitAddMethod('cash');
@@ -418,11 +516,43 @@ export function SessionDetailScreen() {
     );
   }, [settleMutation, t]);
 
-  const markRoundStatus = useCallback((roundItems: SessionItem[], status: ItemStatus) => {
-    const itemIds = roundItems.filter(i => i.status !== status).map(i => i.id);
-    if (itemIds.length > 0) {
-      updateStatusMutation.mutate({ itemIds, status });
+  const markRoundStatus = useCallback((roundItems: SessionItem[], status: RoundTargetStatus, roundNumber: number) => {
+    // The API's state machine is forward-only (pending → sent → preparing →
+    // ready → served) and 409s the WHOLE batch if any item is already at or
+    // past the target — so only send items strictly below the target rank.
+    const targetRank = ITEM_STATUS_RANK[status];
+    const itemIds = roundItems
+      .filter((i) => {
+        const rank = ITEM_STATUS_RANK[i.status];
+        return rank !== undefined && rank < targetRank;
+      })
+      .map((i) => i.id);
+    if (itemIds.length === 0) return;
+
+    // Delayed commit: park the change behind a grace window with a Cancel
+    // snackbar instead of firing immediately (backward transitions are
+    // rejected server-side, so this is the only workable undo).
+    if (pendingTimerRef.current) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
     }
+    const prev = pendingStatusRef.current;
+    if (prev && prev.roundNumber === roundNumber && prev.status === status) {
+      // Second tap on the same pending chip → commit right away.
+      setPendingStatus(null);
+      updateStatusMutation.mutate({ itemIds, status });
+      return;
+    }
+    if (prev) {
+      // A different change was pending — flush it so it isn't silently lost.
+      updateStatusMutation.mutate({ itemIds: prev.itemIds, status: prev.status });
+    }
+    setPendingStatus({ roundNumber, itemIds, status });
+    pendingTimerRef.current = setTimeout(() => {
+      pendingTimerRef.current = null;
+      setPendingStatus(null);
+      updateStatusMutation.mutate({ itemIds, status });
+    }, STATUS_COMMIT_DELAY_MS);
   }, [updateStatusMutation]);
 
   // Long-press on an item row → edit / remove action sheet. Disabled on
@@ -434,10 +564,10 @@ export function SessionDetailScreen() {
     if (session?.status !== 'open') return;
     Alert.alert(
       `${item.quantity}× ${item.name}`,
-      'Adjust this item before close-out.',
+      t('itemSheetMessage'),
       [
         {
-          text: 'Edit quantity',
+          text: t('editQuantityAction'),
           onPress: () => {
             setEditingItem(item);
             setQtyInput(String(item.quantity));
@@ -445,7 +575,7 @@ export function SessionDetailScreen() {
           },
         },
         {
-          text: 'Edit notes',
+          text: t('editNotesAction'),
           onPress: () => {
             setEditingItem(item);
             setNotesInput(item.notes || '');
@@ -453,16 +583,16 @@ export function SessionDetailScreen() {
           },
         },
         {
-          text: 'Remove',
+          text: t('removeAction'),
           style: 'destructive',
           onPress: () => {
             Alert.alert(
-              'Remove item?',
-              `Remove ${item.quantity}× ${item.name} from this session?`,
+              t('removeConfirmTitle'),
+              t('removeConfirmMessage', { quantity: item.quantity, name: item.name }),
               [
-                { text: 'Cancel', style: 'cancel' },
+                { text: t('cancel'), style: 'cancel' },
                 {
-                  text: 'Remove',
+                  text: t('removeAction'),
                   style: 'destructive',
                   onPress: () => removeItemMutation.mutate(item.id),
                 },
@@ -470,17 +600,17 @@ export function SessionDetailScreen() {
             );
           },
         },
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
       ],
     );
-  }, [session?.status, removeItemMutation]);
+  }, [session?.status, removeItemMutation, t]);
 
   const handleSubmitEdit = useCallback(() => {
     if (!editingItem) return;
     if (editMode === 'qty') {
       const n = parseInt(qtyInput, 10);
       if (!Number.isFinite(n) || n < 1) {
-        Alert.alert('Invalid quantity', 'Quantity must be at least 1. Use Remove to delete the item instead.');
+        Alert.alert(t('invalidQtyTitle'), t('invalidQtyMessage'));
         return;
       }
       if (n === editingItem.quantity) {
@@ -503,7 +633,56 @@ export function SessionDetailScreen() {
         data: { notes: trimmed.length > 0 ? trimmed : null },
       });
     }
-  }, [editingItem, editMode, qtyInput, notesInput, updateItemMutation]);
+  }, [editingItem, editMode, qtyInput, notesInput, updateItemMutation, t]);
+
+  // "Add items" — shared by the persistent header button and the button at
+  // the bottom of the item list. Routes to the Menu tab with this session
+  // pre-targeted; the cart's "Send" CTA there appends a new round and
+  // returns here.
+  const handleAddItems = useCallback(() => {
+    if (!session) return;
+    navigation.navigate('MainTabs', {
+      screen: 'Menu',
+      params: { screen: 'MenuHome', params: { sessionId: session.id } },
+    });
+  }, [navigation, session]);
+
+  // Table actions sheet (merge / unmerge) — exposes what the floor plan hides
+  // behind a long-press. Merge navigates to the floor plan in merge mode;
+  // unmerge lists this session's merged secondaries by label.
+  const handleTableActions = useCallback(() => {
+    if (!session || session.status !== 'open' || !session.tableId) return;
+    const merged = session.mergedTableIds || [];
+    const planTables = floorPlanDetail?.tables || [];
+    const options: Array<{ text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }> = [
+      {
+        text: t('mergeAction'),
+        onPress: () =>
+          navigation.navigate('FloorPlan', {
+            mergeSessionId: session.id,
+            floorPlanId: session.floorPlanId || undefined,
+          }),
+      },
+    ];
+    for (const tid of merged) {
+      const label = planTables.find((tbl) => tbl.id === tid)?.label || '';
+      options.push({
+        text: label ? t('unmergeLabelAction', { label }) : t('unmergeUnknownAction'),
+        style: 'destructive',
+        onPress: () => unmergeMutation.mutate(tid),
+      });
+    }
+    options.push({ text: t('cancel'), style: 'cancel' });
+    Alert.alert(session.tableLabel || t('tableActionsLabel'), '', options);
+  }, [session, floorPlanDetail, navigation, unmergeMutation, t]);
+
+  // Per-round collapse — fully-served rounds fold away by default so long
+  // sessions read as a summary instead of a flat scroll. Tapping a round
+  // header toggles it either way.
+  const [roundExpandOverrides, setRoundExpandOverrides] = useState<Record<number, boolean>>({});
+  const toggleRound = useCallback((roundNumber: number, currentlyExpanded: boolean) => {
+    setRoundExpandOverrides((prev) => ({ ...prev, [roundNumber]: !currentlyExpanded }));
+  }, []);
 
   const handleCancel = useCallback(() => {
     Alert.alert(
@@ -553,8 +732,8 @@ export function SessionDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel={t('retryAccessibilityLabel')}
           >
-            <Ionicons name="refresh" size={18} color="#fff" />
-            <Text style={{ fontSize: 15, fontFamily: fonts.bold, color: '#fff' }} maxFontSizeMultiplier={1.3}>
+            <Ionicons name="refresh" size={18} color={colors.onPrimary} />
+            <Text style={{ fontSize: 15, fontFamily: fonts.bold, color: colors.onPrimary }} maxFontSizeMultiplier={1.3}>
               {t('retryButton')}
             </Text>
           </TouchableOpacity>
@@ -622,6 +801,31 @@ export function SessionDetailScreen() {
               {statusLabel}
             </Text>
           </View>
+          {/* Persistent "+ Add" — the bottom-of-scroll button stays, but long
+              sessions shouldn't require scrolling to add a round. */}
+          {isOpen && (
+            <TouchableOpacity
+              onPress={handleAddItems}
+              style={[styles.headerIconBtn, { backgroundColor: colors.primary + '18' }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('addItemsAccessibilityLabel')}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons name="add" size={22} color={colors.primary} />
+            </TouchableOpacity>
+          )}
+          {/* Table actions (merge / unmerge) for table-bound sessions. */}
+          {isOpen && !!session.tableId && (
+            <TouchableOpacity
+              onPress={handleTableActions}
+              style={[styles.headerIconBtn, { backgroundColor: colors.surface }]}
+              accessibilityRole="button"
+              accessibilityLabel={t('tableActionsLabel')}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            >
+              <Ionicons name="ellipsis-horizontal" size={20} color={colors.text} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -642,105 +846,153 @@ export function SessionDetailScreen() {
           </View>
         )}
 
-        {/* Items by round */}
+        {/* Items by round. Round headers carry count + subtotal; fully-served
+            rounds are dimmed and collapsed by default (tap to expand). */}
         {rounds.map(([roundNum, roundItems]) => {
           const allServed = roundItems.every(i => i.status === 'served');
           const roundNotes = roundNotesByNumber.get(roundNum);
+          const roundQty = roundItems.reduce((s, i) => s + i.quantity, 0);
+          const roundSubtotal = roundItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+          const expanded = roundExpandOverrides[roundNum] ?? !allServed;
+          const roundSummary = `${roundQty === 1 ? t('roundItemsSingular', { count: roundQty }) : t('roundItemsPlural', { count: roundQty })} · ${formatCurrency(roundSubtotal, currency)}`;
           return (
-            <View key={roundNum} style={styles.roundSection}>
-              <View style={styles.roundHeader}>
-                <Text style={[styles.roundLabel, { color: colors.textMuted }]} maxFontSizeMultiplier={1.3}>
-                  {t('roundLabel', { number: roundNum })}
-                </Text>
-                {isOpen && !allServed && (
-                  <View style={styles.roundActions}>
-                    <TouchableOpacity
-                      onPress={() => markRoundStatus(roundItems, 'sent')}
-                      style={[styles.roundActionBtn, { backgroundColor: '#3B82F620' }]}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('markRoundSentLabel', { number: roundNum })}
-                    >
-                      <Text style={[styles.roundActionText, { color: '#3B82F6' }]} maxFontSizeMultiplier={1.3}>{t('roundActionSent')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => markRoundStatus(roundItems, 'ready')}
-                      style={[styles.roundActionBtn, { backgroundColor: '#22C55E20' }]}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('markRoundReadyLabel', { number: roundNum })}
-                    >
-                      <Text style={[styles.roundActionText, { color: '#22C55E' }]} maxFontSizeMultiplier={1.3}>{t('roundActionReady')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => markRoundStatus(roundItems, 'served')}
-                      style={[styles.roundActionBtn, { backgroundColor: '#A8A29E20' }]}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('markRoundServedLabel', { number: roundNum })}
-                    >
-                      <Text style={[styles.roundActionText, { color: '#A8A29E' }]} maxFontSizeMultiplier={1.3}>{t('roundActionServed')}</Text>
-                    </TouchableOpacity>
-                  </View>
+            <View key={roundNum} style={[styles.roundSection, allServed && styles.roundSectionServed]}>
+              <TouchableOpacity
+                style={styles.roundHeader}
+                onPress={() => toggleRound(roundNum, expanded)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={expanded ? t('roundCollapseLabel', { number: roundNum }) : t('roundExpandLabel', { number: roundNum })}
+                accessibilityState={{ expanded }}
+              >
+                <View style={styles.roundHeaderLeft}>
+                  <Ionicons
+                    name={expanded ? 'chevron-down' : 'chevron-forward'}
+                    size={14}
+                    color={colors.textMuted}
+                  />
+                  <Text style={[styles.roundLabel, { color: colors.textMuted }]} maxFontSizeMultiplier={1.3}>
+                    {t('roundLabel', { number: roundNum })}
+                  </Text>
+                  <Text style={[styles.roundSummary, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.3} numberOfLines={1}>
+                    {roundSummary}
+                  </Text>
+                </View>
+                {allServed && (
+                  <Ionicons name="checkmark-done" size={16} color={colors.textMuted} />
                 )}
-              </View>
+              </TouchableOpacity>
 
-              <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                {roundNotes && (
-                  <View
-                    style={[
-                      styles.roundNotesBox,
-                      { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' },
-                    ]}
-                    accessibilityRole="text"
-                    accessibilityLabel={`${t('roundNotesLabel')}: ${roundNotes}`}
-                  >
-                    <Ionicons name="chatbox-ellipses-outline" size={14} color={colors.primary} />
-                    <View style={styles.roundNotesTextWrap}>
-                      <Text style={[styles.roundNotesLabel, { color: colors.primary }]} maxFontSizeMultiplier={1.3}>
-                        {t('roundNotesLabel')}
-                      </Text>
-                      <Text style={[styles.roundNotesText, { color: colors.text }]} maxFontSizeMultiplier={1.5}>
-                        {roundNotes}
-                      </Text>
-                    </View>
-                  </View>
-                )}
-                {roundItems.map((item) => {
-                  const config = STATUS_CONFIG[item.status] || STATUS_CONFIG.pending;
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={styles.itemRow}
-                      onLongPress={() => handleItemLongPress(item)}
-                      disabled={!isOpen}
-                      delayLongPress={350}
-                      activeOpacity={0.7}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${item.quantity} ${item.name}. Long press to edit or remove.`}
+              {/* Round status chips — ≥44pt targets. A chip shows as "done"
+                  (filled + check) once every item is at/past its status, and
+                  as pending while a delayed commit is counting down. */}
+              {isOpen && !allServed && expanded && (
+                <View style={styles.roundActions}>
+                  {ROUND_CHIP_TARGETS.map(({ status, color, labelKey }) => {
+                    const targetRank = ITEM_STATUS_RANK[status];
+                    const done = roundItems.every((i) => (ITEM_STATUS_RANK[i.status] ?? 0) >= targetRank);
+                    const isPending = pendingStatus?.roundNumber === roundNum && pendingStatus.status === status;
+                    return (
+                      <TouchableOpacity
+                        key={status}
+                        onPress={() => markRoundStatus(roundItems, status, roundNum)}
+                        disabled={done || updateStatusMutation.isPending}
+                        style={[
+                          styles.roundActionBtn,
+                          {
+                            backgroundColor: done ? color + '30' : color + '15',
+                            borderColor: isPending ? colors.primary : done ? color : color + '50',
+                          },
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={t(`markRound${status === 'sent' ? 'Sent' : status === 'ready' ? 'Ready' : 'Served'}Label`, { number: roundNum })}
+                        accessibilityState={{ selected: done, busy: isPending }}
+                      >
+                        {done && <Ionicons name="checkmark" size={14} color={color} />}
+                        {isPending && <ActivityIndicator size="small" color={colors.primary} />}
+                        <Text style={[styles.roundActionText, { color }]} maxFontSizeMultiplier={1.3}>
+                          {t(labelKey)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+
+              {expanded && (
+                <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  {roundNotes && (
+                    <View
+                      style={[
+                        styles.roundNotesBox,
+                        { backgroundColor: colors.primary + '15', borderColor: colors.primary + '40' },
+                      ]}
+                      accessibilityRole="text"
+                      accessibilityLabel={`${t('roundNotesLabel')}: ${roundNotes}`}
                     >
-                      <View style={styles.itemInfo}>
-                        <Text style={[styles.itemName, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
-                          {item.quantity}× {item.name}
+                      <Ionicons name="chatbox-ellipses-outline" size={14} color={colors.primary} />
+                      <View style={styles.roundNotesTextWrap}>
+                        <Text style={[styles.roundNotesLabel, { color: colors.primary }]} maxFontSizeMultiplier={1.3}>
+                          {t('roundNotesLabel')}
                         </Text>
-                        {item.notes && (
-                          <Text style={[styles.itemNotes, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-                            {item.notes}
-                          </Text>
-                        )}
+                        <Text style={[styles.roundNotesText, { color: colors.text }]} maxFontSizeMultiplier={1.5}>
+                          {roundNotes}
+                        </Text>
                       </View>
-                      <View style={styles.itemRight}>
-                        <Text style={[styles.itemPrice, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.3}>
-                          {formatCurrency(item.unitPrice * item.quantity, currency)}
-                        </Text>
-                        <View style={[styles.itemStatusBadge, { backgroundColor: config.color + '20' }]}>
-                          <Ionicons name={config.icon as any} size={12} color={config.color} />
-                          <Text style={[styles.itemStatusText, { color: config.color }]} maxFontSizeMultiplier={1.3}>
-                            {t(config.labelKey)}
+                    </View>
+                  )}
+                  {roundItems.map((item) => {
+                    const config = STATUS_CONFIG[item.status] || STATUS_CONFIG.pending;
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={styles.itemRow}
+                        onLongPress={() => handleItemLongPress(item)}
+                        disabled={!isOpen}
+                        delayLongPress={350}
+                        activeOpacity={0.7}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${item.quantity} ${item.name}`}
+                      >
+                        <View style={styles.itemInfo}>
+                          <Text style={[styles.itemName, { color: colors.text }]} maxFontSizeMultiplier={1.3} numberOfLines={2}>
+                            {item.quantity}× {item.name}
                           </Text>
+                          {item.notes && (
+                            <Text style={[styles.itemNotes, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5} numberOfLines={2}>
+                              {item.notes}
+                            </Text>
+                          )}
                         </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+                        <View style={styles.itemRight}>
+                          <Text style={[styles.itemPrice, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.3}>
+                            {formatCurrency(item.unitPrice * item.quantity, currency)}
+                          </Text>
+                          <View style={[styles.itemStatusBadge, { backgroundColor: config.color + '20' }]}>
+                            <Ionicons name={config.icon as any} size={12} color={config.color} />
+                            <Text style={[styles.itemStatusText, { color: config.color }]} maxFontSizeMultiplier={1.3}>
+                              {t(config.labelKey)}
+                            </Text>
+                          </View>
+                        </View>
+                        {/* Visible entry point to the same edit/remove sheet the
+                            long-press opens — discoverability for finding #7. */}
+                        {isOpen && (
+                          <TouchableOpacity
+                            onPress={() => handleItemLongPress(item)}
+                            style={styles.itemMoreBtn}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('itemActionsLabel', { name: item.name })}
+                            hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+                          >
+                            <Ionicons name="ellipsis-horizontal" size={18} color={colors.textMuted} />
+                          </TouchableOpacity>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
             </View>
           );
         })}
@@ -784,10 +1036,7 @@ export function SessionDetailScreen() {
             round directly to this session and return here. */}
         {isOpen && (
           <TouchableOpacity
-            onPress={() => navigation.navigate('MainTabs', {
-              screen: 'Menu',
-              params: { screen: 'MenuHome', params: { sessionId: session.id } },
-            })}
+            onPress={handleAddItems}
             style={[styles.addItemsButton, { borderColor: colors.border, backgroundColor: colors.surface }]}
             accessibilityRole="button"
             accessibilityLabel={t('addItemsAccessibilityLabel')}
@@ -824,10 +1073,10 @@ export function SessionDetailScreen() {
               accessibilityLabel={items.length === 0 ? t('closeTabAccessibilityNoItems') : t('closeTabAccessibility')}
             >
               {closeTabMutation.isPending ? (
-                <ActivityIndicator color="#fff" accessibilityLabel={t('chargingCardLabel')} />
+                <ActivityIndicator color={colors.onPrimary} accessibilityLabel={t('chargingCardLabel')} />
               ) : (
                 <>
-                  <Ionicons name="wallet-outline" size={20} color="#fff" />
+                  <Ionicons name="wallet-outline" size={20} color={colors.onPrimary} />
                   <Text style={styles.settleButtonText} maxFontSizeMultiplier={1.3}>{t('closeTabButton')}</Text>
                 </>
               )}
@@ -841,10 +1090,10 @@ export function SessionDetailScreen() {
               accessibilityLabel={t('markCompleteAccessibilityLabel')}
             >
               {settleMutation.isPending ? (
-                <ActivityIndicator color="#fff" accessibilityLabel={t('settlingLabel')} />
+                <ActivityIndicator color={colors.onPrimary} accessibilityLabel={t('settlingLabel')} />
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle-outline" size={20} color="#fff" />
+                  <Ionicons name="checkmark-circle-outline" size={20} color={colors.onPrimary} />
                   <Text style={styles.settleButtonText} maxFontSizeMultiplier={1.3}>{t('markCompleteButton')}</Text>
                 </>
               )}
@@ -858,15 +1107,43 @@ export function SessionDetailScreen() {
               accessibilityLabel={t('settleAccessibilityLabel')}
             >
               {settleMutation.isPending ? (
-                <ActivityIndicator color="#fff" accessibilityLabel={t('settlingLabel')} />
+                <ActivityIndicator color={colors.onPrimary} accessibilityLabel={t('settlingLabel')} />
               ) : (
                 <>
-                  <Ionicons name="cash-outline" size={20} color="#fff" />
+                  {/* Neutral icon — settle defaults to Tap to Pay, so a cash
+                      glyph here misled operators. */}
+                  <Ionicons name="card-outline" size={20} color={colors.onPrimary} />
                   <Text style={styles.settleButtonText} maxFontSizeMultiplier={1.3}>{t('settleButton')}</Text>
                 </>
               )}
             </TouchableOpacity>
           )}
+        </View>
+      )}
+
+      {/* Delayed-commit snackbar — visible while a round status change is
+          counting down to commit. Cancel aborts before the request fires. */}
+      {pendingStatus && (
+        <View
+          style={[styles.snackbar, { backgroundColor: colors.card, borderColor: colors.border }]}
+          accessibilityRole="alert"
+        >
+          <Text style={[styles.snackbarText, { color: colors.text }]} maxFontSizeMultiplier={1.3} numberOfLines={2}>
+            {t('statusPendingSnackbar', {
+              number: pendingStatus.roundNumber,
+              status: t(STATUS_CONFIG[pendingStatus.status].labelKey),
+            })}
+          </Text>
+          <TouchableOpacity
+            onPress={cancelPendingStatus}
+            style={styles.snackbarBtn}
+            accessibilityRole="button"
+            accessibilityLabel={t('cancel')}
+          >
+            <Text style={[styles.snackbarBtnText, { color: colors.primary }]} maxFontSizeMultiplier={1.3}>
+              {t('cancel')}
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -900,85 +1177,19 @@ export function SessionDetailScreen() {
               {t('subtotalPreview', { amount: session ? formatCurrency(session.subtotal, currency) : '' })}
             </Text>
 
-            <View style={styles.tipOptionsGrid}>
-              {tipPercentages.map((pct) => {
-                const isActive = selectedTipPct === pct;
-                const tipPreview = session ? session.subtotal * (pct / 100) : 0;
-                return (
-                  <TouchableOpacity
-                    key={pct}
-                    onPress={() => { setSelectedTipPct(pct); setCustomTipText(''); }}
-                    style={[
-                      styles.tipOption,
-                      { borderColor: isActive ? colors.primary : colors.border, backgroundColor: isActive ? colors.primary + '15' : colors.surface },
-                    ]}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('tipPercentAccessibility', { pct })}
-                    accessibilityState={{ selected: isActive }}
-                  >
-                    <Text style={[styles.tipOptionPct, { color: isActive ? colors.primary : colors.text }]} maxFontSizeMultiplier={1.2}>
-                      {t('tipPercentLabel', { pct })}
-                    </Text>
-                    <Text style={[styles.tipOptionAmount, { color: colors.textMuted }]} maxFontSizeMultiplier={1.5}>
-                      {formatCurrency(tipPreview, currency)}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-              {allowCustomTip && (
-                <TouchableOpacity
-                  onPress={() => setSelectedTipPct(-1)}
-                  style={[
-                    styles.tipOption,
-                    { borderColor: selectedTipPct === -1 ? colors.primary : colors.border, backgroundColor: selectedTipPct === -1 ? colors.primary + '15' : colors.surface },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('customTipAccessibility')}
-                  accessibilityState={{ selected: selectedTipPct === -1 }}
-                >
-                  <Text style={[styles.tipOptionPct, { color: selectedTipPct === -1 ? colors.primary : colors.text }]} maxFontSizeMultiplier={1.2}>
-                    {t('customTip')}
-                  </Text>
-                </TouchableOpacity>
-              )}
-              <TouchableOpacity
-                onPress={() => { setSelectedTipPct(0); setCustomTipText(''); }}
-                style={[
-                  styles.tipOption,
-                  { borderColor: selectedTipPct === 0 ? colors.primary : colors.border, backgroundColor: selectedTipPct === 0 ? colors.primary + '15' : colors.surface },
-                ]}
-                accessibilityRole="button"
-                accessibilityLabel={t('noTipAccessibility')}
-                accessibilityState={{ selected: selectedTipPct === 0 }}
-              >
-                <Text style={[styles.tipOptionPct, { color: selectedTipPct === 0 ? colors.primary : colors.text }]} maxFontSizeMultiplier={1.2}>
-                  {t('noTip')}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {selectedTipPct === -1 && (
-              <View style={styles.customTipRow}>
-                <Text style={[styles.customTipLabel, { color: colors.textSecondary }]} maxFontSizeMultiplier={1.5}>
-                  {t('customTipLabel')}
-                </Text>
-                <TextInput
-                  value={customTipText}
-                  onChangeText={(text) => {
-                    // Only allow digits + optional decimal for 2-decimal currencies
-                    const cleaned = isZeroDecimal(currency)
-                      ? text.replace(/[^0-9]/g, '')
-                      : text.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
-                    setCustomTipText(cleaned);
-                  }}
-                  placeholder={t('customTipPlaceholder')}
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="decimal-pad"
-                  style={[styles.customTipInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-                  accessibilityLabel={t('customTipAccessibility')}
-                />
-              </View>
-            )}
+            <TipPicker
+              subtotal={session?.subtotal || 0}
+              currency={currency}
+              percentages={tipPercentages}
+              allowCustom={allowCustomTip}
+              selectedPct={selectedTipPct}
+              customText={customTipText}
+              onSelect={(pct) => {
+                setSelectedTipPct(pct);
+                if (pct !== CUSTOM_TIP) setCustomTipText('');
+              }}
+              onCustomTextChange={setCustomTipText}
+            />
 
             {/* Summary */}
             <View style={[styles.tipSummary, { borderTopColor: colors.border }]}>
@@ -1020,10 +1231,10 @@ export function SessionDetailScreen() {
               accessibilityLabel={t('chargeButtonAccessibility', { amount: formatCurrency(sessionPreTipTotal + computedTipBase, currency) })}
             >
               {closeTabMutation.isPending ? (
-                <ActivityIndicator color="#fff" accessibilityLabel={t('chargingCardLabel')} />
+                <ActivityIndicator color={colors.onPrimary} accessibilityLabel={t('chargingCardLabel')} />
               ) : (
                 <>
-                  <Ionicons name="wallet-outline" size={20} color="#fff" />
+                  <Ionicons name="wallet-outline" size={20} color={colors.onPrimary} />
                   <Text style={styles.chargeButtonText} maxFontSizeMultiplier={1.3}>
                     {t('chargeButton', { amount: formatCurrency(sessionPreTipTotal + computedTipBase, currency) })}
                   </Text>
@@ -1121,24 +1332,26 @@ export function SessionDetailScreen() {
               </View>
             </View>
 
-            {/* Tip entry — shared across methods. Optional. */}
-            <View style={{ marginBottom: 12 }}>
-              <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 4 }} maxFontSizeMultiplier={1.5}>{t('tipOptionalLabel')}</Text>
-              <TextInput
-                value={settleTipText}
-                onChangeText={(text) => {
-                  const cleaned = isZeroDecimal(currency)
-                    ? text.replace(/[^0-9]/g, '')
-                    : text.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
-                  setSettleTipText(cleaned);
-                }}
-                placeholder="0"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="decimal-pad"
-                style={[styles.customTipInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-                accessibilityLabel={t('tipOptionalLabel')}
-              />
-            </View>
+            {/* Tip entry — shared across methods. Optional. Same percentage
+                grid as the close-tab flow (finding #9). */}
+            {showTipScreen && (
+              <View style={{ marginBottom: 12, gap: 6 }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 12 }} maxFontSizeMultiplier={1.5}>{t('tipOptionalLabel')}</Text>
+                <TipPicker
+                  subtotal={session?.subtotal || 0}
+                  currency={currency}
+                  percentages={tipPercentages}
+                  allowCustom={allowCustomTip}
+                  selectedPct={settleTipPct}
+                  customText={settleTipCustomText}
+                  onSelect={(pct) => {
+                    setSettleTipPct(pct);
+                    if (pct !== CUSTOM_TIP) setSettleTipCustomText('');
+                  }}
+                  onCustomTextChange={setSettleTipCustomText}
+                />
+              </View>
+            )}
 
             {/* Cash mode: tendered + change */}
             {settleMethod === 'cash' && (
@@ -1158,6 +1371,37 @@ export function SessionDetailScreen() {
                   style={[styles.customTipInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
                   accessibilityLabel={t('cashTenderedLabel')}
                 />
+                {/* Quick-tender chips — exact total + common denominations at
+                    or above the total (finding #10). */}
+                <View style={styles.quickTenderRow} accessibilityLabel={t('quickTenderLabel')}>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setSettleCashTenderedText(settleTotalBase.toFixed(isZeroDecimal(currency) ? 0 : 2))
+                    }
+                    style={[styles.quickTenderChip, { borderColor: colors.primary, backgroundColor: colors.primary + '15' }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('exactAmountAccessibility', { amount: formatCurrency(settleTotalBase, currency) })}
+                  >
+                    <Text style={[styles.quickTenderText, { color: colors.primary }]} maxFontSizeMultiplier={1.3}>
+                      {t('exactAmount')}
+                    </Text>
+                  </TouchableOpacity>
+                  {(isZeroDecimal(currency) ? CASH_DENOMINATIONS_ZERO_DECIMAL : CASH_DENOMINATIONS)
+                    .filter((d) => d >= settleTotalBase)
+                    .map((d) => (
+                      <TouchableOpacity
+                        key={d}
+                        onPress={() => setSettleCashTenderedText(String(d))}
+                        style={[styles.quickTenderChip, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                        accessibilityRole="button"
+                        accessibilityLabel={formatCurrency(d, currency)}
+                      >
+                        <Text style={[styles.quickTenderText, { color: colors.text }]} maxFontSizeMultiplier={1.3}>
+                          {formatCurrency(d, currency)}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                </View>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
                   <Text style={{ color: colors.textSecondary, fontSize: 13 }} maxFontSizeMultiplier={1.5}>{t('changeLabel')}</Text>
                   <Text style={{ color: '#22C55E', fontSize: 13, fontFamily: fonts.semiBold }} maxFontSizeMultiplier={1.3}>
@@ -1173,7 +1417,7 @@ export function SessionDetailScreen() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
                   <Text style={{ color: colors.textSecondary, fontSize: 12 }} maxFontSizeMultiplier={1.5}>{t('splitRemainingLabel')}</Text>
                   <Text style={{ color: colors.text, fontSize: 13, fontFamily: fonts.semiBold }} maxFontSizeMultiplier={1.3}>
-                    {formatCurrency(settleSplitRemainingSmallest / Math.pow(10, isZeroDecimal(currency) ? 0 : 2), currency)}
+                    {formatCurrency(fromSmallestUnit(settleSplitRemainingSmallest, currency), currency)}
                   </Text>
                 </View>
 
@@ -1205,7 +1449,10 @@ export function SessionDetailScreen() {
                 {settleSplitRemainingSmallest > 0 && (
                   <View style={{ gap: 6 }}>
                     <View style={{ flexDirection: 'row', gap: 6 }}>
-                      {(['cash', 'tap_to_pay'] as const).map((m) => {
+                      {/* v1: tap_to_pay intentionally excluded — record-only
+                          pieces would create phantom pending tenders (see
+                          settleSplitPieces state above). */}
+                      {(['cash'] as const).map((m) => {
                         const isActive = settleSplitAddMethod === m;
                         return (
                           <TouchableOpacity
@@ -1322,12 +1569,12 @@ export function SessionDetailScreen() {
           <View style={[styles.tipModalContent, { backgroundColor: colors.card }]}>
             <View style={styles.tipModalHeader}>
               <Text style={[styles.tipModalTitle, { color: colors.text }]} maxFontSizeMultiplier={1.2}>
-                {editMode === 'qty' ? 'Edit quantity' : 'Edit notes'}
+                {editMode === 'qty' ? t('editQuantityAction') : t('editNotesAction')}
               </Text>
               <TouchableOpacity
                 onPress={() => { setEditingItem(null); setEditMode(null); }}
                 accessibilityRole="button"
-                accessibilityLabel="Close"
+                accessibilityLabel={t('closeLabel')}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
                 <Ionicons name="close" size={24} color={colors.textSecondary} />
@@ -1359,9 +1606,9 @@ export function SessionDetailScreen() {
                   marginTop: 12,
                   textAlign: 'center',
                 }}
-                placeholder="Qty"
+                placeholder={t('qtyPlaceholder')}
                 placeholderTextColor={colors.textMuted}
-                accessibilityLabel="Quantity"
+                accessibilityLabel={t('quantityLabel')}
               />
             ) : (
               <TextInput
@@ -1383,9 +1630,9 @@ export function SessionDetailScreen() {
                   minHeight: 88,
                   textAlignVertical: 'top',
                 }}
-                placeholder="Item notes (e.g. no onions)"
+                placeholder={t('notesPlaceholder')}
                 placeholderTextColor={colors.textMuted}
-                accessibilityLabel="Item notes"
+                accessibilityLabel={t('itemNotesLabel')}
               />
             )}
 
@@ -1393,7 +1640,7 @@ export function SessionDetailScreen() {
               onPress={handleSubmitEdit}
               disabled={updateItemMutation.isPending}
               accessibilityRole="button"
-              accessibilityLabel="Save changes"
+              accessibilityLabel={t('saveButton')}
               style={{
                 backgroundColor: updateItemMutation.isPending ? colors.border : colors.primary,
                 paddingVertical: 14,
@@ -1405,7 +1652,7 @@ export function SessionDetailScreen() {
               {updateItemMutation.isPending ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={{ color: '#fff', fontFamily: fonts.bold, fontSize: 15 }} maxFontSizeMultiplier={1.3}>Save</Text>
+                <Text style={{ color: '#fff', fontFamily: fonts.bold, fontSize: 15 }} maxFontSizeMultiplier={1.3}>{t('saveButton')}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -1431,11 +1678,83 @@ const styles = StyleSheet.create({
   customerName: { fontSize: 16, fontFamily: fonts.semiBold },
   customerEmail: { fontSize: 14, fontFamily: fonts.regular },
   roundSection: { gap: 8 },
-  roundHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  roundSectionServed: { opacity: 0.55 },
+  roundHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 44,
+  },
+  roundHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
   roundLabel: { fontSize: 12, fontFamily: fonts.semiBold, textTransform: 'uppercase', letterSpacing: 1 },
-  roundActions: { flexDirection: 'row', gap: 6 },
-  roundActionBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  roundActionText: { fontSize: 11, fontFamily: fonts.semiBold },
+  roundSummary: { fontSize: 12, fontFamily: fonts.medium, flexShrink: 1 },
+  roundActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  roundActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    minHeight: 44,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  roundActionText: { fontSize: 13, fontFamily: fonts.semiBold },
+  headerIconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  itemMoreBtn: {
+    marginLeft: 8,
+    minWidth: 32,
+    minHeight: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  snackbar: {
+    position: 'absolute',
+    left: 16,
+    right: 16,
+    bottom: 96,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingLeft: 16,
+    paddingRight: 6,
+    paddingVertical: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    ...shadows.lg,
+  },
+  snackbarText: { fontSize: 14, fontFamily: fonts.medium, flex: 1 },
+  snackbarBtn: {
+    minHeight: 44,
+    minWidth: 44,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  snackbarBtnText: { fontSize: 14, fontFamily: fonts.bold },
+  quickTenderRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  quickTenderChip: {
+    minHeight: 44,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickTenderText: { fontSize: 14, fontFamily: fonts.semiBold },
   roundNotesBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1467,7 +1786,8 @@ const styles = StyleSheet.create({
   cancelButton: { flex: 1, alignItems: 'center', paddingVertical: 14, borderRadius: 14, borderWidth: 1 },
   cancelButtonText: { fontSize: 16, fontFamily: fonts.semiBold },
   settleButton: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 14 },
-  settleButtonText: { fontSize: 16, fontFamily: fonts.semiBold, color: '#fff' },
+  // Dark stone on amber/green fills — white fails contrast (see colors.onPrimary)
+  settleButtonText: { fontSize: 16, fontFamily: fonts.semiBold, color: '#1C1917' },
   emptyText: { fontSize: 16, fontFamily: fonts.semiBold, textAlign: 'center' },
   addItemsButton: {
     flexDirection: 'row',
@@ -1501,28 +1821,6 @@ const styles = StyleSheet.create({
   },
   tipModalTitle: { fontSize: 20, fontFamily: fonts.bold },
   tipSubtotalLabel: { fontSize: 13, fontFamily: fonts.regular, textAlign: 'center' },
-  tipOptionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'center',
-  },
-  tipOption: {
-    flexBasis: '30%',
-    minHeight: 64,
-    borderRadius: 14,
-    borderWidth: 2,
-    padding: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-  },
-  tipOptionPct: { fontSize: 17, fontFamily: fonts.bold },
-  tipOptionAmount: { fontSize: 11, fontFamily: fonts.regular },
-  customTipRow: {
-    gap: 6,
-  },
-  customTipLabel: { fontSize: 12, fontFamily: fonts.semiBold, textTransform: 'uppercase', letterSpacing: 0.5 },
   customTipInput: {
     minHeight: 48,
     borderRadius: 12,
@@ -1545,5 +1843,5 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     ...shadows.md,
   },
-  chargeButtonText: { fontSize: 16, fontFamily: fonts.bold, color: '#fff' },
+  chargeButtonText: { fontSize: 16, fontFamily: fonts.bold, color: '#1C1917' },
 });

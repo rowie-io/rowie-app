@@ -17,7 +17,10 @@ export interface OnboardingLink {
 
 export interface CreateAccountResponse {
   accountId: string;
-  onboardingUrl: string;
+  // The API omits onboardingUrl when the account is already fully onboarded
+  // (status 'complete') or gated by the fraud review ('needs_review').
+  onboardingUrl?: string;
+  status?: 'new' | 'resume' | 'complete' | 'needs_review';
 }
 
 export const stripeConnectApi = {

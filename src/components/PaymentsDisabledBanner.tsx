@@ -69,7 +69,7 @@ export function PaymentsDisabledBanner({ compact = false }: PaymentsDisabledBann
           accessibilityHint={t('messageManager')}
         >
           <Text style={styles.buttonText} maxFontSizeMultiplier={1.3}>{t('buttonText')}</Text>
-          <Ionicons name="open-outline" size={16} color="#fff" />
+          <Ionicons name="open-outline" size={16} color={colors.onPrimary} />
         </TouchableOpacity>
       )}
     </View>
@@ -129,7 +129,7 @@ const createStyles = (colors: any, compact: boolean) =>
     buttonText: {
       fontSize: 15,
       fontWeight: '600',
-      color: '#fff',
+      color: colors.onPrimary,
     },
     // Compact banner styles
     compactContainer: {

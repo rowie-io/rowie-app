@@ -56,7 +56,7 @@ export function TapToPayFirstUseModal({
             <View style={styles.iconContainer}>
               <View style={[styles.iconGradient, { backgroundColor: colors.primary }]}>
                 <View style={styles.iconInner}>
-                  <Ionicons name="wifi" size={32} color="#fff" style={styles.wifiIcon} />
+                  <Ionicons name="wifi" size={32} color={colors.onPrimary} style={styles.wifiIcon} />
                 </View>
               </View>
             </View>
@@ -259,6 +259,6 @@ const createStyles = (colors: any, isDark: boolean) =>
     proceedButtonText: {
       fontSize: 15,
       fontWeight: '600',
-      color: '#fff',
+      color: colors.onPrimary,
     },
   });

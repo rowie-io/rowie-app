@@ -38,7 +38,9 @@
     "item": "položka",
     "items": "položek",
     "noCategory": "Bez kategorie",
-    "percentSymbol": "%"
+    "percentSymbol": "%",
+    "undo": "Vrátit zpět",
+    "removedFromCart": "Odebráno: {name}"
   },
   "auth": {
     "loginTitle": "Přihlášení",
@@ -385,7 +387,12 @@
     "goToCartAccessibilityLabelSingular": "Přejít do košíku, {count} položka",
     "goToCartAccessibilityLabelPlural": "Přejít do košíku, {count} položek",
     "goToCartButton": "Přejít do košíku",
-    "switchToMenuAccessibilityLabel": "Přepnout na menu {name}"
+    "switchToMenuAccessibilityLabel": "Přepnout na menu {name}",
+    "longPressNotesHint": "Tip: podržte položku pro přidání poznámky",
+    "dismissHintAccessibilityLabel": "Zavřít nápovědu",
+    "quickChargeLabel": "Účtovat",
+    "quickChargeOfflineLabel": "Offline",
+    "quickChargeOfflineNotice": "nedostupné offline"
   },
   "checkout": {
     "tapToPayLabel": "Tap to Pay on iPhone",
@@ -476,7 +483,9 @@
     "cancelHoldAccessibilityLabel": "Zrušit odložení objednávky",
     "holdingOrderAccessibilityLabel": "Odkládání objednávky",
     "closeHoldDialogAccessibilityLabel": "Zavřít dialog odložení objednávky",
-    "subtotalWithCountSingular": "Mezisoučet ({count} položka)"
+    "subtotalWithCountSingular": "Mezisoučet ({count} položka)",
+    "chargesDisabledPayHint": "Platby nejsou dostupné, dokud nedokončíte nastavení plateb.",
+    "offlinePayHint": "Žádné internetové připojení — platby nejsou dostupné, dokud nebudete znovu online."
   },
   "payment": {
     "preparingPayment": "Příprava platby...",
@@ -619,7 +628,10 @@
     "cashReceived": "Hotovost přijata",
     "splitComplete": "Rozdělená platba dokončena",
     "cardPaymentComplete": "Platba kartou dokončena",
-    "splitMethodsBadge": "Zaplaceno několika způsoby"
+    "splitMethodsBadge": "Zaplaceno několika způsoby",
+    "checkHistory": "Zkontrolovat historii",
+    "elapsedTime": "Uplynulo {time}",
+    "tenderQuickAmountAccessibility": "Nastavit přijatou hotovost na {amount}"
   },
   "settings": {
     "title": "Nastavení",
@@ -679,7 +691,7 @@
     "sectionAbout": "O APLIKACI",
     "learnTapToPay": "Více o {tapToPayName}",
     "contactSupport": "Kontaktovat podporu",
-    "contactSupportAccessibilityHint": "Otevře e-mail na support@rowie.io",
+    "contactSupportAccessibilityHint": "Otevře e-mail na support@rowie.eu",
     "termsOfUse": "Podmínky užívání",
     "privacyPolicy": "Zásady ochrany osobních údajů",
     "signOut": "Odhlásit se",
@@ -688,7 +700,7 @@
     "biometricNeedsRelogin": "Odhlaste se a znovu se přihlaste, poté po zobrazení výzvy zvolte Povolit pro zapnutí biometrického přihlášení.",
     "errorBiometricToggle": "Nepodařilo se {action} biometrické přihlášení.",
     "deleteAccountAlertTitle": "Smazat účet",
-    "deleteAccountAlertMessage": "Váš účet bude okamžitě deaktivován a po 30 dnech trvale smazán. Všechna vaše data budou odstraněna a tuto akci nelze vrátit.\n\nMůžete kontaktovat support@rowie.io do 30 dnů pro zrušení.",
+    "deleteAccountAlertMessage": "Váš účet bude okamžitě deaktivován a po 30 dnech trvale smazán. Všechna vaše data budou odstraněna a tuto akci nelze vrátit.\n\nMůžete kontaktovat support@rowie.eu do 30 dnů pro zrušení.",
     "deleteAccountAlertCancel": "Zrušit",
     "deleteAccountAlertConfirm": "Smazat účet",
     "deleteAccountScheduledTitle": "Smazání účtu naplánováno",
@@ -696,7 +708,7 @@
     "deleteAccountAlreadyScheduledTitle": "Již naplánováno",
     "deleteAccountAlreadyScheduledMessage": "Smazání vašeho účtu je již naplánováno.",
     "deleteAccountErrorTitle": "Chyba",
-    "deleteAccountErrorMessage": "Nepodařilo se zpracovat požadavek na smazání. Zkuste to znovu nebo kontaktujte support@rowie.io.",
+    "deleteAccountErrorMessage": "Nepodařilo se zpracovat požadavek na smazání. Zkuste to znovu nebo kontaktujte support@rowie.eu.",
     "subscriptionStatusFreePlan": "Bezplatný plán",
     "subscriptionStatusCancelsOn": "Zruší se {date}",
     "subscriptionStatusCanceled": "Zrušeno",
@@ -712,7 +724,15 @@
     "changePasswordAccessibilityHint": "Aktualizujte heslo svého účtu",
     "bookings": "Bookings",
     "bookingsSubtitle": "Take payment for pay-at-appointment bookings",
-    "bookingsAccessibilityHint": "Opens the bookings list"
+    "bookingsAccessibilityHint": "Opens the bookings list",
+    "posModeSectionTitle": "Režim pokladny",
+    "posModeTableService": "Obsluha u stolu",
+    "posModeTableServiceSubtitle": "Před každou objednávkou vyberte stůl. Objednávky se přiřazují ke stolům.",
+    "posModeTableServiceDisabledSubtitle": "Pro tuto pobočku nejsou nastaveny žádné půdorysy. Přidejte jej v prodejním portálu pro aktivaci.",
+    "posModeQuickService": "Rychlý výdej",
+    "posModeQuickServiceSubtitle": "Režim pultu / rychlého občerstvení / food trucku. Objednávky jdou rovnou k pokladně, bez stolu.",
+    "posModeTableServiceAccessibilityLabel": "Režim obsluhy u stolu",
+    "posModeQuickServiceAccessibilityLabel": "Režim rychlého výdeje"
   },
   "changePassword": {
     "title": "Změnit heslo",
@@ -847,7 +867,13 @@
     "receiptSentMessage": "Účtenka odeslána na {email}",
     "receiptErrorTitle": "Chyba",
     "receiptErrorMessage": "Odeslání účtenky selhalo",
-    "goBackAccessibilityLabel": "Zpět"
+    "goBackAccessibilityLabel": "Zpět",
+    "searchPlaceholder": "Hledat e-mail, jméno nebo částku",
+    "searchAccessibilityLabel": "Hledat transakce",
+    "clearSearchAccessibilityLabel": "Vymazat vyhledávání",
+    "noResultsTitle": "Žádné odpovídající transakce",
+    "noResultsSubtitle": "Zkuste jiné vyhledávání nebo filtr.",
+    "refundedOfTotal": "Vráceno {refunded} z {total}"
   },
   "tapToPay": {
     "settingsHeaderTitle": "Nastavení plateb",
@@ -984,7 +1010,13 @@
     "readerConnecting": "Připojování...",
     "readerConnectingAccessibilityLabel": "Připojování ke čtečce",
     "readerConnectToAccessibilityLabel": "Připojit se k {name}",
-    "readerTapToConnect": "Klepněte pro připojení"
+    "readerTapToConnect": "Klepněte pro připojení",
+    "readerDeleteConfirmTitle": "Odebrat čtečku?",
+    "readerDeleteConfirmMessage": "Čtečka „{name}“ bude odebrána z vašeho účtu Stripe. Později ji můžete znovu zaregistrovat.",
+    "readerDeleteConfirmButton": "Odebrat",
+    "educationSkipConfirmTitle": "Nastavit později?",
+    "educationSkipConfirmMessage": "Tap to Pay můžete kdykoli nastavit v Nastavení → Tap to Pay.",
+    "educationSkipConfirmConfirm": "Nastavit později"
   },
   "upgrade": {
     "goBackAccessibilityLabel": "Zpět",
@@ -1070,7 +1102,21 @@
     "noScansYetText": "Zatím žádná skenování",
     "ticketVerifiedMessage": "Vstupenka ověřena",
     "unknownTier": "Neznámý",
-    "failedToVerifyTicketMessage": "Ověření vstupenky selhalo"
+    "failedToVerifyTicketMessage": "Ověření vstupenky selhalo",
+    "washAlreadyUsedTitle": "Již naskenováno",
+    "washWrongEventTitle": "Nesprávná akce",
+    "washEventCancelledTitle": "Akce zrušena",
+    "washNetworkErrorTitle": "Nelze ověřit",
+    "washNetworkErrorMessage": "Zkontrolujte připojení a naskenujte vstupenku znovu",
+    "torchOnAccessibilityLabel": "Zapnout svítilnu",
+    "torchOffAccessibilityLabel": "Vypnout svítilnu",
+    "manualEntryAccessibilityLabel": "Zadat kód vstupenky ručně",
+    "manualEntryTitle": "Zadejte kód vstupenky",
+    "manualEntrySubtitle": "Zadejte kód uvedený pod QR kódem vstupenky",
+    "manualEntryPlaceholder": "Kód vstupenky",
+    "manualEntrySubmit": "Ověřit",
+    "feedbackMuteAccessibilityLabel": "Ztlumit odezvu skenování",
+    "feedbackUnmuteAccessibilityLabel": "Zapnout odezvu skenování"
   },
   "preorders": {
     "tabNew": "Nové",
@@ -1197,7 +1243,7 @@
     "loading": "Načítání",
     "loadingTables": "Načítání stolů",
     "noFloorPlansTitle": "Žádné plány nejsou nakonfigurovány",
-    "noFloorPlansSubtitle": "Nastavte plány v portálu prodejce",
+    "noFloorPlansSubtitle": "Vytvořte si plán sálu v portálu Rowie na portal.rowie.eu → Stoly",
     "noTablesOnFloorPlan": "V tomto plánu nejsou žádné stoly",
     "noMenuTitle": "Žádné menu vybráno",
     "noMenuMessage": "Před zahájením relace vyberte menu.",
@@ -1218,8 +1264,31 @@
     "statusCleaning": "úklid",
     "tableAccessibilityLabel": "{label}, {status}",
     "tableAccessibilityLabelWithSession": "{label}, {status}, {count} položek",
+    "tableAccessibilityLabelWithSessionOne": "{label}, {status}, 1 položka",
     "filterAccessibilityLabel": "{name}",
-    "seatSingular": "{count} místo"
+    "seatSingular": "{count} místo",
+    "tableStatus_empty": "Volný",
+    "tableStatus_active": "Obsazený",
+    "tableStatus_aging": "Čeká",
+    "tableStatus_urgent": "Naléhavé",
+    "tableStatus_check_requested": "Účet vyžádán",
+    "tableStatus_merged": "Sloučený",
+    "tableStatus_unavailable": "Nedostupný",
+    "mergeInto": "Sloučit s {label}",
+    "mergeAction": "Sloučit s jiným stolem",
+    "unmergeCountAction": "Rozdělit ({count})",
+    "unmergeLabelAction": "Rozdělit {label}",
+    "unmergeTitle": "Který stůl rozdělit?",
+    "tableSheetTitle": "Stůl {label}",
+    "mergeBannerText": "Klepnutím na volný stůl jej sloučíte.",
+    "cancelMergeLabel": "Zrušit sloučení",
+    "mergeFailedTitle": "Sloučení se nezdařilo",
+    "mergeFailedMessage": "Tento stůl se nepodařilo sloučit.",
+    "unmergeFailedTitle": "Rozdělení se nezdařilo",
+    "unmergeFailedMessage": "Tento stůl se nepodařilo rozdělit.",
+    "longPressHint": "Tip: podržte stůl pro další možnosti",
+    "dismissHintLabel": "Skrýt tip",
+    "noTablesSubtitle": "Přidejte stoly do tohoto plánu v portálu Rowie na portal.rowie.eu → Stoly"
   },
   "sessionDetail": {
     "addItems": "Přidat položky",
@@ -1313,7 +1382,45 @@
     "tipPercentAccessibility": "Spropitné {pct}%",
     "tipPercentLabel": "{pct}%",
     "totalLabel": "Celkem",
-    "totalToCharge": "Celkem k stržení"
+    "totalToCharge": "Celkem k stržení",
+    "closeLabel": "Zavřít",
+    "saveButton": "Uložit",
+    "editQuantityAction": "Upravit množství",
+    "editNotesAction": "Upravit poznámky",
+    "removeAction": "Odebrat",
+    "itemSheetMessage": "Upravte položku před uzavřením účtu.",
+    "removeConfirmTitle": "Odebrat položku?",
+    "removeConfirmMessage": "Odebrat {quantity}× {name} z této relace?",
+    "invalidQtyTitle": "Neplatné množství",
+    "invalidQtyMessage": "Množství musí být alespoň 1. K odstranění položky použijte Odebrat.",
+    "updateFailedTitle": "Aktualizace se nezdařila",
+    "updateFailedMessage": "Položku se nepodařilo aktualizovat.",
+    "statusUpdateFailedMessage": "Stav položky se nepodařilo aktualizovat.",
+    "removeFailedTitle": "Odebrání se nezdařilo",
+    "removeFailedMessage": "Položku se nepodařilo odebrat.",
+    "itemActionsLabel": "Akce pro {name}",
+    "qtyPlaceholder": "Množ.",
+    "quantityLabel": "Množství",
+    "notesPlaceholder": "Poznámky k položce (např. bez cibule)",
+    "itemNotesLabel": "Poznámky k položce",
+    "roundItemsSingular": "{count} položka",
+    "roundItemsPlural": "{count} položek",
+    "roundCollapseLabel": "Sbalit kolo {number}",
+    "roundExpandLabel": "Rozbalit kolo {number}",
+    "statusPendingSnackbar": "Označuji kolo {number} jako {status}…",
+    "exactAmount": "Přesně",
+    "exactAmountAccessibility": "Přesná částka {amount}",
+    "quickTenderLabel": "Rychlé částky",
+    "mergeAction": "Sloučit s jiným stolem",
+    "unmergeLabelAction": "Rozdělit {label}",
+    "unmergeUnknownAction": "Rozdělit stůl",
+    "unmergeFailedTitle": "Rozdělení se nezdařilo",
+    "unmergeFailedMessage": "Tento stůl se nepodařilo rozdělit.",
+    "tableActionsLabel": "Akce stolu",
+    "nothingToChargeTitle": "Není co účtovat",
+    "nothingToChargeMessage": "Tato relace má nulový součet.",
+    "couldNotStartPaymentTitle": "Platbu se nepodařilo zahájit",
+    "couldNotStartPaymentMessage": "Platební záměr se nepodařilo vytvořit."
   },
   "addItemsToSession": {
     "headerTitle": "Přidat položky",
@@ -1586,7 +1693,10 @@
       "chargeAmount": "Účtovat {amount}",
       "invalidAmountTitle": "Neplatná částka",
       "minimumCharge": "Minimální účtovaná částka je {amount}",
-      "quickChargeDescription": "Rychlé zúčtování – {amount}"
+      "quickChargeDescription": "Rychlé zúčtování – {amount}",
+      "deleteKey": "Smazat poslední číslici",
+      "clearAmount": "Vymazat částku",
+      "closeAccessibilityLabel": "Zavřít rychlé zúčtování"
     },
     "floatingTabBar": {
       "menuLabel": "Menu",
@@ -1594,7 +1704,12 @@
       "ordersLabel": "Objednávky",
       "historyLabel": "Historie",
       "eventsLabel": "Akce",
-      "accountLabel": "Účet"
+      "accountLabel": "Účet",
+      "chargeLabel": "Účtovat",
+      "chargeOfflineLabel": "Offline",
+      "chargeAccessibilityLabel": "Rychlé zúčtování",
+      "chargeAccessibilityHint": "Otevře klávesnici rychlého zúčtování",
+      "chargeOfflineHint": "nedostupné offline"
     },
     "screenHeader": {
       "goBack": "Zpět"
@@ -1640,6 +1755,29 @@
     "alreadyPaidTitle": "Already paid",
     "alreadyPaidMessage": "This booking has already been paid.",
     "paymentErrorTitle": "Couldn't start payment",
-    "paymentErrorMessage": "We couldn't start the payment. Please try again."
+    "paymentErrorMessage": "We couldn't start the payment. Please try again.",
+    "next30DaysLabel": "Příštích 30 dní",
+    "emptyDayTitle": "Žádné rezervace v tento den",
+    "emptyDaySubtitle": "Vyberte jiný den nebo zobrazte příštích 30 dní.",
+    "emptySearchTitle": "Žádné odpovídající rezervace",
+    "emptySearchSubtitle": "Zkuste jiné jméno nebo vymažte vyhledávání.",
+    "statusPending": "Čeká na potvrzení",
+    "statusConfirmed": "Potvrzeno",
+    "statusCompleted": "Dokončeno",
+    "statusCancelled": "Zrušeno",
+    "statusNoShow": "Nedostavil se",
+    "statusPartiallyRefunded": "Částečně vráceno",
+    "actionsTitle": "Akce rezervace",
+    "confirmAction": "Potvrdit rezervaci",
+    "completeAction": "Označit jako dokončené",
+    "noShowAction": "Označit jako nedostavení",
+    "cancelAction": "Zrušit rezervaci",
+    "cancelConfirmTitle": "Zrušit rezervaci?",
+    "cancelConfirmMessage": "Tímto zrušíte rezervaci zákazníka {name}. Tuto akci nelze vrátit zpět.",
+    "cancelConfirmMessagePaid": "Tímto zrušíte rezervaci zákazníka {name} a online platba bude automaticky vrácena. Tuto akci nelze vrátit zpět.",
+    "cancelConfirmButton": "Zrušit rezervaci",
+    "keepBookingButton": "Ponechat rezervaci",
+    "statusUpdateErrorTitle": "Rezervaci se nepodařilo aktualizovat",
+    "statusUpdateErrorMessage": "Zkuste to prosím znovu."
   }
 }

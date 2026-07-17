@@ -16,8 +16,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import { useTranslations } from '../lib/i18n';
 import { authService } from '../lib/api/auth';
+import {
+  isBiometricLoginEnabled,
+  hasStoredCredentials,
+  storeCredentials,
+} from '../lib/biometricAuth';
 import { fonts } from '../lib/fonts';
 import logger from '../lib/logger';
 
@@ -28,6 +34,7 @@ interface ChangePasswordModalProps {
 
 export function ChangePasswordModal({ visible, onClose }: ChangePasswordModalProps) {
   const { colors, isDark } = useTheme();
+  const { user } = useAuth();
   const t = useTranslations('changePassword');
   const tc = useTranslations('common');
   const insets = useSafeAreaInsets();
@@ -78,6 +85,16 @@ export function ChangePasswordModal({ visible, onClose }: ChangePasswordModalPro
     setIsSubmitting(true);
     try {
       await authService.changePassword(currentPassword, newPassword);
+
+      // Biometric login replays the stored email+password, so refresh the
+      // stored credentials or Face ID would keep replaying the OLD password.
+      try {
+        if (user?.email && (await isBiometricLoginEnabled()) && (await hasStoredCredentials())) {
+          await storeCredentials(user.email, newPassword);
+        }
+      } catch (credErr) {
+        logger.error('[ChangePasswordModal] Failed to refresh biometric credentials:', credErr);
+      }
 
       // On success, all sessions are kicked server-side. Show success and close.
       // The session-kick flow will trigger sign-out via SocketContext / API 401.

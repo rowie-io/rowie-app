@@ -8,6 +8,17 @@ React Native POS for mobile bars, food trucks, restaurants, events. Contactless 
 
 ---
 
+
+## ⚠️ SECURITY — vendored phone input, never reinstall upstream
+
+`react-native-international-phone-number` and `react-native-country-select`
+were **vendored into `src/vendor/`** (2026-07-10, from the last clean releases
+0.11.6 / 0.3.8) after the upstream maintainer's npm account shipped compromised
+versions (`0.11.1000`, `0.12.x` pull the malicious `@agnoliaarisian7180/string-argv`).
+
+- **Never** add either package back to package.json — the code lives in `src/vendor/` and is ours to maintain.
+- `libphonenumber-js` remains a real npm dependency (trusted, actively maintained).
+- Native imports: `src/vendor/phone-input`; web builds shim it via resolved-path check in `metro.config.js`.
 ## Apple Tap to Pay Compliance (CRITICAL)
 
 Must comply with Apple TTPOi v1.5 (March 2025). See root CLAUDE.md for the summary; full details below.
@@ -594,7 +605,7 @@ SocketEvents = {
 `GET /floor-plans` · `/floor-plans/{id}`
 
 ### Events (EventsScanner)
-`GET /events/{id}` · `POST /tickets/{id}/scan`
+`GET /events` · `POST /events/scan` · `GET /events/{eventId}/scans`
 
 ### Transactions / Connect / Billing / Org
 `GET /stripe/connect/transactions`, `/stripe/connect/status`, `/billing`, `/organizations`, `/locations`
@@ -649,8 +660,8 @@ npm run submit:ios     # Submit to App Store
 ```bash
 EXPO_PUBLIC_APP_ENV=local          # local | dev | prod
 EXPO_PUBLIC_API_URL=http://localhost:4334
-EXPO_PUBLIC_WEBSITE_URL=https://rowie.io
-EXPO_PUBLIC_VENDOR_DASHBOARD_URL=https://portal.rowie.io
+EXPO_PUBLIC_WEBSITE_URL=https://rowie.eu
+EXPO_PUBLIC_VENDOR_DASHBOARD_URL=https://portal.rowie.eu
 EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_xxx
 ```
 

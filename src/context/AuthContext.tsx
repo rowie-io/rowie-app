@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Alert, Image } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { authService, User, Organization, Subscription, stripeConnectApi, ConnectStatus } from '../lib/api';
+import { authService, User, Organization, Subscription, AccessibleLocation, stripeConnectApi, ConnectStatus } from '../lib/api';
 import { setOnSessionKicked, apiClient } from '../lib/api/client';
 import { setOnSocketSessionKicked } from '../lib/session-callbacks';
 import {
@@ -14,13 +14,6 @@ import logger from '../lib/logger';
 
 /** When set, LoginScreen should skip the auto biometric prompt on mount. */
 export const SKIP_BIOMETRIC_KEY = 'rowie_skip_biometric_on_mount';
-
-interface AccessibleLocation {
-  id: string;
-  name: string;
-  isDefault?: boolean;
-  [key: string]: any;
-}
 
 interface AuthState {
   user: User | null;
@@ -150,6 +143,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user,
           organization,
           subscription,
+          // Hydrate locations from the cached /auth/me blob so staff aren't
+          // location-less until the network refresh completes.
+          accessibleLocations: user.accessibleLocations || [],
           currentLocationId: storedLocationId,
           isLoading: false,
           isAuthenticated: true,
@@ -188,7 +184,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await authService.saveOrganization(profile.organization);
 
         // Update state with fresh data
-        const profileLocations: AccessibleLocation[] = (profile as any).accessibleLocations || [];
+        // /auth/me returns accessibleLocations at the top level of the user
+        // payload, so it lives on profile.user (not on the {user, organization}
+        // wrapper that getProfile assembles).
+        const profileLocations: AccessibleLocation[] = profile.user.accessibleLocations || [];
         const effectiveLocations = profileLocations.length > 0 ? profileLocations : null;
 
         // If the stored currentLocationId no longer matches an accessible
@@ -276,7 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // X-Location-Id on every request. Single-location users auto-select; multi-
     // location users keep whatever's already stored (LocationPickerScreen will
     // prompt them to pick if the stored id is missing or stale).
-    const accessibleLocations: any[] = (response as any).accessibleLocations || [];
+    const accessibleLocations: AccessibleLocation[] = response.accessibleLocations || [];
     let nextLocationId: string | null = null;
     if (accessibleLocations.length === 1) {
       const id: string = accessibleLocations[0].id;
@@ -284,11 +283,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await AsyncStorage.setItem('currentLocationId', id);
     } else if (accessibleLocations.length > 1) {
       const existing = await AsyncStorage.getItem('currentLocationId');
-      const stillValid = existing && accessibleLocations.some((l: any) => l.id === existing);
+      const stillValid = existing && accessibleLocations.some((l) => l.id === existing);
       if (stillValid && existing) {
         nextLocationId = existing;
       } else {
-        const def = accessibleLocations.find((l: any) => l.isDefault) || accessibleLocations[0];
+        const def = accessibleLocations.find((l) => l.isDefault) || accessibleLocations[0];
         const id: string = def.id;
         nextLocationId = id;
         await AsyncStorage.setItem('currentLocationId', id);
